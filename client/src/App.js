@@ -11,7 +11,9 @@ import LoginForm from './LoginForm';
 import SignUpForm from './SignUpForm';
 import ForgotPassword from './ForgetPassword';
 import ResetPassword from './ResetPassword';
-import './App.css';
+import { Box, CssBaseline } from '@mui/material';
+
+const drawerWidth = 240;
 
 function App() {
   const [user, setUser] = useState(null);
@@ -32,32 +34,40 @@ function App() {
 
   return (
     <Router>
-      <div className="app-container">
-        <Header user={user} />
-        <div className="content-wrapper">
-          {user && <Sidebar />}
-          <main className="main-content">
-            <Routes>
-              {user ? (
-                <>
-                  <Route path="/" element={<UserWorkspace user={user} />} />
-                  <Route path="/settings/profile" element={<SettingsProfile user={user} />} />
-                  <Route path="/settings/users" element={<SettingsUsers />} />
-                  <Route path="*" element={<Navigate to="/" />} />
-                </>
-              ) : (
-                <>
-                  <Route path="/login" element={<LoginForm />} />
-                  <Route path="/signup" element={<SignUpForm />} />
-                  <Route path="/forgot-password" element={<ForgotPassword />} />
-                  <Route path="/reset-password" element={<ResetPassword />} />
-                  <Route path="*" element={<Navigate to="/login" />} />
-                </>
-              )}
-            </Routes>
-          </main>
-        </div>
-      </div>
+      <Box sx={{ display: 'flex' }}>
+        <CssBaseline />
+        {user && <Sidebar />}
+        <Box
+          component="main"
+          sx={{
+            flexGrow: 1,
+            p: 3,
+            ml: `${drawerWidth}px`,  // Ensure content is pushed to the right by the sidebar width
+            mt: '64px',  // Ensure content starts below the header (assuming header height is 64px)
+            width: `calc(100% - ${drawerWidth}px)`,  // Adjust the content width to account for the sidebar
+          }}
+        >
+          <Header user={user} />
+          <Routes>
+            {user ? (
+              <>
+                <Route path="/" element={<UserWorkspace user={user} />} />
+                <Route path="/settings/profile" element={<SettingsProfile user={user} />} />
+                <Route path="/settings/users" element={<SettingsUsers />} />
+                <Route path="*" element={<Navigate to="/" />} />
+              </>
+            ) : (
+              <>
+                <Route path="/login" element={<LoginForm />} />
+                <Route path="/signup" element={<SignUpForm />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="*" element={<Navigate to="/login" />} />
+              </>
+            )}
+          </Routes>
+        </Box>
+      </Box>
     </Router>
   );
 }
