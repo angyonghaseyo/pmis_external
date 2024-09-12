@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebaseConfig';
 import Header from './Header';
-import Sidebar from './components/Sidebar';
+import Sidebar from './Sidebar';
 import UserWorkspace from './components/UserWorkspace';
 import SettingsProfile from './components/SettingsProfile';
 import SettingsUsers from './components/SettingsUsers';
@@ -32,29 +32,31 @@ function App() {
 
   return (
     <Router>
-      <div className="App">
-        <Header />
-        {user ? (
-          <div className="flex h-screen bg-gray-100">
-            <Sidebar />
-            <main className="flex-1 overflow-y-auto">
-              <Routes>
-                <Route path="/" element={<UserWorkspace user={user} />} />
-                <Route path="/settings/profile" element={<SettingsProfile user={user} />} />
-                <Route path="/settings/users" element={<SettingsUsers />} />
-                <Route path="*" element={<Navigate to="/" />} />
-              </Routes>
-            </main>
-          </div>
-        ) : (
-          <Routes>
-            <Route path="/login" element={<LoginForm />} />
-            <Route path="/signup" element={<SignUpForm />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="*" element={<Navigate to="/login" />} />
-          </Routes>
-        )}
+      <div className="app-container">
+        <Header user={user} />
+        <div className="content-wrapper">
+          {user && <Sidebar />}
+          <main className="main-content">
+            <Routes>
+              {user ? (
+                <>
+                  <Route path="/" element={<UserWorkspace user={user} />} />
+                  <Route path="/settings/profile" element={<SettingsProfile user={user} />} />
+                  <Route path="/settings/users" element={<SettingsUsers />} />
+                  <Route path="*" element={<Navigate to="/" />} />
+                </>
+              ) : (
+                <>
+                  <Route path="/login" element={<LoginForm />} />
+                  <Route path="/signup" element={<SignUpForm />} />
+                  <Route path="/forgot-password" element={<ForgotPassword />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="*" element={<Navigate to="/login" />} />
+                </>
+              )}
+            </Routes>
+          </main>
+        </div>
       </div>
     </Router>
   );
