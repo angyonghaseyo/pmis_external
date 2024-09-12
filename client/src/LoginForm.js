@@ -44,7 +44,7 @@ function LoginForm() {
 
     return (
         <div className="auth-form">
-            <h2>🚢 Oceania PMIS</h2>
+            <h2>🚢 🚨Oceania PMIS</h2>
             <p>Sign in to your account</p>
             {error && <p className="error-message">{error}</p>}
             <form onSubmit={handleSubmit}>
