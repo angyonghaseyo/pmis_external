@@ -1,0 +1,105 @@
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    background-color: #ffffff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.logo {
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.logo a {
+    text-decoration: none;
+    color: #25316D;
+    display: flex;
+    align-items: center;
+}
+
+.logo a:hover {
+    color: #1e2755;
+}
+
+nav {
+    display: flex;
+    align-items: center;
+}
+
+.nav-button {
+    background-color: #25316D;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: bold;
+    margin-right: 10px;
+    transition: background-color 0.3s ease;
+}
+
+.nav-button:hover {
+    background-color: #1e2755;
+}
+
+.language-select {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: white;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.language-select:focus {
+    outline: none;
+    border-color: #25316D;
+}
+
+.user-menu {
+    display: flex;
+    align-items: center;
+}
+
+.notification-icon {
+    margin-right: 15px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    color: #25316D;
+}
+
+.user-profile {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.user-name {
+    font-weight: bold;
+    color: #333;
+}
+
+@media (max-width: 768px) {
+    .app-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    nav {
+        margin-top: 10px;
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .nav-button {
+        margin-right: 0;
+    }
+}
