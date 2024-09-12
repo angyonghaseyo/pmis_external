@@ -11,6 +11,7 @@ import LoginForm from './LoginForm';
 import SignUpForm from './SignUpForm';
 import ForgotPassword from './ForgetPassword';
 import ResetPassword from './ResetPassword';
+import EditProfile from './EditProfile';
 import { Box, CssBaseline } from '@mui/material';
 
 const drawerWidth = 240;
@@ -40,11 +41,11 @@ function App() {
         <Box
           component="main"
           sx={{
-            flexGrow: 1,
-            p: 3,
-            ml: `${drawerWidth}px`,  
-            mt: '64px', 
-            width: `calc(100% - ${drawerWidth}px)`,  
+            flexGrow: 1, // Allow the main content to grow
+            padding: '1rem', // Optional padding, reduce if needed
+            width: '100%', // Make sure the width fills the rest of the available space
+            maxWidth: `calc(100% - ${drawerWidth}px)`, // Ensure that the main content occupies the space after the sidebar
+            mt: '80px',  // Adjust this if you want more or less space from the header
           }}
         >
           <Header user={user} />
@@ -52,7 +53,7 @@ function App() {
             {user ? (
               <>
                 <Route path="/" element={<UserWorkspace user={user} />} />
-                <Route path="/settings/profile" element={<SettingsProfile user={user} />} />
+                <Route path="/settings/profile" element={<EditProfile user={user} />} />
                 <Route path="/settings/users" element={<SettingsUsers />} />
                 <Route path="*" element={<Navigate to="/" />} />
               </>

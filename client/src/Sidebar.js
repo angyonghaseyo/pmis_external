@@ -5,8 +5,8 @@ import { List, ListItem, ListItemIcon, ListItemText, Collapse, Drawer } from '@m
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 
-const drawerWidth = 240;  
-const headerHeight = 64;  
+const drawerWidth = 240;
+const headerHeight = 64;
 
 const Sidebar = () => {
   const [expandedItems, setExpandedItems] = useState({});
@@ -34,11 +34,11 @@ const Sidebar = () => {
       anchor="left"
       sx={{
         width: drawerWidth,
-        flexShrink: 0,
+        flexShrink: 0, // Prevent shrinking
         '& .MuiDrawer-paper': {
-          width: drawerWidth,
+          width: drawerWidth, // Keep the sidebar at 240px
           boxSizing: 'border-box',
-          mt: `${headerHeight}px`,  
+          mt: `${headerHeight}px`, // Header offset
         },
       }}
     >
