@@ -60,9 +60,6 @@ export const sendPasswordResetEmailToUser = (email) =>
 export const confirmUserPasswordReset = (oobCode, newPassword) =>
   confirmPasswordReset(auth, oobCode, newPassword).catch(handleApiError);
 
-// Resources
-export const getResources = () => authAxios.get('/resources').catch(handleApiError);
-
 // User Account Management
 export const getUsers = () => authAxios.get('/users').catch(handleApiError);
 
@@ -141,7 +138,6 @@ const api = {
   updateUserPassword,
   sendPasswordResetEmailToUser,
   confirmUserPasswordReset,
-  getResources,
   getUsers,
   createUser,
   updateUser,

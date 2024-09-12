@@ -3,8 +3,10 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebaseConfig';
 import Header from './Header';
+import Sidebar from './components/Sidebar';
 import UserWorkspace from './components/UserWorkspace';
-import UserAccountManagement from './components/UserAccountManagement';
+import SettingsProfile from './components/SettingsProfile';
+import SettingsUsers from './components/SettingsUsers';
 import LoginForm from './LoginForm';
 import SignUpForm from './SignUpForm';
 import ForgotPassword from './ForgetPassword';
@@ -31,28 +33,28 @@ function App() {
   return (
     <Router>
       <div className="App">
-        <Header user={user} />
-        <main className="main-content">
+        <Header />
+        {user ? (
+          <div className="flex h-screen bg-gray-100">
+            <Sidebar />
+            <main className="flex-1 overflow-y-auto">
+              <Routes>
+                <Route path="/" element={<UserWorkspace user={user} />} />
+                <Route path="/settings/profile" element={<SettingsProfile user={user} />} />
+                <Route path="/settings/users" element={<SettingsUsers />} />
+                <Route path="*" element={<Navigate to="/" />} />
+              </Routes>
+            </main>
+          </div>
+        ) : (
           <Routes>
-            <Route path="/login" element={!user ? <LoginForm /> : <Navigate to="/" />} />
-            <Route path="/signup" element={!user ? <SignUpForm /> : <Navigate to="/" />} />
+            <Route path="/login" element={<LoginForm />} />
+            <Route path="/signup" element={<SignUpForm />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
-            <Route
-              path="/"
-              element={
-                user ? (
-                  <>
-                    <UserWorkspace user={user} />
-                    <UserAccountManagement />
-                  </>
-                ) : (
-                  <Navigate to="/login" />
-                )
-              }
-            />
+            <Route path="*" element={<Navigate to="/login" />} />
           </Routes>
-        </main>
+        )}
       </div>
     </Router>
   );
