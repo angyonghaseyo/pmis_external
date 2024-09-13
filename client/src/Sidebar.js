@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Home, Briefcase, Users, Anchor, Clock, Package, DollarSign, FileText, Settings } from 'lucide-react';
 import { List, ListItem, ListItemIcon, ListItemText, Collapse, Drawer } from '@mui/material';
 import ExpandLess from '@mui/icons-material/ExpandLess';
@@ -15,17 +15,39 @@ const Sidebar = () => {
   const navItems = [
     { name: "Dashboard", icon: <Home />, path: "/", children: [] },
     { name: "Assets and Facilities", icon: <Briefcase />, path: "/assets", children: [] },
-    { name: "Manpower", icon: <Users />, path: "/manpower", children: ['Subitem 1', 'Subitem 2'] },
+    { 
+      name: "Manpower", 
+      icon: <Users />, 
+      path: "/manpower", 
+      children: ['Inquiries and Feedback'] 
+    },
     { name: "Vessel Visits", icon: <Anchor />, path: "/vessels", children: ['Subitem 1', 'Subitem 2'] },
     { name: "Port Operations and Resources", icon: <Clock />, path: "/operations", children: ['Subitem 1', 'Subitem 2'] },
     { name: "Cargos", icon: <Package />, path: "/cargos", children: ['Subitem 1', 'Subitem 2'] },
     { name: "Financial", icon: <DollarSign />, path: "/financial", children: ['Subitem 1', 'Subitem 2'] },
     { name: "Customs and Trade Documents", icon: <FileText />, path: "/documents", children: ['Subitem 1', 'Subitem 2'] },
-    { name: "Settings", icon: <Settings />, path: "/settings", children: ['Profile', 'Users'] }
+    { 
+      name: "Settings", 
+      icon: <Settings />, 
+      path: "/settings", 
+      children: ['Profile', 'Users'] 
+    }
   ];
 
   const toggleExpand = (index) => {
     setExpandedItems(prev => ({ ...prev, [index]: !prev[index] }));
+  };
+
+  // Click handler for items without children
+  const handleMainItemClick = (path) => {
+    navigate(path);
+  };
+
+  // Click handler for sub-items (Profile, Users, Inquiries, etc.)
+  const handleSubItemClick = (parentPath, subItem) => {
+    const formattedSubItem = subItem.toLowerCase().replace(/\s/g, '-');  
+    const subItemPath = `${parentPath}/${formattedSubItem}`;
+    navigate(subItemPath);
   };
 
   return (
@@ -45,7 +67,7 @@ const Sidebar = () => {
       <List>
         {navItems.map((item, index) => (
           <div key={index}>
-            <ListItem button onClick={() => item.children.length > 0 ? toggleExpand(index) : navigate(item.path)}>
+            <ListItem button onClick={() => item.children.length > 0 ? toggleExpand(index) : handleMainItemClick(item.path)}>
               <ListItemIcon>{item.icon}</ListItemIcon>
               <ListItemText primary={item.name} />
               {item.children.length > 0 && (expandedItems[index] ? <ExpandLess /> : <ExpandMore />)}
@@ -56,7 +78,7 @@ const Sidebar = () => {
                   button
                   key={subIndex}
                   sx={{ pl: 4 }}
-                  onClick={() => navigate(`${item.path}/${subitem.toLowerCase().replace(' ', '-')}`)}
+                  onClick={() => handleSubItemClick(item.path, subitem)}
                 >
                   <ListItemText primary={subitem} />
                 </ListItem>

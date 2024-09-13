@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Globe } from 'lucide-react';
-import { Grid, Card, CardContent, Typography, Box, Avatar, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material';
-import { getLeaveStatistics, getTimeLog, getServiceOperations } from '../services/api';
+import { Grid, Card, CardContent, Typography, Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, LinearProgress } from '@mui/material';
 
 const UserWorkspace = ({ user }) => {
   const [leaveStats, setLeaveStats] = useState([]);
@@ -9,22 +7,36 @@ const UserWorkspace = ({ user }) => {
   const [serviceOperations, setServiceOperations] = useState([]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const leaveStatsData = await getLeaveStatistics();
-        setLeaveStats(leaveStatsData || []);
+    // Simulate data fetching
+    const simulateData = () => {
+      // Mock data for leave statistics
+      const leaveStatsData = [
+        { title: 'Total leave allowance', value: 34, paid: 11, unpaid: 4 },
+        { title: 'Total leave taken', value: 20, paid: 10, unpaid: 10 },
+        { title: 'Total leave available', value: 87, paid: 50, unpaid: 37 },
+        { title: 'Leave request pending', value: 5, paid: 3, unpaid: 2 },
+      ];
 
-        const timeLogData = await getTimeLog();
-        setTimeLog(timeLogData || {});
+      // Mock data for time log
+      const timeLogData = {
+        today: { Scheduled: '08:00', Balance: '12:00', Worked: '05:00' },
+        month: { Total: 216, Shortage: 23, WorkedTime: 189, Overtime: 56 },
+      };
 
-        const serviceOpsData = await getServiceOperations();
-        setServiceOperations(serviceOpsData || []);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      }
+      // Mock data for service operations
+      const serviceOpsData = [
+        { title: 'Unload cargo', status: 'Ready', latestUpdate: 'Dec 7, 2023 23:26', description: 'Cargo unloading in progress.' },
+        { title: 'Load cargo', status: 'In Progress', latestUpdate: 'Dec 7, 2023 18:40', description: 'Cargo loading ongoing.' },
+        { title: 'Inspect containers', status: 'Completed', latestUpdate: 'Dec 6, 2023 15:22', description: 'Inspection completed.' },
+      ];
+
+      // Simulate setting data after fetching
+      setLeaveStats(leaveStatsData);
+      setTimeLog(timeLogData);
+      setServiceOperations(serviceOpsData);
     };
 
-    fetchData();
+    simulateData();
   }, []);
 
   return (
@@ -62,29 +74,60 @@ const UserWorkspace = ({ user }) => {
         <CardContent>
           <Typography variant="h6" gutterBottom>Time Log</Typography>
           <Grid container spacing={3}>
+            {/* Today Section */}
             <Grid item xs={12} md={6}>
-              <Card sx={{ bgcolor: 'grey.100', p: 2 }}>
-                <Typography variant="subtitle1" gutterBottom>Today</Typography>
-                {timeLog.today ? (
-                  Object.entries(timeLog.today).map(([key, value], index) => (
-                    <Typography key={index} variant="body2">{value || 'N/A'} {key}</Typography>
-                  ))
-                ) : (
-                  <Typography variant="body2">N/A</Typography>
-                )}
-              </Card>
+              <Box display="flex" justifyContent="space-around" alignItems="center" sx={{ bgcolor: 'grey.100', p: 2, borderRadius: 2 }}>
+                <Box textAlign="center">
+                  <Typography variant="h5">{timeLog.today?.Scheduled || 'N/A'}</Typography>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                    Scheduled
+                  </Typography>
+                </Box>
+                <Box textAlign="center">
+                  <Typography variant="h5">{timeLog.today?.Balance || 'N/A'}</Typography>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                    Balance
+                  </Typography>
+                </Box>
+                <Box textAlign="center">
+                  <Typography variant="h5">{timeLog.today?.Worked || 'N/A'}</Typography>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                    Worked
+                  </Typography>
+                </Box>
+              </Box>
             </Grid>
+
+            {/* This Month Section */}
             <Grid item xs={12} md={6}>
-              <Card sx={{ bgcolor: 'grey.100', p: 2 }}>
-                <Typography variant="subtitle1" gutterBottom>This Month</Typography>
-                {timeLog.month ? (
-                  Object.entries(timeLog.month).map(([key, value], index) => (
-                    <Typography key={index} variant="body2">{key}: {value || 'N/A'}</Typography>
-                  ))
-                ) : (
-                  <Typography variant="body2">N/A</Typography>
-                )}
-              </Card>
+              <Box sx={{ bgcolor: 'grey.100', p: 2, borderRadius: 2 }}>
+                <Typography variant="subtitle1" gutterBottom>
+                  This Month
+                </Typography>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                  <Typography variant="body2">Total</Typography>
+                  <Typography variant="body2">{timeLog.month?.Total || 'N/A'} hour</Typography>
+                </Box>
+                <LinearProgress variant="determinate" value={75} sx={{ mb: 1, height: 10 }} />
+
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                  <Typography variant="body2">Shortage time</Typography>
+                  <Typography variant="body2">{timeLog.month?.Shortage || 'N/A'} hour</Typography>
+                </Box>
+                <LinearProgress variant="determinate" value={30} sx={{ mb: 1, height: 10 }} />
+
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                  <Typography variant="body2">Worked time</Typography>
+                  <Typography variant="body2">{timeLog.month?.WorkedTime || 'N/A'} hour</Typography>
+                </Box>
+                <LinearProgress variant="determinate" value={85} sx={{ mb: 1, height: 10 }} />
+
+                <Box display="flex" justifyContent="space-between" alignItems="center">
+                  <Typography variant="body2">Overtime</Typography>
+                  <Typography variant="body2">{timeLog.month?.Overtime || 'N/A'} hour</Typography>
+                </Box>
+                <LinearProgress variant="determinate" value={40} sx={{ height: 10 }} />
+              </Box>
             </Grid>
           </Grid>
         </CardContent>

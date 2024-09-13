@@ -11,6 +11,7 @@ import SignUpForm from './SignUpForm';
 import ForgotPassword from './ForgetPassword';
 import ResetPassword from './ResetPassword';
 import EditProfile from './EditProfile';
+import InquiryFeedback from './InquiryFeedback'; // Import your InquiryFeedback component
 import { Box, CssBaseline } from '@mui/material';
 
 const drawerWidth = 240;
@@ -52,6 +53,7 @@ function App() {
             {user ? (
               <>
                 <Route path="/" element={<UserWorkspace user={user} />} />
+                <Route path="/manpower/inquiries-and-feedback" element={<InquiryFeedback />} />  {/* Add this route */}
                 <Route path="/settings/profile" element={<EditProfile user={user} />} />
                 <Route path="/settings/users" element={<SettingsUsers />} />
                 <Route path="*" element={<Navigate to="/" />} />
