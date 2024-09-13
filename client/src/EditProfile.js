@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { TextField, Button, Box, Typography, Select, MenuItem, InputLabel, FormControl, Grid, Chip, Avatar } from '@mui/material';
 import { getCurrentUser, updateUserProfile, sendPasswordResetEmailToUser, deleteUserAccount } from './services/api';
-import { auth, storage } from './firebaseConfig';
+import { auth, db, storage } from './firebaseConfig';
+import { updateProfile } from 'firebase/auth';
+import { doc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 function EditProfile() {
@@ -90,21 +92,32 @@ function EditProfile() {
         await uploadBytes(imageRef, blob);
         photoURL = await getDownloadURL(imageRef);
       }
-
+  
       const fullName = `${profile.salutation} ${profile.firstName} ${profile.lastName}`.trim();
       const updatedProfile = {
         displayName: fullName,
-        email: profile.email,
+        photoURL: photoURL,
+      };
+  
+      // Update Firebase Auth user profile
+      await updateProfile(auth.currentUser, updatedProfile);
+  
+      // Update Firestore document
+      const userDocRef = doc(db, 'users', auth.currentUser.uid);
+      await updateDoc(userDocRef, {
+        salutation: profile.salutation,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        displayName: fullName,
         photoURL: photoURL,
         userType: profile.userType,
         teams: profile.teams,
-      };
-
-      await updateUserProfile(updatedProfile);
+      });
+  
       alert('Profile updated successfully');
     } catch (err) {
       console.error('Error updating profile:', err);
-      setError('Failed to update profile');
+      setError('Failed to update profile: ' + err.message);
     } finally {
       setLoading(false);
     }
