@@ -8,6 +8,8 @@ import {
   updateProfile,
   deleteUser as firebaseDeleteUser
 } from '../firebaseConfig';
+import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { db } from '../firebaseConfig';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
@@ -33,23 +35,31 @@ const handleApiError = (error) => {
 export const loginUser = (email, password) =>
   signInWithEmailAndPassword(auth, email, password).catch(handleApiError);
 
-export const registerUser = (email, password, userData) =>
-  createUserWithEmailAndPassword(auth, email, password)
-    .then(async (userCredential) => {
-      await authAxios.post('/users', { ...userData, uid: userCredential.user.uid });
-      return userCredential;
-    })
-    .catch(handleApiError);
+export const registerUser = async (email, password, userData) => {
+  try {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+    await setDoc(doc(db, 'users', user.uid), { ...userData, uid: user.uid });
+    return userCredential;
+  } catch (error) {
+    return handleApiError(error);
+  }
+};
 
 export const logoutUser = () => auth.signOut().catch(handleApiError);
 
 // User management
 export const getCurrentUser = () => auth.currentUser;
 
-export const updateUserProfile = (userData) =>
-  updateProfile(auth.currentUser, userData).then(() =>
-    authAxios.put(`/users/${auth.currentUser.uid}`, userData)
-  ).catch(handleApiError);
+export const updateUserProfile = async (userData) => {
+  try {
+    const user = auth.currentUser;
+    await updateProfile(user, userData);
+    await updateDoc(doc(db, 'users', user.uid), userData);
+  } catch (error) {
+    handleApiError(error);
+  }
+};
 
 export const updateUserPassword = (newPassword) =>
   auth.currentUser.updatePassword(newPassword).catch(handleApiError);
@@ -62,19 +72,64 @@ export const confirmUserPasswordReset = (oobCode, newPassword) =>
   confirmPasswordReset(auth, oobCode, newPassword).catch(handleApiError);
 
 // User Account Management
-export const getUsers = () => authAxios.get('/users').catch(handleApiError);
+export const getUsers = async () => {
+  try {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      throw new Error('No authenticated user');
+    }
 
-export const createUser = (userData) => authAxios.post('/users', userData).catch(handleApiError);
+    const userDocRef = doc(db, 'users', currentUser.uid);
+    const userDocSnap = await getDoc(userDocRef);
+    const currentUserData = userDocSnap.data();
 
-export const updateUser = (userId, userData) =>
-  authAxios.put(`/users/${userId}`, userData).catch(handleApiError);
+    if (!currentUserData || !currentUserData.company) {
+      throw new Error('User company information not found');
+    }
 
-export const deleteUser = (userId) => authAxios.delete(`/users/${userId}`).catch(handleApiError);
+    const usersQuery = query(
+      collection(db, 'users'),
+      where('company', '==', currentUserData.company)
+    );
+
+    const querySnapshot = await getDocs(usersQuery);
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    throw error;
+  }
+};
+
+export const createUser = async (userData) => {
+  try {
+    const docRef = await setDoc(doc(collection(db, 'users')), userData);
+    return docRef.id;
+  } catch (error) {
+    handleApiError(error);
+  }
+};
+
+export const updateUser = async (userId, userData) => {
+  try {
+    await updateDoc(doc(db, 'users', userId), userData);
+  } catch (error) {
+    handleApiError(error);
+  }
+};
+
+export const deleteUser = async (userId) => {
+  try {
+    await deleteDoc(doc(db, 'users', userId));
+  } catch (error) {
+    handleApiError(error);
+  }
+};
 
 export const deleteUserAccount = async () => {
   try {
-    await authAxios.delete(`/users/${auth.currentUser.uid}`);
-    await firebaseDeleteUser(auth.currentUser);
+    const user = auth.currentUser;
+    await deleteDoc(doc(db, 'users', user.uid));
+    await firebaseDeleteUser(user);
   } catch (error) {
     handleApiError(error);
   }

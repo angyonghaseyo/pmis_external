@@ -14,7 +14,7 @@ router.post('/users', async (req, res) => {
       name,
       email,
       role,
-      userType: 'external'
+      userType: 'admin'
     });
     res.status(201).json({ message: 'User created successfully', userId: userRecord.uid });
   } catch (error) {
@@ -26,7 +26,7 @@ router.post('/users', async (req, res) => {
 router.get('/users', async (req, res) => {
   try {
     const snapshot = await admin.firestore().collection('users')
-      .where('userType', '==', 'external')
+      .where('userType', '==', 'admin')
       .get();
     const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     res.json(users);
