@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, Globe } from 'lucide-react';
+import { Grid, Card, CardContent, Typography, Box, Avatar, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material';
 import { getLeaveStatistics, getTimeLog, getServiceOperations } from '../services/api';
 
 const UserWorkspace = ({ user }) => {
@@ -11,13 +12,13 @@ const UserWorkspace = ({ user }) => {
     const fetchData = async () => {
       try {
         const leaveStatsData = await getLeaveStatistics();
-        setLeaveStats(leaveStatsData);
+        setLeaveStats(leaveStatsData || []);
 
         const timeLogData = await getTimeLog();
-        setTimeLog(timeLogData);
+        setTimeLog(timeLogData || {});
 
         const serviceOpsData = await getServiceOperations();
-        setServiceOperations(serviceOpsData);
+        setServiceOperations(serviceOpsData || []);
       } catch (error) {
         console.error('Error fetching data:', error);
       }
@@ -27,85 +28,101 @@ const UserWorkspace = ({ user }) => {
   }, []);
 
   return (
-    <div>
+    <Box sx={{ p: 3 }}>
       {/* Header */}
-      <header className="bg-white shadow-sm p-4 flex justify-between items-center">
-        <h2 className="text-xl font-semibold">Dashboard</h2>
-        <div className="flex items-center space-x-4">
-          <Globe size={20} />
-          <span>EN</span>
-          <Bell size={20} />
-          <img src={user.photoURL || "/api/placeholder/40/40"} alt="User" className="w-8 h-8 rounded-full" />
-        </div>
-      </header>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h4" component="h2">Dashboard</Typography>
+      </Box>
 
-      {/* Dashboard content */}
-      <div className="p-6">
-        <h3 className="text-lg font-semibold mb-6">Good to see you, {user.displayName} 👋</h3>
+      {/* Welcome message */}
+      <Typography variant="h5" gutterBottom>Good to see you, {user.displayName} 👋</Typography>
 
-        {/* Leave statistics */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          {leaveStats.map((stat, index) => (
-            <div key={index} className="bg-white p-4 rounded-lg shadow">
-              <h4 className="text-sm font-medium text-gray-500 mb-2">{stat.title}</h4>
-              <p className="text-2xl font-bold text-indigo-600">{stat.value}</p>
-              <div className="text-sm mt-2">
-                <span className="text-green-500">Paid: {stat.paid}</span>
-                <span className="text-red-500 ml-2">Unpaid: {stat.unpaid}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+      {/* Leave statistics */}
+      <Grid container spacing={3} mb={3}>
+        {leaveStats.length > 0 ? leaveStats.map((stat, index) => (
+          <Grid item xs={12} sm={6} md={3} key={index}>
+            <Card>
+              <CardContent>
+                <Typography variant="subtitle2" color="textSecondary">{stat.title || 'N/A'}</Typography>
+                <Typography variant="h4" component="p" color="primary">{stat.value || 'N/A'}</Typography>
+                <Box display="flex" justifyContent="space-between" mt={1}>
+                  <Typography variant="body2" color="green">Paid: {stat.paid || 'N/A'}</Typography>
+                  <Typography variant="body2" color="red">Unpaid: {stat.unpaid || 'N/A'}</Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        )) : (
+          <Typography variant="body1">No leave statistics available.</Typography>
+        )}
+      </Grid>
 
-        {/* Time Log */}
-        <div className="bg-white p-6 rounded-lg shadow mb-6">
-          <h4 className="text-lg font-semibold mb-4">Time Log</h4>
-          <div className="flex justify-between">
-            <div>
-              <h5 className="font-medium mb-2">Today</h5>
-              {timeLog.today && Object.entries(timeLog.today).map(([key, value], index) => (
-                <p key={index} className="text-sm">
-                  <span className="font-medium">{value}</span> {key}
-                </p>
-              ))}
-            </div>
-            <div>
-              <h5 className="font-medium mb-2">This month</h5>
-              {timeLog.month && Object.entries(timeLog.month).map(([key, value], index) => (
-                <p key={index} className="text-sm">
-                  {key}: <span className="font-medium">{value}</span>
-                </p>
-              ))}
-            </div>
-          </div>
-        </div>
+      {/* Time Log */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>Time Log</Typography>
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <Card sx={{ bgcolor: 'grey.100', p: 2 }}>
+                <Typography variant="subtitle1" gutterBottom>Today</Typography>
+                {timeLog.today ? (
+                  Object.entries(timeLog.today).map(([key, value], index) => (
+                    <Typography key={index} variant="body2">{value || 'N/A'} {key}</Typography>
+                  ))
+                ) : (
+                  <Typography variant="body2">N/A</Typography>
+                )}
+              </Card>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Card sx={{ bgcolor: 'grey.100', p: 2 }}>
+                <Typography variant="subtitle1" gutterBottom>This Month</Typography>
+                {timeLog.month ? (
+                  Object.entries(timeLog.month).map(([key, value], index) => (
+                    <Typography key={index} variant="body2">{key}: {value || 'N/A'}</Typography>
+                  ))
+                ) : (
+                  <Typography variant="body2">N/A</Typography>
+                )}
+              </Card>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
 
-        {/* Latest Service Operations */}
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h4 className="text-lg font-semibold mb-4">Latest Service Operations</h4>
-          <table className="w-full">
-            <thead>
-              <tr className="text-left text-gray-500 border-b">
-                <th className="pb-2">Title</th>
-                <th className="pb-2">Status</th>
-                <th className="pb-2">Latest Update</th>
-                <th className="pb-2">Description</th>
-              </tr>
-            </thead>
-            <tbody>
-              {serviceOperations.map((operation, index) => (
-                <tr key={index} className="border-b last:border-b-0">
-                  <td className="py-3">{operation.title}</td>
-                  <td className="py-3">{operation.status}</td>
-                  <td className="py-3">{operation.latestUpdate}</td>
-                  <td className="py-3">{operation.description}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+      {/* Latest Service Operations */}
+      <Card>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>Latest Service Operations</Typography>
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Title</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Latest Update</TableCell>
+                  <TableCell>Description</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {serviceOperations.length > 0 ? serviceOperations.map((operation, index) => (
+                  <TableRow key={index}>
+                    <TableCell>{operation.title || 'N/A'}</TableCell>
+                    <TableCell>{operation.status || 'N/A'}</TableCell>
+                    <TableCell>{operation.latestUpdate || 'N/A'}</TableCell>
+                    <TableCell>{operation.description || 'N/A'}</TableCell>
+                  </TableRow>
+                )) : (
+                  <TableRow>
+                    <TableCell colSpan={4} align="center">No service operations available.</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </CardContent>
+      </Card>
+    </Box>
   );
 };
 

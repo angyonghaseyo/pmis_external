@@ -1,23 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { auth, signOut } from './firebaseConfig';
-import { Box, AppBar, Toolbar, IconButton, Menu, MenuItem, Typography, Avatar, Select, FormControl } from '@mui/material';
+import { Box, AppBar, Toolbar, IconButton, Menu, MenuItem, Typography, Avatar, Button, Select, FormControl } from '@mui/material';
 import { Notifications, Logout, Person, DirectionsBoat } from '@mui/icons-material';
 
-function Header() {
-  const [user, setUser] = useState(null);
+function Header({ user }) {
   const [anchorEl, setAnchorEl] = useState(null); // For user profile menu
   const [notificationAnchorEl, setNotificationAnchorEl] = useState(null); // For notifications
   const [language, setLanguage] = useState('EN');
   const navigate = useNavigate();
-
-  useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      setUser(user);
-    });
-
-    return () => unsubscribe();
-  }, []);
 
   const handleLogout = async () => {
     try {
@@ -54,16 +45,17 @@ function Header() {
         {/* Left Section - Boat Icon and Oceania PMIS */}
         <Box display="flex" alignItems="center">
           <DirectionsBoat sx={{ color: '#25316D', fontSize: 30, marginRight: 1 }} />
-          <Typography 
-            variant="h6" 
-            component={Link} 
-            to="/" 
-            sx={{ textDecoration: 'none', color: '#25316D', fontWeight: 'bold' }}>
+          <Typography
+            variant="h6"
+            component={Link}
+            to="/"
+            sx={{ textDecoration: 'none', color: '#25316D', fontWeight: 'bold' }}
+          >
             Oceania PMIS
           </Typography>
         </Box>
 
-        {/* Right Section - Language Select, Notifications, and User Profile */}
+        {/* Right Section - Language Select, Notifications, and User Profile/Login */}
         <Box display="flex" alignItems="center">
           <FormControl>
             <Select
@@ -79,46 +71,58 @@ function Header() {
             </Select>
           </FormControl>
 
-          {user && (
-            <IconButton onClick={handleNotificationClick} color="inherit" sx={{ marginRight: 2 }}>
-              <Notifications sx={{ color: '#25316D' }} />
-            </IconButton>
+          {user ? (
+            <>
+              <IconButton onClick={handleNotificationClick} color="inherit" sx={{ marginRight: 2 }}>
+                <Notifications sx={{ color: '#25316D' }} />
+              </IconButton>
+
+              {/* Notification Menu */}
+              <Menu
+                anchorEl={notificationAnchorEl}
+                open={Boolean(notificationAnchorEl)}
+                onClose={handleNotificationClose}
+                keepMounted
+              >
+                <MenuItem onClick={handleNotificationClose}>No new notifications</MenuItem>
+              </Menu>
+
+              {/* User Avatar and Profile Menu */}
+              <IconButton onClick={handleProfileMenuClick} color="inherit">
+                {user.photoURL ? (
+                  <Avatar src={user.photoURL} />
+                ) : (
+                  <Avatar>
+                    <Person />
+                  </Avatar>
+                )}
+              </IconButton>
+
+              <Menu
+                anchorEl={anchorEl}
+                open={Boolean(anchorEl)}
+                onClose={handleProfileMenuClose}
+                keepMounted
+              >
+                <MenuItem onClick={() => navigate('/settings/profile')}>
+                  <Person sx={{ marginRight: 1 }} /> Edit Profile
+                </MenuItem>
+                <MenuItem onClick={handleLogout}>
+                  <Logout sx={{ marginRight: 1 }} /> Logout
+                </MenuItem>
+              </Menu>
+            </>
+          ) : (
+            <Button
+              variant="contained"
+              color="primary"
+              component={Link}
+              to="/login"
+              sx={{ textTransform: 'none' }}
+            >
+              Login
+            </Button>
           )}
-
-          {/* Notification Menu */}
-          <Menu
-            anchorEl={notificationAnchorEl}
-            open={Boolean(notificationAnchorEl)}
-            onClose={handleNotificationClose}
-            keepMounted
-          >
-            <MenuItem onClick={handleNotificationClose}>No new notifications</MenuItem>
-          </Menu>
-
-          {/* User Avatar and Profile Menu */}
-          <IconButton onClick={handleProfileMenuClick} color="inherit">
-            {user?.photoURL ? (
-              <Avatar src={user.photoURL} />
-            ) : (
-              <Avatar>
-                <Person />
-              </Avatar>
-            )}
-          </IconButton>
-
-          <Menu
-            anchorEl={anchorEl}
-            open={Boolean(anchorEl)}
-            onClose={handleProfileMenuClose}
-            keepMounted
-          >
-            <MenuItem onClick={() => navigate('/settings/profile')}>
-              <Person sx={{ marginRight: 1 }} /> Edit Profile
-            </MenuItem>
-            <MenuItem onClick={handleLogout}>
-              <Logout sx={{ marginRight: 1 }} /> Logout
-            </MenuItem>
-          </Menu>
         </Box>
       </Toolbar>
     </AppBar>
