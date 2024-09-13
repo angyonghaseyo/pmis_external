@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TextField, Button, Box, Typography, Select, MenuItem, InputLabel, FormControl, Grid, Avatar } from '@mui/material';
-import { getCurrentUser, updateUserProfile, sendPasswordResetEmailToUser, deleteUserAccount } from './services/api';
+import { sendPasswordResetEmailToUser, deleteUserAccount } from './services/api';
 import { auth, db, storage } from './firebaseConfig';
 import { updateProfile } from 'firebase/auth';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';

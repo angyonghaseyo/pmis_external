@@ -1,41 +1,57 @@
-import React, { useState, useEffect } from 'react';
-import { getUsers, updateUser, deleteUser } from '../services/api';
-import { Edit2, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { getUsers, updateUser, deleteUser, inviteUser } from '../services/api';
+import { 
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, 
+  Button, TextField, Select, MenuItem, Pagination, Box, Typography, IconButton,
+  Dialog, DialogTitle, DialogContent, DialogActions, FormControl, InputLabel
+} from '@mui/material';
+import { Edit, Delete, Add } from '@mui/icons-material';
 
 const SettingsUsers = () => {
   const [users, setUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [usersPerPage] = useState(10);
+  const [page, setPage] = useState(1);
+  const [rowsPerPage] = useState(10);
+  const [totalUsers, setTotalUsers] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [newUser, setNewUser] = useState({ name: '', email: '', team: '', company: 'Oceania Port', userType: 'Normal' });
+
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await getUsers(page, rowsPerPage, searchTerm);
+      setUsers(response.users);
+      setTotalUsers(response.total);
+    } catch (err) {
+      console.error('Error fetching users:', err);
+      setError('Failed to fetch users. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, [page, rowsPerPage, searchTerm]);
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [fetchUsers]);
 
-  const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      const fetchedUsers = await getUsers();
-      setUsers(fetchedUsers);
-      setLoading(false);
-    } catch (err) {
-      setError('Failed to fetch users. Please try again later.');
-      setLoading(false);
-    }
+  const handleSearch = (event) => {
+    setSearchTerm(event.target.value);
+    setPage(1);
   };
 
-  const handleSearch = (e) => {
-    setSearchTerm(e.target.value);
-    setCurrentPage(1);
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
   };
 
   const handleUpdateUser = async (userId, updatedData) => {
     try {
       await updateUser(userId, updatedData);
-      fetchUsers(); // Refresh the user list
+      fetchUsers();
     } catch (err) {
+      console.error('Error updating user:', err);
       setError('Failed to update user. Please try again.');
     }
   };
@@ -44,127 +60,179 @@ const SettingsUsers = () => {
     if (window.confirm('Are you sure you want to delete this user?')) {
       try {
         await deleteUser(userId);
-        fetchUsers(); // Refresh the user list
+        fetchUsers();
       } catch (err) {
+        console.error('Error deleting user:', err);
         setError('Failed to delete user. Please try again.');
       }
     }
   };
 
-  // Filter users based on search term
-  const filteredUsers = users.filter(user =>
-    user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.team.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.company.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleInviteUser = async () => {
+    try {
+      await inviteUser(newUser);
+      setInviteDialogOpen(false);
+      setNewUser({ name: '', email: '', team: '', company: 'Oceania Port', userType: 'Normal' });
+      fetchUsers();
+    } catch (err) {
+      console.error('Error inviting user:', err);
+      setError('Failed to invite user. Please try again.');
+    }
+  };
 
-  // Get current users for pagination
-  const indexOfLastUser = currentPage * usersPerPage;
-  const indexOfFirstUser = indexOfLastUser - usersPerPage;
-  const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
+  const handleNewUserChange = (event) => {
+    setNewUser({ ...newUser, [event.target.name]: event.target.value });
+  };
 
-  // Change page
-  const paginate = (pageNumber) => setCurrentPage(pageNumber);
-
-  if (loading) return <div className="text-center mt-8">Loading...</div>;
-  if (error) return <div className="text-center mt-8 text-red-500">{error}</div>;
+  if (loading) return <Typography>Loading...</Typography>;
+  if (error) return <Typography color="error">{error}</Typography>;
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-semibold">Users</h2>
-        <input
-          type="text"
-          placeholder="Search users..."
-          value={searchTerm}
-          onChange={handleSearch}
-          className="p-2 border rounded"
-        />
-      </div>
-      <div className="bg-white shadow-md rounded-lg overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Team</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User Type</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {currentUsers.map((user) => (
-              <tr key={user.id}>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 h-10 w-10">
-                      <img className="h-10 w-10 rounded-full" src={user.photoURL || "/api/placeholder/40/40"} alt="" />
-                    </div>
-                    <div className="ml-4">
-                      <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                      <div className="text-sm text-gray-500">{user.email}</div>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">{user.team}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">{user.company}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                    user.status === 'Active' ? 'bg-green-100 text-green-800' : 
-                    user.status === 'Inactive' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {user.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {user.userType}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <button
-                    onClick={() => handleUpdateUser(user.id, { status: user.status === 'Active' ? 'Inactive' : 'Active' })}
-                    className="text-indigo-600 hover:text-indigo-900 mr-2"
+    <Box>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+        <Typography variant="h4">Users</Typography>
+        <Button
+          variant="contained"
+          color="primary"
+          startIcon={<Add />}
+          onClick={() => setInviteDialogOpen(true)}
+        >
+          Invite User
+        </Button>
+      </Box>
+
+      <TextField
+        label="Search users"
+        variant="outlined"
+        value={searchTerm}
+        onChange={handleSearch}
+        fullWidth
+        margin="normal"
+      />
+
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>User Name</TableCell>
+              <TableCell>Team</TableCell>
+              <TableCell>Company</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell>User Type</TableCell>
+              <TableCell>Action</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {users.map((user) => (
+              <TableRow key={user.id}>
+                <TableCell>
+                  <Box display="flex" alignItems="center">
+                    <img
+                      src={user.photoURL || "/api/placeholder/40/40"}
+                      alt={user.name}
+                      style={{ width: 40, height: 40, borderRadius: '50%', marginRight: '10px' }}
+                    />
+                    {user.name}
+                  </Box>
+                </TableCell>
+                <TableCell>{user.team}</TableCell>
+                <TableCell>{user.company}</TableCell>
+                <TableCell>
+                  <Select
+                    value={user.status}
+                    onChange={(e) => handleUpdateUser(user.id, { status: e.target.value })}
+                    size="small"
                   >
-                    <Edit2 size={18} />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteUser(user.id)}
-                    className="text-red-600 hover:text-red-900"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </td>
-              </tr>
+                    <MenuItem value="Active">Active</MenuItem>
+                    <MenuItem value="Inactive">Inactive</MenuItem>
+                    <MenuItem value="Pending">Pending</MenuItem>
+                  </Select>
+                </TableCell>
+                <TableCell>{user.userType}</TableCell>
+                <TableCell>
+                  <IconButton onClick={() => {/* Implement edit functionality */}}>
+                    <Edit />
+                  </IconButton>
+                  <IconButton onClick={() => handleDeleteUser(user.id)}>
+                    <Delete />
+                  </IconButton>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="mt-4 flex justify-between items-center">
-        <div>
-          Showing {indexOfFirstUser + 1} to {Math.min(indexOfLastUser, filteredUsers.length)} of {filteredUsers.length} users
-        </div>
-        <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-          {Array.from({ length: Math.ceil(filteredUsers.length / usersPerPage) }).map((_, index) => (
-            <button
-              key={index}
-              onClick={() => paginate(index + 1)}
-              className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                currentPage === index + 1
-                  ? 'z-10 bg-indigo-50 border-indigo-500 text-indigo-600'
-                  : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-              }`}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      <Box display="flex" justifyContent="space-between" alignItems="center" mt={2}>
+        <Typography>
+          Showing {(page - 1) * rowsPerPage + 1} to {Math.min(page * rowsPerPage, totalUsers)} of {totalUsers} users
+        </Typography>
+        <Pagination
+          count={Math.ceil(totalUsers / rowsPerPage)}
+          page={page}
+          onChange={handleChangePage}
+        />
+      </Box>
+
+      {/* Invite User Dialog */}
+      <Dialog open={inviteDialogOpen} onClose={() => setInviteDialogOpen(false)}>
+        <DialogTitle>Invite New User</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            name="name"
+            label="Name"
+            type="text"
+            fullWidth
+            value={newUser.name}
+            onChange={handleNewUserChange}
+          />
+          <TextField
+            margin="dense"
+            name="email"
+            label="Email Address"
+            type="email"
+            fullWidth
+            value={newUser.email}
+            onChange={handleNewUserChange}
+          />
+          <TextField
+            margin="dense"
+            name="team"
+            label="Team"
+            type="text"
+            fullWidth
+            value={newUser.team}
+            onChange={handleNewUserChange}
+          />
+          <TextField
+            margin="dense"
+            name="company"
+            label="Company"
+            type="text"
+            fullWidth
+            value={newUser.company}
+            onChange={handleNewUserChange}
+          />
+          <FormControl fullWidth margin="dense">
+            <InputLabel>User Type</InputLabel>
+            <Select
+              name="userType"
+              value={newUser.userType}
+              onChange={handleNewUserChange}
             >
-              {index + 1}
-            </button>
-          ))}
-        </nav>
-      </div>
-    </div>
+              <MenuItem value="Normal">Normal</MenuItem>
+              <MenuItem value="Admin">Admin</MenuItem>
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setInviteDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleInviteUser} color="primary">Invite</Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 };
 

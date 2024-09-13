@@ -62,7 +62,8 @@ export const confirmUserPasswordReset = (oobCode, newPassword) =>
   confirmPasswordReset(auth, oobCode, newPassword).catch(handleApiError);
 
 // User Account Management
-export const getUsers = () => authAxios.get('/users').catch(handleApiError);
+export const getUsers = (page, rowsPerPage, searchTerm) => 
+  authAxios.get('/users', { params: { page, rowsPerPage, searchTerm } }).catch(handleApiError);
 
 export const createUser = (userData) => authAxios.post('/users', userData).catch(handleApiError);
 
@@ -79,6 +80,9 @@ export const deleteUserAccount = async () => {
     handleApiError(error);
   }
 };
+
+// New function for inviting users
+export const inviteUser = (userData) => authAxios.post('/invite-user', userData).catch(handleApiError);
 
 // Dashboard data
 export const getLeaveStatistics = () => authAxios.get('/leave-statistics').catch(handleApiError);
@@ -153,6 +157,7 @@ const api = {
   updateUser,
   deleteUser,
   deleteUserAccount,
+  inviteUser,
   getLeaveStatistics,
   getTimeLog,
   getServiceOperations,

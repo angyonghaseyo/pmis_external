@@ -8,7 +8,7 @@ import ExpandMore from '@mui/icons-material/ExpandMore';
 const drawerWidth = 240;
 const headerHeight = 64;
 
-const Sidebar = () => {
+const Sidebar = ({ user, userRole }) => {
   const [expandedItems, setExpandedItems] = useState({});
   const navigate = useNavigate();
 
@@ -21,7 +21,12 @@ const Sidebar = () => {
     { name: "Cargos", icon: <Package />, path: "/cargos", children: ['Subitem 1', 'Subitem 2'] },
     { name: "Financial", icon: <DollarSign />, path: "/financial", children: ['Subitem 1', 'Subitem 2'] },
     { name: "Customs and Trade Documents", icon: <FileText />, path: "/documents", children: ['Subitem 1', 'Subitem 2'] },
-    { name: "Settings", icon: <Settings />, path: "/settings", children: ['Profile', 'Users'] }
+    { 
+      name: "Settings", 
+      icon: <Settings />, 
+      path: "/settings", 
+      children: userRole === 'Admin' ? ['Profile', 'Users'] : ['Profile']
+    }
   ];
 
   const toggleExpand = (index) => {
@@ -34,33 +39,48 @@ const Sidebar = () => {
       anchor="left"
       sx={{
         width: drawerWidth,
-        flexShrink: 0, 
+        flexShrink: 0,
         '& .MuiDrawer-paper': {
-          width: drawerWidth, 
+          width: drawerWidth,
           boxSizing: 'border-box',
-          mt: `${headerHeight}px`, 
+          mt: `${headerHeight}px`,
         },
       }}
     >
       <List>
         {navItems.map((item, index) => (
           <div key={index}>
-            <ListItem button onClick={() => item.children.length > 0 ? toggleExpand(index) : navigate(item.path)}>
+            <ListItem 
+              button 
+              onClick={() => item.children.length > 0 ? toggleExpand(index) : navigate(item.path)}
+              component={item.children.length === 0 ? NavLink : 'div'}
+              to={item.children.length === 0 ? item.path : undefined}
+              sx={{
+                color: 'inherit',
+                textDecoration: 'none',
+                '&.active': {
+                  backgroundColor: 'rgba(0, 0, 0, 0.08)',
+                },
+              }}
+            >
               <ListItemIcon>{item.icon}</ListItemIcon>
               <ListItemText primary={item.name} />
               {item.children.length > 0 && (expandedItems[index] ? <ExpandLess /> : <ExpandMore />)}
             </ListItem>
             <Collapse in={expandedItems[index]} timeout="auto" unmountOnExit>
-              {item.children.map((subitem, subIndex) => (
-                <ListItem
-                  button
-                  key={subIndex}
-                  sx={{ pl: 4 }}
-                  onClick={() => navigate(`${item.path}/${subitem.toLowerCase().replace(' ', '-')}`)}
-                >
-                  <ListItemText primary={subitem} />
-                </ListItem>
-              ))}
+              <List component="div" disablePadding>
+                {item.children.map((subitem, subIndex) => (
+                  <ListItem
+                    button
+                    key={subIndex}
+                    sx={{ pl: 4 }}
+                    component={NavLink}
+                    to={`${item.path}/${subitem.toLowerCase().replace(' ', '-')}`}
+                  >
+                    <ListItemText primary={subitem} />
+                  </ListItem>
+                ))}
+              </List>
             </Collapse>
           </div>
         ))}
