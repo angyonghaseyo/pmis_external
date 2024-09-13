@@ -1,22 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { TextField, Button, Box, Typography, Select, MenuItem, InputLabel, FormControl, Grid, Chip, Avatar } from '@mui/material';
+import { TextField, Button, Box, Typography, Select, MenuItem, InputLabel, FormControl, Grid, Avatar } from '@mui/material';
 import { getCurrentUser, updateUserProfile, sendPasswordResetEmailToUser, deleteUserAccount } from './services/api';
 import { auth, db, storage } from './firebaseConfig';
 import { updateProfile } from 'firebase/auth';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+
+const teams = [
+  'Assets and Facilities',
+  'Manpower',
+  'Vessel Visits',
+  'Port Operations and Resources',
+  'Cargos',
+  'Financial',
+  'Customs and Trade Documents'
+];
 
 function EditProfile() {
   const [profile, setProfile] = useState({
     email: '',
-    salutation: 'Mr',
+    salutation: '',
     firstName: '',
     lastName: '',
-    company: 'Oceania Port',
-    userType: 'Normal',
+    company: '',
+    userType: '',
     teams: []
   });
-
   const [selectedImage, setSelectedImage] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -28,34 +37,23 @@ function EditProfile() {
   const fetchUserProfile = async () => {
     try {
       setLoading(true);
-      const user = await getCurrentUser();
+      const user = auth.currentUser;
       if (user) {
-        const fullName = user.displayName || '';
-        const nameParts = fullName.split(' ');
-        
-        let salutation = 'Mr';
-        let firstName = '';
-        let lastName = '';
-
-        if (['Mr', 'Ms', 'Dr'].includes(nameParts[0])) {
-          salutation = nameParts[0];
-          firstName = nameParts.slice(1, -1).join(' ');
-          lastName = nameParts[nameParts.length - 1];
-        } else {
-          firstName = nameParts.slice(0, -1).join(' ');
-          lastName = nameParts[nameParts.length - 1];
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          setProfile({
+            email: user.email || '',
+            salutation: userData.salutation || '',
+            firstName: userData.firstName || '',
+            lastName: userData.lastName || '',
+            company: userData.company || 'Oceania Port',
+            userType: userData.userType || 'Normal',
+            teams: userData.teams || []
+          });
+          setSelectedImage(user.photoURL);
         }
-
-        setProfile({
-          email: user.email || '',
-          salutation: salutation,
-          firstName: firstName,
-          lastName: lastName,
-          company: 'Oceania Port',
-          userType: user.userType || 'Normal',
-          teams: user.teams || []
-        });
-        setSelectedImage(user.photoURL);
       }
     } catch (err) {
       console.error('Error fetching user profile:', err);
@@ -73,11 +71,12 @@ function EditProfile() {
     }));
   };
 
-  const handleTeamsChange = (e) => {
-    setProfile(prevProfile => ({
-      ...prevProfile,
-      teams: e.target.value,
-    }));
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const imageUrl = URL.createObjectURL(file);
+      setSelectedImage(imageUrl);
+    }
   };
 
   const handleSubmit = async () => {
@@ -110,8 +109,9 @@ function EditProfile() {
         lastName: profile.lastName,
         displayName: fullName,
         photoURL: photoURL,
+        company: profile.company,
         userType: profile.userType,
-        teams: profile.teams,
+        // Note: We're not updating 'teams' here as it should be managed elsewhere
       });
   
       alert('Profile updated successfully');
@@ -120,14 +120,6 @@ function EditProfile() {
       setError('Failed to update profile: ' + err.message);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const imageUrl = URL.createObjectURL(file);
-      setSelectedImage(imageUrl);
     }
   };
 
@@ -154,8 +146,8 @@ function EditProfile() {
     }
   };
 
-  if (loading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error}</div>;
+  if (loading) return <Typography>Loading...</Typography>;
+  if (error) return <Typography color="error">{error}</Typography>;
 
   return (
     <Box sx={{ padding: '1rem' }}>
@@ -163,7 +155,7 @@ function EditProfile() {
 
       <Box display="flex" alignItems="center" sx={{ marginBottom: '2rem' }}>
         <Avatar
-          sx={{ width: 50, height: 50, marginRight: '1rem' }}
+          sx={{ width: 100, height: 100, marginRight: '1rem' }}
           src={selectedImage || ''}
         >
           {!selectedImage && profile.firstName[0]}
@@ -174,32 +166,33 @@ function EditProfile() {
         </Button>
       </Box>
 
-      <TextField
-        label="Email Address"
-        name="email"
-        value={profile.email}
-        onChange={handleChange}
-        fullWidth
-        margin="normal"
-        disabled
-      />
-
-      <FormControl fullWidth margin="normal">
-        <InputLabel id="salutation-label">Salutation</InputLabel>
-        <Select
-          labelId="salutation-label"
-          name="salutation"
-          value={profile.salutation}
-          onChange={handleChange}
-        >
-          <MenuItem value="Mr">Mr</MenuItem>
-          <MenuItem value="Ms">Ms</MenuItem>
-          <MenuItem value="Dr">Dr</MenuItem>
-        </Select>
-      </FormControl>
-
       <Grid container spacing={2}>
-        <Grid item xs={12} md={6}>
+        <Grid item xs={12}>
+          <TextField
+            label="Email Address"
+            name="email"
+            value={profile.email}
+            fullWidth
+            margin="normal"
+            disabled
+          />
+        </Grid>
+        <Grid item xs={12} sm={4}>
+          <FormControl fullWidth margin="normal">
+            <InputLabel id="salutation-label">Salutation</InputLabel>
+            <Select
+              labelId="salutation-label"
+              name="salutation"
+              value={profile.salutation}
+              onChange={handleChange}
+            >
+              <MenuItem value="Mr">Mr</MenuItem>
+              <MenuItem value="Ms">Ms</MenuItem>
+              <MenuItem value="Dr">Dr</MenuItem>
+            </Select>
+          </FormControl>
+        </Grid>
+        <Grid item xs={12} sm={4}>
           <TextField
             label="First Name"
             name="firstName"
@@ -209,7 +202,7 @@ function EditProfile() {
             margin="normal"
           />
         </Grid>
-        <Grid item xs={12} md={6}>
+        <Grid item xs={12} sm={4}>
           <TextField
             label="Last Name"
             name="lastName"
@@ -219,72 +212,70 @@ function EditProfile() {
             margin="normal"
           />
         </Grid>
+        <Grid item xs={12}>
+          <TextField
+            label="Company"
+            name="company"
+            value={profile.company}
+            onChange={handleChange}
+            fullWidth
+            margin="normal"
+          />
+        </Grid>
+        <Grid item xs={12}>
+          <FormControl fullWidth margin="normal">
+            <InputLabel id="user-type-label">User Type</InputLabel>
+            <Select
+              labelId="user-type-label"
+              name="userType"
+              value={profile.userType}
+              onChange={handleChange}
+              disabled
+            >
+              <MenuItem value="Normal">Normal</MenuItem>
+              <MenuItem value="Admin">Admin</MenuItem>
+            </Select>
+          </FormControl>
+        </Grid>
+        <Grid item xs={12}>
+          <Box sx={{ border: '1px solid #ccc', borderRadius: '4px', padding: '1rem', marginTop: '1rem' }}>
+            <Typography variant="subtitle1" gutterBottom>Teams</Typography>
+            <div className="teams-container" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+              {teams.map((team) => (
+                <div key={team} className="team-checkbox" style={{ display: 'flex', alignItems: 'center', minWidth: '200px' }}>
+                  <input
+                    type="checkbox"
+                    id={team}
+                    checked={profile.teams.includes(team)}
+                    disabled
+                    style={{ marginRight: '8px' }}
+                  />
+                  <label htmlFor={team}>{team}</label>
+                </div>
+              ))}
+            </div>
+          </Box>
+        </Grid>
       </Grid>
 
-      <TextField
-        label="Company"
-        name="company"
-        value={profile.company}
-        onChange={handleChange}
-        fullWidth
-        margin="normal"
-        disabled
-      />
-
-      <FormControl fullWidth margin="normal">
-        <InputLabel id="user-type-label">User Type</InputLabel>
-        <Select
-          labelId="user-type-label"
-          name="userType"
-          value={profile.userType}
-          onChange={handleChange}
-          disabled
+      <Box sx={{ marginTop: '2rem' }}>
+        <Typography variant="h6" gutterBottom>User Account Management</Typography>
+        <Button
+          variant="outlined"
+          color="primary"
+          onClick={handlePasswordReset}
+          sx={{ marginRight: '1rem' }}
         >
-          <MenuItem value="Normal">Normal</MenuItem>
-          <MenuItem value="Admin">Admin</MenuItem>
-        </Select>
-      </FormControl>
-
-      <FormControl fullWidth margin="normal">
-        <InputLabel id="teams-label">Teams</InputLabel>
-        <Select
-          labelId="teams-label"
-          name="teams"
-          multiple
-          value={profile.teams}
-          onChange={handleTeamsChange}
-          renderValue={(selected) => (
-            <Box sx={{ display: 'flex', flexWrap: 'wrap' }}>
-              {selected.map((value) => (
-                <Chip key={value} label={value} sx={{ margin: '2px' }} />
-              ))}
-            </Box>
-          )}
+          Request Password Reset
+        </Button>
+        <Button
+          variant="contained"
+          color="error"
+          onClick={handleDeleteAccount}
         >
-          {['Assets and Facilities', 'Manpower', 'Vessel Visits', 'Port Operations and Resources', 'Cargos', 'Financial', 'Customs and Trade Documents'].map((team) => (
-            <MenuItem key={team} value={team}>
-              {team}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
-
-      <Typography variant="h6" gutterBottom sx={{ marginTop: '2rem' }}>User Account Management</Typography>
-      <Button
-        variant="outlined"
-        color="primary"
-        sx={{ marginRight: '1rem' }}
-        onClick={handlePasswordReset}
-      >
-        Request for password reset
-      </Button>
-      <Button
-        variant="contained"
-        color="error"
-        onClick={handleDeleteAccount}
-      >
-        Delete Account (DANGER!)
-      </Button>
+          Delete Account
+        </Button>
+      </Box>
 
       <Box sx={{ marginTop: '2rem' }}>
         <Button
@@ -295,7 +286,7 @@ function EditProfile() {
         >
           Save Changes
         </Button>
-        <Button variant="outlined" color="secondary" onClick={() => console.log('Canceled')}>
+        <Button variant="outlined" color="secondary" onClick={() => fetchUserProfile()}>
           Cancel
         </Button>
       </Box>
