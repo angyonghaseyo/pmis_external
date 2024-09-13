@@ -79,8 +79,10 @@ const SettingsUsers = () => {
 
   const handleUpdateUser = async (userId, updatedData) => {
     try {
-      await updateUser(userId, updatedData);
-      setUsers(users.map(user => user.id === userId ? { ...user, ...updatedData } : user));
+      // Remove email from updatedData to prevent updating it
+      const { email, ...dataToUpdate } = updatedData;
+      await updateUser(userId, dataToUpdate);
+      setUsers(users.map(user => user.id === userId ? { ...user, ...dataToUpdate } : user));
       setEditingUser(null);
     } catch (err) {
       console.error('Error updating user:', err);
@@ -190,7 +192,7 @@ const SettingsUsers = () => {
             fullWidth
             variant="outlined"
             value={editingUser?.email || ''}
-            onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+            disabled
           />
           <FormControl fullWidth margin="dense">
             <InputLabel>Teams</InputLabel>
