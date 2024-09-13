@@ -1,170 +1,230 @@
 import React, { useState, useEffect } from 'react';
-import { getUsers, updateUser, deleteUser } from '../services/api';
 import { Edit2, Trash2 } from 'lucide-react';
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableContainer, 
+  TableHead, 
+  TableRow, 
+  Paper, 
+  TextField, 
+  Button, 
+  Typography, 
+  Box, 
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel
+} from '@mui/material';
+import { getUsers, updateUser, deleteUser } from '../services/api';
 
 const SettingsUsers = () => {
   const [users, setUsers] = useState([]);
+  const [filteredUsers, setFilteredUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [usersPerPage] = useState(10);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [editingUser, setEditingUser] = useState(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState(null);
 
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  useEffect(() => {
+    const filtered = users.filter(user =>
+      user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (user.team && user.team.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+    setFilteredUsers(filtered);
+    setCurrentPage(1);
+  }, [searchTerm, users]);
 
   const fetchUsers = async () => {
     try {
       setLoading(true);
       const fetchedUsers = await getUsers();
       setUsers(fetchedUsers);
+      setFilteredUsers(fetchedUsers);
       setLoading(false);
     } catch (err) {
+      console.error('Error fetching users:', err);
       setError('Failed to fetch users. Please try again later.');
       setLoading(false);
     }
   };
 
-  const handleSearch = (e) => {
-    setSearchTerm(e.target.value);
-    setCurrentPage(1);
-  };
-
   const handleUpdateUser = async (userId, updatedData) => {
     try {
       await updateUser(userId, updatedData);
-      fetchUsers(); // Refresh the user list
+      setUsers(users.map(user => user.id === userId ? { ...user, ...updatedData } : user));
+      setEditingUser(null);
     } catch (err) {
+      console.error('Error updating user:', err);
       setError('Failed to update user. Please try again.');
     }
   };
 
   const handleDeleteUser = async (userId) => {
-    if (window.confirm('Are you sure you want to delete this user?')) {
-      try {
-        await deleteUser(userId);
-        fetchUsers(); // Refresh the user list
-      } catch (err) {
-        setError('Failed to delete user. Please try again.');
-      }
+    try {
+      await deleteUser(userId);
+      setUsers(users.filter(user => user.id !== userId));
+      setDeleteConfirmation(null);
+    } catch (err) {
+      console.error('Error deleting user:', err);
+      setError('Failed to delete user. Please try again.');
     }
   };
 
-  // Filter users based on search term
-  const filteredUsers = users.filter(user =>
-    user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.team.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.company.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // Get current users for pagination
   const indexOfLastUser = currentPage * usersPerPage;
   const indexOfFirstUser = indexOfLastUser - usersPerPage;
   const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
 
-  // Change page
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
-  if (loading) return <div className="text-center mt-8">Loading...</div>;
-  if (error) return <div className="text-center mt-8 text-red-500">{error}</div>;
+  if (loading) return <Box display="flex" justifyContent="center" alignItems="center" height="100vh"><CircularProgress /></Box>;
+  if (error) return <Typography color="error" align="center">{error}</Typography>;
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-semibold">Users</h2>
-        <input
-          type="text"
-          placeholder="Search users..."
-          value={searchTerm}
-          onChange={handleSearch}
-          className="p-2 border rounded"
-        />
-      </div>
-      <div className="bg-white shadow-md rounded-lg overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Team</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User Type</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h4" gutterBottom>Users</Typography>
+      <TextField
+        label="Search users"
+        variant="outlined"
+        fullWidth
+        margin="normal"
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+      />
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>Name</TableCell>
+              <TableCell>Email</TableCell>
+              <TableCell>Team</TableCell>
+              <TableCell>Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
             {currentUsers.map((user) => (
-              <tr key={user.id}>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 h-10 w-10">
-                      <img className="h-10 w-10 rounded-full" src={user.photoURL || "/api/placeholder/40/40"} alt="" />
-                    </div>
-                    <div className="ml-4">
-                      <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                      <div className="text-sm text-gray-500">{user.email}</div>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">{user.team}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">{user.company}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                    user.status === 'Active' ? 'bg-green-100 text-green-800' : 
-                    user.status === 'Inactive' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {user.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {user.userType}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <button
-                    onClick={() => handleUpdateUser(user.id, { status: user.status === 'Active' ? 'Inactive' : 'Active' })}
-                    className="text-indigo-600 hover:text-indigo-900 mr-2"
+              <TableRow key={user.id}>
+                <TableCell>{`${user.firstName} ${user.lastName}`}</TableCell>
+                <TableCell>{user.email}</TableCell>
+                <TableCell>{user.team || 'N/A'}</TableCell>
+                <TableCell>
+                  <Button
+                    startIcon={<Edit2 />}
+                    onClick={() => setEditingUser(user)}
                   >
-                    <Edit2 size={18} />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteUser(user.id)}
-                    className="text-red-600 hover:text-red-900"
+                    Edit
+                  </Button>
+                  <Button
+                    startIcon={<Trash2 />}
+                    onClick={() => setDeleteConfirmation(user)}
+                    color="error"
                   >
-                    <Trash2 size={18} />
-                  </button>
-                </td>
-              </tr>
+                    Delete
+                  </Button>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="mt-4 flex justify-between items-center">
-        <div>
-          Showing {indexOfFirstUser + 1} to {Math.min(indexOfLastUser, filteredUsers.length)} of {filteredUsers.length} users
-        </div>
-        <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-          {Array.from({ length: Math.ceil(filteredUsers.length / usersPerPage) }).map((_, index) => (
-            <button
-              key={index}
-              onClick={() => paginate(index + 1)}
-              className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                currentPage === index + 1
-                  ? 'z-10 bg-indigo-50 border-indigo-500 text-indigo-600'
-                  : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-              }`}
+          </TableBody>
+        </Table>
+      </TableContainer>
+      <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+        {Array.from({ length: Math.ceil(filteredUsers.length / usersPerPage) }, (_, i) => (
+          <Button key={i} onClick={() => paginate(i + 1)} variant={currentPage === i + 1 ? 'contained' : 'outlined'} sx={{ mx: 0.5 }}>
+            {i + 1}
+          </Button>
+        ))}
+      </Box>
+
+      {/* Edit User Dialog */}
+      <Dialog open={!!editingUser} onClose={() => setEditingUser(null)}>
+        <DialogTitle>Edit User</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="First Name"
+            fullWidth
+            variant="outlined"
+            value={editingUser?.firstName || ''}
+            onChange={(e) => setEditingUser({ ...editingUser, firstName: e.target.value })}
+          />
+          <TextField
+            margin="dense"
+            label="Last Name"
+            fullWidth
+            variant="outlined"
+            value={editingUser?.lastName || ''}
+            onChange={(e) => setEditingUser({ ...editingUser, lastName: e.target.value })}
+          />
+          <TextField
+            margin="dense"
+            label="Email"
+            fullWidth
+            variant="outlined"
+            value={editingUser?.email || ''}
+            onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+          />
+          <FormControl fullWidth margin="dense">
+            <InputLabel>Team</InputLabel>
+            <Select
+              value={editingUser?.team || ''}
+              onChange={(e) => setEditingUser({ ...editingUser, team: e.target.value })}
+              label="Team"
             >
-              {index + 1}
-            </button>
-          ))}
-        </nav>
-      </div>
-    </div>
+              <MenuItem value="">
+                <em>None</em>
+              </MenuItem>
+              <MenuItem value="Assets and Facilities">Assets and Facilities</MenuItem>
+              <MenuItem value="Manpower">Manpower</MenuItem>
+              <MenuItem value="Vessel Visits">Vessel Visits</MenuItem>
+              <MenuItem value="Port Operations">Port Operations</MenuItem>
+              <MenuItem value="Cargos">Cargos</MenuItem>
+              <MenuItem value="Financial">Financial</MenuItem>
+              <MenuItem value="Customs and Trade">Customs and Trade</MenuItem>
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditingUser(null)}>Cancel</Button>
+          <Button onClick={() => handleUpdateUser(editingUser.id, editingUser)}>Save</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={!!deleteConfirmation}
+        onClose={() => setDeleteConfirmation(null)}
+      >
+        <DialogTitle>Confirm Delete</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete the user {deleteConfirmation?.firstName} {deleteConfirmation?.lastName}?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteConfirmation(null)}>Cancel</Button>
+          <Button onClick={() => handleDeleteUser(deleteConfirmation.id)} color="error">
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 };
 

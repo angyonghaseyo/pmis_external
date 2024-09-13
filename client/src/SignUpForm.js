@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, storage, db } from './firebaseConfig';
+import './AuthForms.css';
 
 const teams = [
   'Assets and Facilities',
@@ -23,13 +24,14 @@ function SignUpForm() {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [photoFile, setPhotoFile] = useState(null);
     const [salutation, setSalutation] = useState('Mr');
+    const [company, setCompany] = useState('');
     const [selectedTeams, setSelectedTeams] = useState([]);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
     const validateForm = () => {
-        if (!email || !firstName || !lastName || !password || !confirmPassword) {
+        if (!email || !firstName || !lastName || !password || !confirmPassword || !company) {
             setError('Please fill in all required fields.');
             return false;
         }
@@ -101,7 +103,9 @@ function SignUpForm() {
                 lastName: lastName,
                 salutation: salutation,
                 photoURL: photoURL,
+                company: company,
                 teams: selectedTeams,
+                userType: 'admin',
                 createdAt: new Date()
             });
 
@@ -122,7 +126,7 @@ function SignUpForm() {
             {error && <p className="error-message">{error}</p>}
             <form onSubmit={handleSubmit}>
                 <div className="form-group">
-                    <label htmlFor="email">Email Address</label>
+                    <label htmlFor="email">Email Address*</label>
                     <input
                         type="email"
                         id="email"
@@ -154,6 +158,7 @@ function SignUpForm() {
                             <option value="Mr">Mr</option>
                             <option value="Mrs">Mrs</option>
                             <option value="Ms">Ms</option>
+                            <option value="Dr">Dr</option>
                         </select>
                     </div>
                 </div>
@@ -165,7 +170,7 @@ function SignUpForm() {
                             id="firstName"
                             value={firstName}
                             onChange={(e) => setFirstName(e.target.value)}
-                            placeholder="First Name*"
+                            placeholder="First Name"
                             required
                         />
                     </div>
@@ -176,10 +181,21 @@ function SignUpForm() {
                             id="lastName"
                             value={lastName}
                             onChange={(e) => setLastName(e.target.value)}
-                            placeholder="Last Name*"
+                            placeholder="Last Name"
                             required
                         />
                     </div>
+                </div>
+                <div className="form-group">
+                    <label htmlFor="company">Company*</label>
+                    <input
+                        type="text"
+                        id="company"
+                        value={company}
+                        onChange={(e) => setCompany(e.target.value)}
+                        placeholder="Enter your company name"
+                        required
+                    />
                 </div>
                 <div className="form-group">
                     <label htmlFor="password">Password*</label>
@@ -188,7 +204,7 @@ function SignUpForm() {
                         id="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Password*"
+                        placeholder="Password"
                         required
                     />
                 </div>
@@ -199,7 +215,7 @@ function SignUpForm() {
                         id="confirmPassword"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Confirm Password*"
+                        placeholder="Confirm Password"
                         required
                     />
                 </div>
@@ -223,6 +239,9 @@ function SignUpForm() {
                     {loading ? 'Signing Up...' : 'Sign Up'}
                 </button>
             </form>
+            <p className="auth-switch">
+                Already have an account? <Link to="/login">Log in</Link>
+            </p>
         </div>
     );
 }
