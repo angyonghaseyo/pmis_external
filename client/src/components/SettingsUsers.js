@@ -37,6 +37,8 @@ const teams = [
   'Customs and Trade Documents'
 ];
 
+const userTypes = ['Normal', 'Admin'];
+
 const SettingsUsers = () => {
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
@@ -57,7 +59,8 @@ const SettingsUsers = () => {
       user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (user.teams && user.teams.some(team => team.toLowerCase().includes(searchTerm.toLowerCase())))
+      (user.teams && user.teams.some(team => team.toLowerCase().includes(searchTerm.toLowerCase()))) ||
+      (user.userType && user.userType.toLowerCase().includes(searchTerm.toLowerCase()))
     );
     setFilteredUsers(filtered);
     setCurrentPage(1);
@@ -79,7 +82,6 @@ const SettingsUsers = () => {
 
   const handleUpdateUser = async (userId, updatedData) => {
     try {
-      // Remove email from updatedData to prevent updating it
       const { email, ...dataToUpdate } = updatedData;
       await updateUser(userId, dataToUpdate);
       setUsers(users.map(user => user.id === userId ? { ...user, ...dataToUpdate } : user));
@@ -125,22 +127,25 @@ const SettingsUsers = () => {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Email</TableCell>
-              <TableCell>Teams</TableCell>
-              <TableCell>Actions</TableCell>
+              <TableCell width="20%">Name</TableCell>
+              <TableCell width="25%">Email</TableCell>
+              <TableCell width="25%">Teams</TableCell>
+              <TableCell width="15%">User Type</TableCell>
+              <TableCell width="15%">Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {currentUsers.map((user) => (
               <TableRow key={user.id}>
-                <TableCell>{`${user.firstName} ${user.lastName}`}</TableCell>
-                <TableCell>{user.email}</TableCell>
-                <TableCell>{user.teams ? user.teams.join(', ') : 'N/A'}</TableCell>
-                <TableCell>
+                <TableCell width="20%">{`${user.firstName} ${user.lastName}`}</TableCell>
+                <TableCell width="25%">{user.email}</TableCell>
+                <TableCell width="25%">{user.teams ? user.teams.join(', ') : 'N/A'}</TableCell>
+                <TableCell width="15%">{user.userType || 'N/A'}</TableCell>
+                <TableCell width="15%">
                   <Button
                     startIcon={<Edit2 />}
                     onClick={() => setEditingUser(user)}
+                    size="small"
                   >
                     Edit
                   </Button>
@@ -148,6 +153,7 @@ const SettingsUsers = () => {
                     startIcon={<Trash2 />}
                     onClick={() => setDeleteConfirmation(user)}
                     color="error"
+                    size="small"
                   >
                     Delete
                   </Button>
@@ -207,6 +213,20 @@ const SettingsUsers = () => {
                 <MenuItem key={team} value={team}>
                   <Checkbox checked={(editingUser?.teams || []).indexOf(team) > -1} />
                   <ListItemText primary={team} />
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl fullWidth margin="dense">
+            <InputLabel>User Type</InputLabel>
+            <Select
+              value={editingUser?.userType || ''}
+              onChange={(e) => setEditingUser({ ...editingUser, userType: e.target.value })}
+              label="User Type"
+            >
+              {userTypes.map((type) => (
+                <MenuItem key={type} value={type}>
+                  {type}
                 </MenuItem>
               ))}
             </Select>
