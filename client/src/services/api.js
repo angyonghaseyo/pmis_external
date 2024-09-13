@@ -5,7 +5,8 @@ import {
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
   confirmPasswordReset,
-  updateProfile
+  updateProfile,
+  deleteUser as firebaseDeleteUser
 } from '../firebaseConfig';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
@@ -69,6 +70,15 @@ export const updateUser = (userId, userData) =>
   authAxios.put(`/users/${userId}`, userData).catch(handleApiError);
 
 export const deleteUser = (userId) => authAxios.delete(`/users/${userId}`).catch(handleApiError);
+
+export const deleteUserAccount = async () => {
+  try {
+    await authAxios.delete(`/users/${auth.currentUser.uid}`);
+    await firebaseDeleteUser(auth.currentUser);
+  } catch (error) {
+    handleApiError(error);
+  }
+};
 
 // Dashboard data
 export const getLeaveStatistics = () => authAxios.get('/leave-statistics').catch(handleApiError);
@@ -142,6 +152,7 @@ const api = {
   createUser,
   updateUser,
   deleteUser,
+  deleteUserAccount,
   getLeaveStatistics,
   getTimeLog,
   getServiceOperations,

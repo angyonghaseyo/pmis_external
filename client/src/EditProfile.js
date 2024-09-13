@@ -1,5 +1,8 @@
+import React, { useState, useEffect } from 'react';
 import { TextField, Button, Box, Typography, Select, MenuItem, InputLabel, FormControl, Grid, Chip, Avatar } from '@mui/material';
-import { useState } from 'react';
+import { getCurrentUser, updateUserProfile, sendPasswordResetEmailToUser, deleteUserAccount } from './services/api';
+import { auth, storage } from './firebaseConfig';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 function EditProfile() {
   const [profile, setProfile] = useState({
@@ -9,58 +12,155 @@ function EditProfile() {
     lastName: '',
     company: 'Oceania Port',
     userType: 'Normal',
-    teams: [],
+    teams: []
   });
 
-  const [selectedImage, setSelectedImage] = useState(null); // State to store the uploaded image
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    fetchUserProfile();
+  }, []);
+
+  const fetchUserProfile = async () => {
+    try {
+      setLoading(true);
+      const user = await getCurrentUser();
+      if (user) {
+        const fullName = user.displayName || '';
+        const nameParts = fullName.split(' ');
+        
+        let salutation = 'Mr';
+        let firstName = '';
+        let lastName = '';
+
+        if (['Mr', 'Ms', 'Dr'].includes(nameParts[0])) {
+          salutation = nameParts[0];
+          firstName = nameParts.slice(1, -1).join(' ');
+          lastName = nameParts[nameParts.length - 1];
+        } else {
+          firstName = nameParts.slice(0, -1).join(' ');
+          lastName = nameParts[nameParts.length - 1];
+        }
+
+        setProfile({
+          email: user.email || '',
+          salutation: salutation,
+          firstName: firstName,
+          lastName: lastName,
+          company: 'Oceania Port',
+          userType: user.userType || 'Normal',
+          teams: user.teams || []
+        });
+        setSelectedImage(user.photoURL);
+      }
+    } catch (err) {
+      console.error('Error fetching user profile:', err);
+      setError('Failed to fetch user profile');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setProfile({
-      ...profile,
+    setProfile(prevProfile => ({
+      ...prevProfile,
       [name]: value,
-    });
+    }));
   };
 
   const handleTeamsChange = (e) => {
-    setProfile({
-      ...profile,
+    setProfile(prevProfile => ({
+      ...prevProfile,
       teams: e.target.value,
-    });
+    }));
   };
 
-  const handleSubmit = () => {
-    // Add logic
-    console.log('Profile updated:', profile);
+  const handleSubmit = async () => {
+    try {
+      setLoading(true);
+      let photoURL = selectedImage;
+      
+      if (selectedImage && selectedImage.startsWith('blob:')) {
+        const imageRef = ref(storage, `profile_photos/${auth.currentUser.uid}`);
+        const response = await fetch(selectedImage);
+        const blob = await response.blob();
+        await uploadBytes(imageRef, blob);
+        photoURL = await getDownloadURL(imageRef);
+      }
+
+      const fullName = `${profile.salutation} ${profile.firstName} ${profile.lastName}`.trim();
+      const updatedProfile = {
+        displayName: fullName,
+        email: profile.email,
+        photoURL: photoURL,
+        userType: profile.userType,
+        teams: profile.teams,
+      };
+
+      await updateUserProfile(updatedProfile);
+      alert('Profile updated successfully');
+    } catch (err) {
+      console.error('Error updating profile:', err);
+      setError('Failed to update profile');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const imageUrl = URL.createObjectURL(file); // Create a temporary URL for the image
-      setSelectedImage(imageUrl); // Update the state with the image URL
+      const imageUrl = URL.createObjectURL(file);
+      setSelectedImage(imageUrl);
     }
   };
+
+  const handlePasswordReset = async () => {
+    try {
+      await sendPasswordResetEmailToUser(profile.email);
+      alert('Password reset email sent. Please check your inbox.');
+    } catch (err) {
+      console.error('Error sending password reset email:', err);
+      setError('Failed to send password reset email');
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (window.confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
+      try {
+        await deleteUserAccount();
+        alert('Your account has been deleted successfully.');
+        // Redirect to login page or show a goodbye message
+      } catch (err) {
+        console.error('Error deleting account:', err);
+        setError('Failed to delete account. Please try again.');
+      }
+    }
+  };
+
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error}</div>;
 
   return (
     <Box sx={{ padding: '1rem' }}>
       <Typography variant="h4" gutterBottom>Profile</Typography>
 
-      {/* Profile Picture Upload */}
       <Box display="flex" alignItems="center" sx={{ marginBottom: '2rem' }}>
         <Avatar
           sx={{ width: 50, height: 50, marginRight: '1rem' }}
-          src={selectedImage ? selectedImage : ''} 
+          src={selectedImage || ''}
         >
-          {!selectedImage && 'P'} 
+          {!selectedImage && profile.firstName[0]}
         </Avatar>
         <Button variant="outlined" component="label">
           Upload Photo
-          <input hidden accept="image/*" multiple type="file" onChange={handleImageUpload} />
+          <input hidden accept="image/*" type="file" onChange={handleImageUpload} />
         </Button>
       </Box>
 
-      {/* Email Address */}
       <TextField
         label="Email Address"
         name="email"
@@ -68,9 +168,9 @@ function EditProfile() {
         onChange={handleChange}
         fullWidth
         margin="normal"
+        disabled
       />
 
-      {/* Salutation */}
       <FormControl fullWidth margin="normal">
         <InputLabel id="salutation-label">Salutation</InputLabel>
         <Select
@@ -85,7 +185,6 @@ function EditProfile() {
         </Select>
       </FormControl>
 
-      {/* First Name and Last Name */}
       <Grid container spacing={2}>
         <Grid item xs={12} md={6}>
           <TextField
@@ -109,7 +208,6 @@ function EditProfile() {
         </Grid>
       </Grid>
 
-      {/* Company */}
       <TextField
         label="Company"
         name="company"
@@ -120,7 +218,6 @@ function EditProfile() {
         disabled
       />
 
-      {/* User Type */}
       <FormControl fullWidth margin="normal">
         <InputLabel id="user-type-label">User Type</InputLabel>
         <Select
@@ -128,13 +225,13 @@ function EditProfile() {
           name="userType"
           value={profile.userType}
           onChange={handleChange}
+          disabled
         >
           <MenuItem value="Normal">Normal</MenuItem>
           <MenuItem value="Admin">Admin</MenuItem>
         </Select>
       </FormControl>
 
-      {/* Teams */}
       <FormControl fullWidth margin="normal">
         <InputLabel id="teams-label">Teams</InputLabel>
         <Select
@@ -159,25 +256,23 @@ function EditProfile() {
         </Select>
       </FormControl>
 
-      {/* User Account Management */}
       <Typography variant="h6" gutterBottom sx={{ marginTop: '2rem' }}>User Account Management</Typography>
       <Button
         variant="outlined"
         color="primary"
         sx={{ marginRight: '1rem' }}
-        onClick={() => console.log('Requesting password reset...')}
+        onClick={handlePasswordReset}
       >
         Request for password reset
       </Button>
       <Button
         variant="contained"
         color="error"
-        onClick={() => console.log('Deleting account...')}
+        onClick={handleDeleteAccount}
       >
         Delete Account (DANGER!)
       </Button>
 
-      {/* Save Changes and Cancel Buttons */}
       <Box sx={{ marginTop: '2rem' }}>
         <Button
           variant="contained"

@@ -7,7 +7,8 @@ import {
   confirmPasswordReset,
   updateProfile,
   verifyPasswordResetCode,
-  signOut
+  signOut,
+  deleteUser
 } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
@@ -39,5 +40,6 @@ export {
   confirmPasswordReset,
   updateProfile,
   verifyPasswordResetCode,
-  signOut
+  signOut,
+  deleteUser
 };
