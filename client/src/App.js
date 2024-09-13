@@ -5,7 +5,6 @@ import { auth } from './firebaseConfig';
 import Header from './Header';
 import Sidebar from './Sidebar';
 import UserWorkspace from './components/UserWorkspace';
-import SettingsProfile from './components/SettingsProfile';
 import SettingsUsers from './components/SettingsUsers';
 import LoginForm from './LoginForm';
 import SignUpForm from './SignUpForm';
@@ -41,11 +40,11 @@ function App() {
         <Box
           component="main"
           sx={{
-            flexGrow: 1, 
-            padding: '1rem', 
-            width: '100%', 
-            maxWidth: `calc(100% - ${drawerWidth}px)`, 
-            mt: '80px',  
+            flexGrow: 1,
+            padding: '1rem',
+            width: '100%',
+            maxWidth: `calc(100% - ${drawerWidth}px)`,
+            mt: '80px',
           }}
         >
           <Header user={user} />
