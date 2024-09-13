@@ -29,6 +29,49 @@ body {
     color: #666;
 }
 
+/* Team selection styles */
+.teams-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.team-checkbox {
+    display: flex;
+    align-items: center;
+    background-color: #f0f2f5;
+    border-radius: 20px;
+    padding: 5px 15px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.team-checkbox:hover {
+    background-color: #e4e6e9;
+}
+
+.team-checkbox input[type="checkbox"] {
+    display: none;
+}
+
+.team-checkbox label {
+    margin-left: 5px;
+    cursor: pointer;
+}
+
+.team-checkbox input[type="checkbox"]:checked + label {
+    font-weight: bold;
+    color: #25316D;
+}
+
+.team-checkbox input[type="checkbox"]:checked + label::before {
+    content: '✓';
+    display: inline-block;
+    margin-right: 5px;
+    color: #25316D;
+}
+
 /* Form Groups */
 .form-group {
     margin-bottom: 20px;

@@ -4,7 +4,16 @@ import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, storage, db } from './firebaseConfig';
-import './AuthForms.css';
+
+const teams = [
+  'Assets and Facilities',
+  'Manpower',
+  'Vessel Visits',
+  'Port Operations and Resources',
+  'Cargos',
+  'Financial',
+  'Customs and Trade Documents'
+];
 
 function SignUpForm() {
     const [email, setEmail] = useState('');
@@ -14,6 +23,7 @@ function SignUpForm() {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [photoFile, setPhotoFile] = useState(null);
     const [salutation, setSalutation] = useState('Mr');
+    const [selectedTeams, setSelectedTeams] = useState([]);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
@@ -31,6 +41,10 @@ function SignUpForm() {
             setError('Password should be at least 6 characters long');
             return false;
         }
+        if (selectedTeams.length === 0) {
+            setError('Please select at least one team');
+            return false;
+        }
         return true;
     };
 
@@ -43,6 +57,14 @@ function SignUpForm() {
             }
             setPhotoFile(file);
         }
+    };
+
+    const handleTeamChange = (team) => {
+        setSelectedTeams(prevTeams => 
+            prevTeams.includes(team)
+                ? prevTeams.filter(t => t !== team)
+                : [...prevTeams, team]
+        );
     };
 
     const handleSubmit = async (e) => {
@@ -79,6 +101,7 @@ function SignUpForm() {
                 lastName: lastName,
                 salutation: salutation,
                 photoURL: photoURL,
+                teams: selectedTeams,
                 createdAt: new Date()
             });
 
@@ -179,6 +202,22 @@ function SignUpForm() {
                         placeholder="Confirm Password*"
                         required
                     />
+                </div>
+                <div className="form-group">
+                    <label>Teams*</label>
+                    <div className="teams-container">
+                        {teams.map((team) => (
+                            <div key={team} className="team-checkbox">
+                                <input
+                                    type="checkbox"
+                                    id={team}
+                                    checked={selectedTeams.includes(team)}
+                                    onChange={() => handleTeamChange(team)}
+                                />
+                                <label htmlFor={team}>{team}</label>
+                            </div>
+                        ))}
+                    </div>
                 </div>
                 <button type="submit" className="auth-button" disabled={loading}>
                     {loading ? 'Signing Up...' : 'Sign Up'}
