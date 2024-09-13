@@ -21,9 +21,21 @@ import {
   Select,
   MenuItem,
   FormControl,
-  InputLabel
+  InputLabel,
+  Checkbox,
+  ListItemText
 } from '@mui/material';
 import { getUsers, updateUser, deleteUser } from '../services/api';
+
+const teams = [
+  'Assets and Facilities',
+  'Manpower',
+  'Vessel Visits',
+  'Port Operations and Resources',
+  'Cargos',
+  'Financial',
+  'Customs and Trade Documents'
+];
 
 const SettingsUsers = () => {
   const [users, setUsers] = useState([]);
@@ -45,7 +57,7 @@ const SettingsUsers = () => {
       user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (user.team && user.team.toLowerCase().includes(searchTerm.toLowerCase()))
+      (user.teams && user.teams.some(team => team.toLowerCase().includes(searchTerm.toLowerCase())))
     );
     setFilteredUsers(filtered);
     setCurrentPage(1);
@@ -113,7 +125,7 @@ const SettingsUsers = () => {
             <TableRow>
               <TableCell>Name</TableCell>
               <TableCell>Email</TableCell>
-              <TableCell>Team</TableCell>
+              <TableCell>Teams</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -122,7 +134,7 @@ const SettingsUsers = () => {
               <TableRow key={user.id}>
                 <TableCell>{`${user.firstName} ${user.lastName}`}</TableCell>
                 <TableCell>{user.email}</TableCell>
-                <TableCell>{user.team || 'N/A'}</TableCell>
+                <TableCell>{user.teams ? user.teams.join(', ') : 'N/A'}</TableCell>
                 <TableCell>
                   <Button
                     startIcon={<Edit2 />}
@@ -181,22 +193,20 @@ const SettingsUsers = () => {
             onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
           />
           <FormControl fullWidth margin="dense">
-            <InputLabel>Team</InputLabel>
+            <InputLabel>Teams</InputLabel>
             <Select
-              value={editingUser?.team || ''}
-              onChange={(e) => setEditingUser({ ...editingUser, team: e.target.value })}
-              label="Team"
+              multiple
+              value={editingUser?.teams || []}
+              onChange={(e) => setEditingUser({ ...editingUser, teams: e.target.value })}
+              renderValue={(selected) => selected.join(', ')}
+              label="Teams"
             >
-              <MenuItem value="">
-                <em>None</em>
-              </MenuItem>
-              <MenuItem value="Assets and Facilities">Assets and Facilities</MenuItem>
-              <MenuItem value="Manpower">Manpower</MenuItem>
-              <MenuItem value="Vessel Visits">Vessel Visits</MenuItem>
-              <MenuItem value="Port Operations">Port Operations</MenuItem>
-              <MenuItem value="Cargos">Cargos</MenuItem>
-              <MenuItem value="Financial">Financial</MenuItem>
-              <MenuItem value="Customs and Trade">Customs and Trade</MenuItem>
+              {teams.map((team) => (
+                <MenuItem key={team} value={team}>
+                  <Checkbox checked={(editingUser?.teams || []).indexOf(team) > -1} />
+                  <ListItemText primary={team} />
+                </MenuItem>
+              ))}
             </Select>
           </FormControl>
         </DialogContent>
