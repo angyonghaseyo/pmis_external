@@ -4,7 +4,7 @@
   "description": "Server for External Port Management System",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
+    "start": "set PORT=5000 && node index.js",
     "dev": "nodemon index.js"
   },
   "dependencies": {
