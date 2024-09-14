@@ -189,27 +189,28 @@ const SettingsUsers = () => {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell width="20%">Name</TableCell>
-              <TableCell width="25%">Email</TableCell>
-              <TableCell width="25%">Teams</TableCell>
-              <TableCell width="15%">User Type</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell width="15%">Actions</TableCell>
+              <TableCell style={{ width: '15%' }}>Name</TableCell>
+              <TableCell style={{ width: '20%' }}>Email</TableCell>
+              <TableCell style={{ width: '25%' }}>Teams</TableCell>
+              <TableCell style={{ width: '10%' }}>User Type</TableCell>
+              <TableCell style={{ width: '10%' }}>Status</TableCell>
+              <TableCell style={{ width: '20%' }}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {currentUsers.map((user) => (
               <TableRow key={user.id}>
-                <TableCell width="20%">{`${user.firstName} ${user.lastName}`}</TableCell>
-                <TableCell width="25%">{user.email}</TableCell>
-                <TableCell width="25%">{user.teams ? user.teams.join(', ') : 'N/A'}</TableCell>
-                <TableCell width="15%">{user.userType || 'Normal'}</TableCell>
+                <TableCell>{`${user.firstName} ${user.lastName}`}</TableCell>
+                <TableCell>{user.email}</TableCell>
+                <TableCell>{user.teams ? user.teams.join(', ') : 'N/A'}</TableCell>
+                <TableCell>{user.userType || 'Normal'}</TableCell>
                 <TableCell>{user.status}</TableCell>
-                <TableCell width="15%">
+                <TableCell>
                   <Button
                     startIcon={<Edit2 />}
                     onClick={() => setEditingUser(user)}
                     size="small"
+                    style={{ marginRight: '8px' }} // Add space between buttons
                   >
                     Edit
                   </Button>
