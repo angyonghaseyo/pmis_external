@@ -25,8 +25,8 @@ import {
   Checkbox,
   ListItemText
 } from '@mui/material';
-import { getUsers, updateUser, deleteUser, inviteUser, getCurrentUser } from '../services/api';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { getUsers, updateUser, deleteUser, inviteUser, getCurrentUser, cancelInvitation } from '../services/api';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 
 const teams = [
@@ -38,8 +38,6 @@ const teams = [
   'Financial',
   'Customs and Trade Documents'
 ];
-
-const userTypes = ['Normal', 'Admin'];
 
 const SettingsUsers = () => {
   const [users, setUsers] = useState([]);
@@ -73,8 +71,7 @@ const SettingsUsers = () => {
       user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (user.teams && user.teams.some(team => team.toLowerCase().includes(searchTerm.toLowerCase()))) ||
-      (user.userType && user.userType.toLowerCase().includes(searchTerm.toLowerCase()))
+      (user.teams && user.teams.some(team => team.toLowerCase().includes(searchTerm.toLowerCase())))
     );
     setFilteredUsers(filtered);
     setCurrentPage(1);
@@ -83,33 +80,9 @@ const SettingsUsers = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const currentUser = await getCurrentUser();
-      const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-      const company = userDoc.data().company;
-
-      // Fetch active users
-      const usersQuery = query(collection(db, 'users'), where('company', '==', company));
-      const usersSnapshot = await getDocs(usersQuery);
-      const activeUsers = usersSnapshot.docs.map(doc => ({ 
-        id: doc.id, 
-        ...doc.data(), 
-        status: 'Active',
-        name: `${doc.data().firstName} ${doc.data().lastName}`
-      }));
-
-      // Fetch pending invitations
-      const invitationsQuery = query(collection(db, 'invitations'), where('company', '==', company), where('status', '==', 'Pending'));
-      const invitationsSnapshot = await getDocs(invitationsQuery);
-      const pendingUsers = invitationsSnapshot.docs.map(doc => ({ 
-        id: doc.id, 
-        ...doc.data(), 
-        status: 'Pending',
-        name: `${doc.data().firstName} ${doc.data().lastName}`
-      }));
-
-      const allUsers = [...activeUsers, ...pendingUsers];
-      setUsers(allUsers);
-      setFilteredUsers(allUsers);
+      const fetchedUsers = await getUsers();
+      setUsers(fetchedUsers);
+      setFilteredUsers(fetchedUsers);
       setLoading(false);
     } catch (err) {
       console.error('Error fetching users:', err);
@@ -130,8 +103,13 @@ const SettingsUsers = () => {
 
   const handleUpdateUser = async (userId, updatedData) => {
     try {
-      const { email, ...dataToUpdate } = updatedData;
-      await updateUser(userId, dataToUpdate);
+      const { email, status, ...dataToUpdate } = updatedData;
+      dataToUpdate.userType = 'Normal'; // Ensure userType is always 'Normal'
+      if (status === 'Pending') {
+        await updateUser(userId, dataToUpdate, true);
+      } else {
+        await updateUser(userId, dataToUpdate);
+      }
       setUsers(users.map(user => user.id === userId ? { ...user, ...dataToUpdate } : user));
       setEditingUser(null);
     } catch (err) {
@@ -140,9 +118,13 @@ const SettingsUsers = () => {
     }
   };
 
-  const handleDeleteUser = async (userId) => {
+  const handleDeleteUser = async (userId, status) => {
     try {
-      await deleteUser(userId);
+      if (status === 'Pending') {
+        await cancelInvitation(userId);
+      } else {
+        await deleteUser(userId);
+      }
       setUsers(users.filter(user => user.id !== userId));
       setDeleteConfirmation(null);
     } catch (err) {
@@ -215,10 +197,10 @@ const SettingsUsers = () => {
           <TableBody>
             {currentUsers.map((user) => (
               <TableRow key={user.id}>
-                <TableCell>{user.name}</TableCell>
+                <TableCell>{`${user.firstName} ${user.lastName}`}</TableCell>
                 <TableCell>{user.email}</TableCell>
                 <TableCell>{user.teams ? user.teams.join(', ') : 'N/A'}</TableCell>
-                <TableCell>{user.userType || 'N/A'}</TableCell>
+                <TableCell>{user.userType || 'Normal'}</TableCell>
                 <TableCell>{user.status}</TableCell>
                 <TableCell>
                   <Button
@@ -234,7 +216,7 @@ const SettingsUsers = () => {
                     color="error"
                     size="small"
                   >
-                    Delete
+                    {user.status === 'Pending' ? 'Cancel' : 'Delete'}
                   </Button>
                 </TableCell>
               </TableRow>
@@ -296,20 +278,14 @@ const SettingsUsers = () => {
               ))}
             </Select>
           </FormControl>
-          <FormControl fullWidth margin="dense">
-            <InputLabel>User Type</InputLabel>
-            <Select
-              value={editingUser?.userType || ''}
-              onChange={(e) => setEditingUser({ ...editingUser, userType: e.target.value })}
-              label="User Type"
-            >
-              {userTypes.map((type) => (
-                <MenuItem key={type} value={type}>
-                  {type}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <TextField
+            margin="dense"
+            label="User Type"
+            fullWidth
+            variant="outlined"
+            value="Normal"
+            disabled
+          />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setEditingUser(null)}>Cancel</Button>
@@ -325,13 +301,13 @@ const SettingsUsers = () => {
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to delete the user {deleteConfirmation?.name}?
+            Are you sure you want to {deleteConfirmation?.status === 'Pending' ? 'cancel the invitation for' : 'delete the user'} {deleteConfirmation?.firstName} {deleteConfirmation?.lastName}?
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteConfirmation(null)}>Cancel</Button>
-          <Button onClick={() => handleDeleteUser(deleteConfirmation.id)} color="error">
-            Delete
+          <Button onClick={() => handleDeleteUser(deleteConfirmation.id, deleteConfirmation.status)} color="error">
+            {deleteConfirmation?.status === 'Pending' ? 'Cancel Invitation' : 'Delete'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -374,14 +350,6 @@ const SettingsUsers = () => {
             value={currentUserCompany}
             disabled
           />
-          <TextField
-            margin="dense"
-            label="User Type"
-            fullWidth
-            variant="outlined"
-            value="Normal"
-            disabled
-          />
           <FormControl fullWidth margin="dense">
             <InputLabel>Teams</InputLabel>
             <Select
@@ -399,6 +367,14 @@ const SettingsUsers = () => {
               ))}
             </Select>
           </FormControl>
+          <TextField
+            margin="dense"
+            label="User Type"
+            fullWidth
+            variant="outlined"
+            value="Normal"
+            disabled
+          />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setInviteDialogOpen(false)}>Cancel</Button>

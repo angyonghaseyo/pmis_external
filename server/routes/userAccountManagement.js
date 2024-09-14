@@ -18,28 +18,36 @@ const adminCheck = async (req, res, next) => {
       res.status(403).json({ error: 'Unauthorized access' });
     }
   } catch (error) {
+    console.error('Error checking user permissions:', error);
     res.status(500).json({ error: 'Error checking user permissions' });
   }
 };
 
-// Get all users (admin only)
+// Get all users and invitations (admin only)
 router.get('/users', adminCheck, async (req, res) => {
   try {
-    const snapshot = await admin.firestore().collection('users')
+    const usersSnapshot = await admin.firestore().collection('users')
       .where('company', '==', req.user.company)
       .get();
-    const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    res.json(users);
+    const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), status: 'Active' }));
+
+    const invitationsSnapshot = await admin.firestore().collection('invitations')
+      .where('company', '==', req.user.company)
+      .where('status', '==', 'Pending')
+      .get();
+    const invitations = invitationsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), status: 'Pending' }));
+
+    res.json([...users, ...invitations]);
   } catch (error) {
-    console.error('Error fetching users:', error);
-    res.status(500).json({ error: 'Error fetching users' });
+    console.error('Error fetching users and invitations:', error);
+    res.status(500).json({ error: 'Error fetching users and invitations' });
   }
 });
 
 // Create a new user (admin only)
 router.post('/users', adminCheck, async (req, res) => {
   try {
-    const { email, password, firstName, lastName, teams } = req.body;
+    const { email, password, firstName, lastName, teams, userType } = req.body;
     const userRecord = await admin.auth().createUser({
       email,
       password,
@@ -50,7 +58,7 @@ router.post('/users', adminCheck, async (req, res) => {
       firstName,
       lastName,
       company: req.user.company,
-      userType: 'Normal',
+      userType: userType || 'Normal',
       teams
     });
     res.status(201).json({ message: 'User created successfully', userId: userRecord.uid });
@@ -60,17 +68,28 @@ router.post('/users', adminCheck, async (req, res) => {
   }
 });
 
-// Update a user (admin only)
+// Update a user or invitation (admin only)
 router.put('/users/:userId', adminCheck, async (req, res) => {
   try {
     const { userId } = req.params;
-    const { firstName, lastName, teams, userType } = req.body;
-    await admin.firestore().collection('users').doc(userId).update({ 
-      firstName, 
-      lastName, 
-      teams,
-      userType
-    });
+    const { firstName, lastName, teams, userType, status } = req.body;
+    
+    if (status === 'Pending') {
+      await admin.firestore().collection('invitations').doc(userId).update({ 
+        firstName, 
+        lastName, 
+        teams,
+        userType
+      });
+    } else {
+      await admin.firestore().collection('users').doc(userId).update({ 
+        firstName, 
+        lastName, 
+        teams,
+        userType
+      });
+    }
+    
     res.json({ message: 'User updated successfully' });
   } catch (error) {
     console.error('Error updating user:', error);
@@ -78,35 +97,59 @@ router.put('/users/:userId', adminCheck, async (req, res) => {
   }
 });
 
-// Delete a user (admin only)
+// Delete a user or cancel an invitation (admin only)
 router.delete('/users/:userId', adminCheck, async (req, res) => {
   try {
     const { userId } = req.params;
-    await admin.auth().deleteUser(userId);
-    await admin.firestore().collection('users').doc(userId).delete();
-    res.json({ message: 'User deleted successfully' });
+    const { status } = req.query;
+
+    if (status === 'Pending') {
+      await admin.firestore().collection('invitations').doc(userId).delete();
+      res.json({ message: 'Invitation cancelled successfully' });
+    } else {
+      await admin.auth().deleteUser(userId);
+      await admin.firestore().collection('users').doc(userId).delete();
+      res.json({ message: 'User deleted successfully' });
+    }
   } catch (error) {
-    console.error('Error deleting user:', error);
-    res.status(500).json({ error: 'Error deleting user' });
+    console.error('Error deleting user or cancelling invitation:', error);
+    res.status(500).json({ error: 'Error deleting user or cancelling invitation' });
   }
 });
 
 // Invite a new user (admin only)
 router.post('/invite', adminCheck, async (req, res) => {
   try {
-    const { email, firstName, lastName, teams } = req.body;
+    const { email, firstName, lastName, teams, userType } = req.body;
     
-    // Get the current user's company
-    const adminUser = await admin.firestore().collection('users').doc(req.user.uid).get();
-    const company = adminUser.data().company;
+    // Check if the user already exists
+    const existingUserSnapshot = await admin.firestore().collection('users')
+      .where('email', '==', email)
+      .where('company', '==', req.user.company)
+      .get();
+    
+    if (!existingUserSnapshot.empty) {
+      return res.status(400).json({ error: 'User with this email already exists' });
+    }
+
+    // Check if there's already a pending invitation
+    const existingInvitationSnapshot = await admin.firestore().collection('invitations')
+      .where('email', '==', email)
+      .where('company', '==', req.user.company)
+      .where('status', '==', 'Pending')
+      .get();
+    
+    if (!existingInvitationSnapshot.empty) {
+      return res.status(400).json({ error: 'An invitation for this email is already pending' });
+    }
 
     // Create a new invitation document
     const invitationRef = await admin.firestore().collection('invitations').add({
       email,
       firstName,
       lastName,
-      company,
-      userType: 'Normal',
+      company: req.user.company,
+      userType: userType || 'Normal',
       teams,
       status: 'Pending',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -181,14 +224,12 @@ router.post('/accept-invitation', async (req, res) => {
       firstName: invitationData.firstName,
       lastName: invitationData.lastName,
       company: invitationData.company,
-      userType: 'Normal',
+      userType: invitationData.userType,
       teams: invitationData.teams
     });
 
-    // Update the invitation status
-    await admin.firestore().collection('invitations').doc(invitationId).update({
-      status: 'accepted'
-    });
+    // Delete the invitation
+    await admin.firestore().collection('invitations').doc(invitationId).delete();
 
     res.status(201).json({ message: 'Account created successfully' });
   } catch (error) {
