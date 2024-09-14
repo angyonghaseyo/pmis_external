@@ -25,8 +25,10 @@ import {
 import { getUserInquiriesFeedback, createInquiryFeedback } from './services/api';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import { auth } from './firebaseConfig';
 
 const InquiryFeedback = () => {
+  const [user, setUser] = useState(null);
   const [inquiries, setInquiries] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [formData, setFormData] = useState({
@@ -40,6 +42,14 @@ const InquiryFeedback = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [submitError, setSubmitError] = useState(null);
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+      setUser(currentUser);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     fetchInquiriesFeedback();
@@ -123,7 +133,7 @@ const InquiryFeedback = () => {
     <Box sx={{ display: 'flex' }}>
       <Sidebar />
       <Box sx={{ flexGrow: 1, p: 3 }}>
-        <Header />
+        <Header user={user} />
 
         <Box display="flex" justifyContent="space-between" alignItems="center" mt={2}>
           <Typography variant="h4" component="h2">Inquiries & Feedback</Typography>
