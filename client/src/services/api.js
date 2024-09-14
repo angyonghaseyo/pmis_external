@@ -18,9 +18,14 @@ import {
   setDoc, 
   updateDoc, 
   deleteDoc, 
-  addDoc 
+  addDoc,
+  serverTimestamp
 } from 'firebase/firestore';
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+
 import { db } from '../firebaseConfig';
+
+const storage = getStorage();
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
@@ -192,6 +197,94 @@ export const cancelInvitation = async (invitationId) => {
   }
 };
 
+// Get user's inquiries and feedback
+export const getUserInquiriesFeedback = async () => {
+  try {
+    const user = auth.currentUser;
+    if (!user) throw new Error('No authenticated user');
+
+    const q = query(collection(db, 'inquiries_feedback'), where('userId', '==', user.uid));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  } catch (error) {
+    console.error('Error fetching inquiries and feedback:', error);
+    throw error;
+  }
+};
+
+// Create new inquiry or feedback
+export const createInquiryFeedback = async (data) => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      console.error('No authenticated user');
+      throw new Error('No authenticated user');
+    }
+
+    let fileURL = null;
+    if (data.file) {
+      try {
+        const fileExtension = data.file.name.split('.').pop();
+        const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 15)}.${fileExtension}`;
+        const fileRef = storageRef(storage, `inquiries_feedback/${fileName}`);
+        const snapshot = await uploadBytes(fileRef, data.file);
+        fileURL = await getDownloadURL(snapshot.ref);
+        console.log('File uploaded successfully:', fileURL);
+      } catch (uploadError) {
+        console.error('Error uploading file:', uploadError);
+        throw new Error('Failed to upload file: ' + uploadError.message);
+      }
+    }
+
+    // Create a new object without the 'file' property
+    const { file, ...dataWithoutFile } = data;
+
+    const docData = {
+      ...dataWithoutFile,
+      userId: user.uid,
+      createdAt: serverTimestamp(),
+      status: 'Open',
+      fileURL: fileURL
+    };
+
+    console.log('Attempting to add document with data:', JSON.stringify(docData, null, 2));
+
+    try {
+      const docRef = await addDoc(collection(db, 'inquiries_feedback'), docData);
+      console.log('Document written with ID:', docRef.id);
+      return docRef.id;
+    } catch (firestoreError) {
+      console.error('Error adding document to Firestore:', firestoreError);
+      throw new Error('Failed to save inquiry/feedback data: ' + firestoreError.message);
+    }
+  } catch (error) {
+    console.error('Error in createInquiryFeedback:', error);
+    throw error;
+  }
+};
+
+// Update inquiry or feedback
+export const updateInquiryFeedback = async (id, data) => {
+  try {
+    const docRef = doc(db, 'inquiries_feedback', id);
+    await updateDoc(docRef, data);
+  } catch (error) {
+    console.error('Error updating inquiry/feedback:', error);
+    throw error;
+  }
+};
+
+// Delete inquiry or feedback
+export const deleteInquiryFeedback = async (id) => {
+  try {
+    const docRef = doc(db, 'inquiries_feedback', id);
+    await deleteDoc(docRef);
+  } catch (error) {
+    console.error('Error deleting inquiry/feedback:', error);
+    throw error;
+  }
+};
+
 // Dashboard data
 export const getLeaveStatistics = () => authAxios.get('/leave-statistics').catch(handleApiError);
 
@@ -267,6 +360,10 @@ const api = {
   deleteUserAccount,
   inviteUser,
   cancelInvitation,
+  getUserInquiriesFeedback,
+  createInquiryFeedback,
+  updateInquiryFeedback,
+  deleteInquiryFeedback,
   getLeaveStatistics,
   getTimeLog,
   getServiceOperations,
