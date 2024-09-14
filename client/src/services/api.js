@@ -8,7 +8,18 @@ import {
   updateProfile,
   deleteUser as firebaseDeleteUser
 } from '../firebaseConfig';
-import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { 
+  collection, 
+  query, 
+  where, 
+  getDocs, 
+  doc, 
+  getDoc, 
+  setDoc, 
+  updateDoc, 
+  deleteDoc, 
+  addDoc 
+} from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
@@ -92,8 +103,23 @@ export const getUsers = async () => {
       where('company', '==', currentUserData.company)
     );
 
-    const querySnapshot = await getDocs(usersQuery);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const usersSnapshot = await getDocs(usersQuery);
+    const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), status: 'Active' }));
+
+    const invitationsQuery = query(
+      collection(db, 'invitations'),
+      where('company', '==', currentUserData.company),
+      where('status', '==', 'Pending')
+    );
+
+    const invitationsSnapshot = await getDocs(invitationsQuery);
+    const pendingUsers = invitationsSnapshot.docs.map(doc => ({ 
+      id: doc.id, 
+      ...doc.data(), 
+      status: 'Pending'
+    }));
+
+    return [...users, ...pendingUsers];
   } catch (error) {
     console.error('Error fetching users:', error);
     throw error;
@@ -102,16 +128,25 @@ export const getUsers = async () => {
 
 export const createUser = async (userData) => {
   try {
-    const docRef = await setDoc(doc(collection(db, 'users')), userData);
+    const docRef = await addDoc(collection(db, 'users'), { ...userData, userType: 'Normal' });
     return docRef.id;
   } catch (error) {
     handleApiError(error);
   }
 };
 
-export const updateUser = async (userId, userData) => {
+export const updateUser = async (userId, userData, isPending = false) => {
   try {
-    await updateDoc(doc(db, 'users', userId), userData);
+    const dataToUpdate = {
+      ...userData,
+      userType: 'Normal' // Ensure userType is always 'Normal'
+    };
+    
+    if (isPending) {
+      await updateDoc(doc(db, 'invitations', userId), dataToUpdate);
+    } else {
+      await updateDoc(doc(db, 'users', userId), dataToUpdate);
+    }
   } catch (error) {
     handleApiError(error);
   }
@@ -130,6 +165,28 @@ export const deleteUserAccount = async () => {
     const user = auth.currentUser;
     await deleteDoc(doc(db, 'users', user.uid));
     await firebaseDeleteUser(user);
+  } catch (error) {
+    handleApiError(error);
+  }
+};
+
+export const inviteUser = async (userData) => {
+  try {
+    const invitationRef = await addDoc(collection(db, 'invitations'), {
+      ...userData,
+      userType: 'Normal', // Ensure userType is always 'Normal'
+      createdAt: new Date(),
+      status: 'Pending'
+    });
+    return invitationRef.id;
+  } catch (error) {
+    handleApiError(error);
+  }
+};
+
+export const cancelInvitation = async (invitationId) => {
+  try {
+    await deleteDoc(doc(db, 'invitations', invitationId));
   } catch (error) {
     handleApiError(error);
   }
@@ -208,6 +265,8 @@ const api = {
   updateUser,
   deleteUser,
   deleteUserAccount,
+  inviteUser,
+  cancelInvitation,
   getLeaveStatistics,
   getTimeLog,
   getServiceOperations,
