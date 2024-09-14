@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Edit2, Trash2 } from 'lucide-react';
+import { Edit2, Trash2, UserPlus } from 'lucide-react';
 import { 
   Table, 
   TableBody, 
@@ -25,7 +25,9 @@ import {
   Checkbox,
   ListItemText
 } from '@mui/material';
-import { getUsers, updateUser, deleteUser } from '../services/api';
+import { getUsers, updateUser, deleteUser, inviteUser, getCurrentUser } from '../services/api';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebaseConfig';
 
 const teams = [
   'Assets and Facilities',
@@ -49,9 +51,21 @@ const SettingsUsers = () => {
   const [error, setError] = useState(null);
   const [editingUser, setEditingUser] = useState(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState(null);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [currentUserCompany, setCurrentUserCompany] = useState('');
+  const [newUser, setNewUser] = useState({
+    email: '',
+    firstName: '',
+    lastName: '',
+    company: '',
+    userType: 'Normal',
+    teams: [],
+    status: 'pending'
+  });
 
   useEffect(() => {
     fetchUsers();
+    fetchCurrentUserCompany();
   }, []);
 
   useEffect(() => {
@@ -80,6 +94,16 @@ const SettingsUsers = () => {
     }
   };
 
+  const fetchCurrentUserCompany = async () => {
+    try {
+      const user = await getCurrentUser();
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      setCurrentUserCompany(userDoc.data().company);
+    } catch (err) {
+      console.error('Error fetching current user company:', err);
+    }
+  };
+
   const handleUpdateUser = async (userId, updatedData) => {
     try {
       const { email, ...dataToUpdate } = updatedData;
@@ -103,6 +127,26 @@ const SettingsUsers = () => {
     }
   };
 
+  const handleInviteUser = async () => {
+    try {
+      await inviteUser({...newUser, company: currentUserCompany});
+      setUsers([...users, { ...newUser, id: Date.now().toString(), company: currentUserCompany }]);
+      setInviteDialogOpen(false);
+      setNewUser({
+        email: '',
+        firstName: '',
+        lastName: '',
+        company: '',
+        userType: 'Normal',
+        teams: [],
+        status: 'pending'
+      });
+    } catch (err) {
+      console.error('Error inviting user:', err);
+      setError('Failed to invite user. Please try again.');
+    }
+  };
+
   const indexOfLastUser = currentPage * usersPerPage;
   const indexOfFirstUser = indexOfLastUser - usersPerPage;
   const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
@@ -114,7 +158,16 @@ const SettingsUsers = () => {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>Users</Typography>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+        <Typography variant="h4">Users</Typography>
+        <Button
+          variant="contained"
+          startIcon={<UserPlus />}
+          onClick={() => setInviteDialogOpen(true)}
+        >
+          Invite User
+        </Button>
+      </Box>
       <TextField
         label="Search users"
         variant="outlined"
@@ -127,21 +180,23 @@ const SettingsUsers = () => {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell width="20%">Name</TableCell>
-              <TableCell width="25%">Email</TableCell>
-              <TableCell width="25%">Teams</TableCell>
-              <TableCell width="15%">User Type</TableCell>
-              <TableCell width="15%">Actions</TableCell>
+              <TableCell>Name</TableCell>
+              <TableCell>Email</TableCell>
+              <TableCell>Teams</TableCell>
+              <TableCell>User Type</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {currentUsers.map((user) => (
               <TableRow key={user.id}>
-                <TableCell width="20%">{`${user.firstName} ${user.lastName}`}</TableCell>
-                <TableCell width="25%">{user.email}</TableCell>
-                <TableCell width="25%">{user.teams ? user.teams.join(', ') : 'N/A'}</TableCell>
-                <TableCell width="15%">{user.userType || 'N/A'}</TableCell>
-                <TableCell width="15%">
+                <TableCell>{`${user.firstName} ${user.lastName}`}</TableCell>
+                <TableCell>{user.email}</TableCell>
+                <TableCell>{user.teams ? user.teams.join(', ') : 'N/A'}</TableCell>
+                <TableCell>{user.userType || 'N/A'}</TableCell>
+                <TableCell>{user.status || 'Active'}</TableCell>
+                <TableCell>
                   <Button
                     startIcon={<Edit2 />}
                     onClick={() => setEditingUser(user)}
@@ -253,6 +308,78 @@ const SettingsUsers = () => {
           <Button onClick={() => setDeleteConfirmation(null)}>Cancel</Button>
           <Button onClick={() => handleDeleteUser(deleteConfirmation.id)} color="error">
             Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Invite User Dialog */}
+      <Dialog open={inviteDialogOpen} onClose={() => setInviteDialogOpen(false)}>
+        <DialogTitle>Invite User</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Email Address"
+            type="email"
+            fullWidth
+            variant="outlined"
+            value={newUser.email}
+            onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+          />
+          <TextField
+            margin="dense"
+            label="First Name"
+            fullWidth
+            variant="outlined"
+            value={newUser.firstName}
+            onChange={(e) => setNewUser({ ...newUser, firstName: e.target.value })}
+          />
+          <TextField
+            margin="dense"
+            label="Last Name"
+            fullWidth
+            variant="outlined"
+            value={newUser.lastName}
+            onChange={(e) => setNewUser({ ...newUser, lastName: e.target.value })}
+          />
+          <TextField
+            margin="dense"
+            label="Company"
+            fullWidth
+            variant="outlined"
+            value={currentUserCompany}
+            disabled
+          />
+          <TextField
+            margin="dense"
+            label="User Type"
+            fullWidth
+            variant="outlined"
+            value="Normal"
+            disabled
+          />
+          <FormControl fullWidth margin="dense">
+            <InputLabel>Teams</InputLabel>
+            <Select
+              multiple
+              value={newUser.teams}
+              onChange={(e) => setNewUser({ ...newUser, teams: e.target.value })}
+              renderValue={(selected) => selected.join(', ')}
+              label="Teams"
+            >
+              {teams.map((team) => (
+                <MenuItem key={team} value={team}>
+                  <Checkbox checked={newUser.teams.indexOf(team) > -1} />
+                  <ListItemText primary={team} />
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setInviteDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleInviteUser} variant="contained" color="primary">
+            Invite User
           </Button>
         </DialogActions>
       </Dialog>

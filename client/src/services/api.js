@@ -8,7 +8,7 @@ import {
   updateProfile,
   deleteUser as firebaseDeleteUser
 } from '../firebaseConfig';
-import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
@@ -135,6 +135,20 @@ export const deleteUserAccount = async () => {
   }
 };
 
+// New function for inviting users
+export const inviteUser = async (userData) => {
+  try {
+    const invitationRef = await addDoc(collection(db, 'invitations'), {
+      ...userData,
+      createdAt: new Date(),
+      status: 'pending'
+    });
+    return invitationRef.id;
+  } catch (error) {
+    handleApiError(error);
+  }
+};
+
 // Dashboard data
 export const getLeaveStatistics = () => authAxios.get('/leave-statistics').catch(handleApiError);
 
@@ -208,6 +222,7 @@ const api = {
   updateUser,
   deleteUser,
   deleteUserAccount,
+  inviteUser,
   getLeaveStatistics,
   getTimeLog,
   getServiceOperations,
