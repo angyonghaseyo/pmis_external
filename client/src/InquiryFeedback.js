@@ -180,9 +180,9 @@ const InquiryFeedback = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {inquiries.map((inquiry) => (
+              {inquiries.map((inquiry, index) => (
                 <TableRow key={inquiry.id}>
-                  <TableCell>{inquiry.id}</TableCell>
+                  <TableCell>{index + 1}</TableCell>
                   <TableCell>{inquiry.type}</TableCell>
                   <TableCell>{inquiry.subject}</TableCell>
                   <TableCell>{inquiry.status}</TableCell>
