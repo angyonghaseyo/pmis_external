@@ -15,23 +15,13 @@ const Sidebar = () => {
   const navItems = [
     { name: "Dashboard", icon: <Home />, path: "/", children: [] },
     { name: "Assets and Facilities", icon: <Briefcase />, path: "/assets", children: [] },
-    { 
-      name: "Manpower", 
-      icon: <Users />, 
-      path: "/manpower", 
-      children: ['Inquiries and Feedback'] 
-    },
+    { name: "Manpower", icon: <Users />, path: "/manpower", children: ['Inquiries and Feedback'] },
     { name: "Vessel Visits", icon: <Anchor />, path: "/vessels", children: ['Subitem 1', 'Subitem 2'] },
     { name: "Port Operations and Resources", icon: <Clock />, path: "/operations", children: ['Subitem 1', 'Subitem 2'] },
     { name: "Cargos", icon: <Package />, path: "/cargos", children: ['Subitem 1', 'Subitem 2'] },
     { name: "Financial", icon: <DollarSign />, path: "/financial", children: ['Subitem 1', 'Subitem 2'] },
     { name: "Customs and Trade Documents", icon: <FileText />, path: "/documents", children: ['Subitem 1', 'Subitem 2'] },
-    { 
-      name: "Settings", 
-      icon: <Settings />, 
-      path: "/settings", 
-      children: ['Profile', 'Users'] 
-    }
+    { name: "Settings", icon: <Settings />, path: "/settings", children: ['Profile', 'Users'] }
   ];
 
   const toggleExpand = (index) => {
@@ -43,7 +33,7 @@ const Sidebar = () => {
     navigate(path);
   };
 
-  // Click handler for sub-items (Profile, Users, Inquiries, etc.)
+  // Click handler for sub-items (Profile, Users, Inquiries)
   const handleSubItemClick = (parentPath, subItem) => {
     const formattedSubItem = subItem.toLowerCase().replace(/\s/g, '-');  
     const subItemPath = `${parentPath}/${formattedSubItem}`;

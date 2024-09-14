@@ -220,6 +220,7 @@ function EditProfile() {
             onChange={handleChange}
             fullWidth
             margin="normal"
+            disabled 
           />
         </Grid>
         <Grid item xs={12}>

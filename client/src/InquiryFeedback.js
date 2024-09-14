@@ -75,7 +75,6 @@ const InquiryFeedback = () => {
   };
 
   const handleSubmit = () => {
-    // Validate fields
     const errors = {
       subject: formData.subject.trim() === '',
       description: formData.description.trim() === ''
@@ -84,7 +83,6 @@ const InquiryFeedback = () => {
     setFormErrors(errors);
 
     if (!errors.subject && !errors.description) {
-      // Simulate form submission
       console.log("Submitted data:", formData);
       setOpenDialog(false);
       setFormData({

@@ -25,7 +25,9 @@ import {
   Checkbox,
   ListItemText
 } from '@mui/material';
-import { getUsers, updateUser, deleteUser } from '../services/api';
+import { getUsers, updateUser, deleteUser, inviteUser, getCurrentUser, cancelInvitation } from '../services/api';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebaseConfig';
 
 const teams = [
   'Assets and Facilities',
@@ -37,8 +39,6 @@ const teams = [
   'Customs and Trade Documents'
 ];
 
-const userTypes = ['Normal', 'Admin'];
-
 const SettingsUsers = () => {
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
@@ -49,9 +49,21 @@ const SettingsUsers = () => {
   const [error, setError] = useState(null);
   const [editingUser, setEditingUser] = useState(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState(null);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [currentUserCompany, setCurrentUserCompany] = useState('');
+  const [newUser, setNewUser] = useState({
+    email: '',
+    firstName: '',
+    lastName: '',
+    company: '',
+    userType: 'Normal',
+    teams: [],
+    status: 'Pending'
+  });
 
   useEffect(() => {
     fetchUsers();
+    fetchCurrentUserCompany();
   }, []);
 
   useEffect(() => {
@@ -80,10 +92,26 @@ const SettingsUsers = () => {
     }
   };
 
+  const fetchCurrentUserCompany = async () => {
+    try {
+      const user = await getCurrentUser();
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      setCurrentUserCompany(userDoc.data().company);
+    } catch (err) {
+      console.error('Error fetching current user company:', err);
+    }
+  };
+
   const handleUpdateUser = async (userId, updatedData) => {
     try {
-      const { email, ...dataToUpdate } = updatedData;
-      await updateUser(userId, dataToUpdate);
+      const { email, status, ...dataToUpdate } = updatedData;
+      dataToUpdate.userType = 'Normal'; // Ensure userType is always 'Normal'
+      if (status === 'Pending') {
+        await updateUser(userId, dataToUpdate, true);
+      } else {
+        await updateUser(userId, dataToUpdate);
+      }
+      
       setUsers(users.map(user => user.id === userId ? { ...user, ...dataToUpdate } : user));
       setEditingUser(null);
     } catch (err) {
@@ -92,9 +120,14 @@ const SettingsUsers = () => {
     }
   };
 
-  const handleDeleteUser = async (userId) => {
+  const handleDeleteUser = async (userId, status) => {
     try {
-      await deleteUser(userId);
+      if (status === 'Pending') {
+        await cancelInvitation(userId);
+      } else {
+        await deleteUser(userId);
+      }
+  
       setUsers(users.filter(user => user.id !== userId));
       setDeleteConfirmation(null);
     } catch (err) {
@@ -102,6 +135,26 @@ const SettingsUsers = () => {
       setError('Failed to delete user. Please try again.');
     }
   };
+
+  const handleInviteUser = async () => {
+    try {
+      await inviteUser({...newUser, company: currentUserCompany});
+      setUsers([...users, { ...newUser, id: Date.now().toString(), company: currentUserCompany, status: 'Pending' }]);
+      setInviteDialogOpen(false);
+      setNewUser({
+        email: '',
+        firstName: '',
+        lastName: '',
+        company: '',
+        userType: 'Normal',
+        teams: [],
+        status: 'Pending'
+      });
+    } catch (err) {
+      console.error('Error inviting user:', err);
+      setError('Failed to invite user. Please try again.');
+    }
+  }; // Missing closing brace added here
 
   const indexOfLastUser = currentPage * usersPerPage;
   const indexOfFirstUser = indexOfLastUser - usersPerPage;
@@ -131,6 +184,7 @@ const SettingsUsers = () => {
               <TableCell width="25%">Email</TableCell>
               <TableCell width="25%">Teams</TableCell>
               <TableCell width="15%">User Type</TableCell>
+              <TableCell>Status</TableCell>
               <TableCell width="15%">Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -140,7 +194,8 @@ const SettingsUsers = () => {
                 <TableCell width="20%">{`${user.firstName} ${user.lastName}`}</TableCell>
                 <TableCell width="25%">{user.email}</TableCell>
                 <TableCell width="25%">{user.teams ? user.teams.join(', ') : 'N/A'}</TableCell>
-                <TableCell width="15%">{user.userType || 'N/A'}</TableCell>
+                <TableCell width="15%">{user.userType || 'Normal'}</TableCell>
+                <TableCell>{user.status}</TableCell>
                 <TableCell width="15%">
                   <Button
                     startIcon={<Edit2 />}
@@ -155,7 +210,7 @@ const SettingsUsers = () => {
                     color="error"
                     size="small"
                   >
-                    Delete
+                    {user.status === 'Pending' ? 'Cancel' : 'Delete'}
                   </Button>
                 </TableCell>
               </TableRow>
@@ -217,20 +272,14 @@ const SettingsUsers = () => {
               ))}
             </Select>
           </FormControl>
-          <FormControl fullWidth margin="dense">
-            <InputLabel>User Type</InputLabel>
-            <Select
-              value={editingUser?.userType || ''}
-              onChange={(e) => setEditingUser({ ...editingUser, userType: e.target.value })}
-              label="User Type"
-            >
-              {userTypes.map((type) => (
-                <MenuItem key={type} value={type}>
-                  {type}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <TextField
+            margin="dense"
+            label="User Type"
+            fullWidth
+            variant="outlined"
+            value="Normal"
+            disabled
+          />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setEditingUser(null)}>Cancel</Button>
@@ -246,13 +295,85 @@ const SettingsUsers = () => {
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to delete the user {deleteConfirmation?.firstName} {deleteConfirmation?.lastName}?
+            Are you sure you want to {deleteConfirmation?.status === 'Pending' ? 'cancel the invitation for' : 'delete the user'} {deleteConfirmation?.firstName} {deleteConfirmation?.lastName}?
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteConfirmation(null)}>Cancel</Button>
-          <Button onClick={() => handleDeleteUser(deleteConfirmation.id)} color="error">
-            Delete
+          <Button onClick={() => handleDeleteUser(deleteConfirmation.id, deleteConfirmation.status)} color="error">
+            {deleteConfirmation?.status === 'Pending' ? 'Cancel Invitation' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Invite User Dialog */}
+      <Dialog open={inviteDialogOpen} onClose={() => setInviteDialogOpen(false)}>
+        <DialogTitle>Invite User</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Email Address"
+            type="email"
+            fullWidth
+            variant="outlined"
+            value={newUser.email}
+            onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+          />
+          <TextField
+            margin="dense"
+            label="First Name"
+            fullWidth
+            variant="outlined"
+            value={newUser.firstName}
+            onChange={(e) => setNewUser({ ...newUser, firstName: e.target.value })}
+          />
+          <TextField
+            margin="dense"
+            label="Last Name"
+            fullWidth
+            variant="outlined"
+            value={newUser.lastName}
+            onChange={(e) => setNewUser({ ...newUser, lastName: e.target.value })}
+          />
+          <TextField
+            margin="dense"
+            label="Company"
+            fullWidth
+            variant="outlined"
+            value={currentUserCompany}
+            disabled
+          />
+          <FormControl fullWidth margin="dense">
+            <InputLabel>Teams</InputLabel>
+            <Select
+              multiple
+              value={newUser.teams}
+              onChange={(e) => setNewUser({ ...newUser, teams: e.target.value })}
+              renderValue={(selected) => selected.join(', ')}
+              label="Teams"
+            >
+              {teams.map((team) => (
+                <MenuItem key={team} value={team}>
+                  <Checkbox checked={newUser.teams.indexOf(team) > -1} />
+                  <ListItemText primary={team} />
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <TextField
+            margin="dense"
+            label="User Type"
+            fullWidth
+            variant="outlined"
+            value="Normal"
+            disabled
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setInviteDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleInviteUser} variant="contained" color="primary">
+            Invite User
           </Button>
         </DialogActions>
       </Dialog>
