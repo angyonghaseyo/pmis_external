@@ -12,6 +12,7 @@ import ForgotPassword from './ForgetPassword';
 import ResetPassword from './ResetPassword';
 import EditProfile from './EditProfile';
 import InquiryFeedback from './InquiryFeedback'; 
+import CompanyInfo from './CompanyInfo'; 
 import { Box, CssBaseline } from '@mui/material';
 
 const drawerWidth = 240;
@@ -56,6 +57,7 @@ function App() {
                 <Route path="/manpower/inquiries-and-feedback" element={<InquiryFeedback />} />
                 <Route path="/settings/profile" element={<EditProfile user={user} />} />
                 <Route path="/settings/users" element={<SettingsUsers />} />
+                <Route path="/settings/company" element={<CompanyInfo />} /> 
                 <Route path="*" element={<Navigate to="/" />} />
               </>
             ) : (

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Edit2, Trash2 } from 'lucide-react';
+import { Edit2, Trash2, UserPlus } from 'lucide-react';
 import { 
   Table, 
   TableBody, 
@@ -154,7 +154,7 @@ const SettingsUsers = () => {
       console.error('Error inviting user:', err);
       setError('Failed to invite user. Please try again.');
     }
-  }; // Missing closing brace added here
+  }; 
 
   const indexOfLastUser = currentPage * usersPerPage;
   const indexOfFirstUser = indexOfLastUser - usersPerPage;
@@ -167,7 +167,16 @@ const SettingsUsers = () => {
 
   return (
     <Box sx={{ p: 3 }}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
       <Typography variant="h4" gutterBottom>Users</Typography>
+      <Button
+          variant="contained"
+          startIcon={<UserPlus />}
+          onClick={() => setInviteDialogOpen(true)}
+        >
+          Invite User
+        </Button>
+      </Box>
       <TextField
         label="Search users"
         variant="outlined"

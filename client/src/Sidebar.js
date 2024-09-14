@@ -21,7 +21,7 @@ const Sidebar = () => {
     { name: "Cargos", icon: <Package />, path: "/cargos", children: ['Subitem 1', 'Subitem 2'] },
     { name: "Financial", icon: <DollarSign />, path: "/financial", children: ['Subitem 1', 'Subitem 2'] },
     { name: "Customs and Trade Documents", icon: <FileText />, path: "/documents", children: ['Subitem 1', 'Subitem 2'] },
-    { name: "Settings", icon: <Settings />, path: "/settings", children: ['Profile', 'Users'] }
+    { name: "Settings", icon: <Settings />, path: "/settings", children: ['Profile', 'Users', 'Company'] }
   ];
 
   const toggleExpand = (index) => {
