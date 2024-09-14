@@ -26,7 +26,7 @@ import {
   ListItemText
 } from '@mui/material';
 import { getUsers, updateUser, deleteUser, inviteUser, getCurrentUser } from '../services/api';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 
 const teams = [
@@ -60,7 +60,7 @@ const SettingsUsers = () => {
     company: '',
     userType: 'Normal',
     teams: [],
-    status: 'pending'
+    status: 'Pending'
   });
 
   useEffect(() => {
@@ -83,9 +83,33 @@ const SettingsUsers = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const fetchedUsers = await getUsers();
-      setUsers(fetchedUsers);
-      setFilteredUsers(fetchedUsers);
+      const currentUser = await getCurrentUser();
+      const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+      const company = userDoc.data().company;
+
+      // Fetch active users
+      const usersQuery = query(collection(db, 'users'), where('company', '==', company));
+      const usersSnapshot = await getDocs(usersQuery);
+      const activeUsers = usersSnapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data(), 
+        status: 'Active',
+        name: `${doc.data().firstName} ${doc.data().lastName}`
+      }));
+
+      // Fetch pending invitations
+      const invitationsQuery = query(collection(db, 'invitations'), where('company', '==', company), where('status', '==', 'pending'));
+      const invitationsSnapshot = await getDocs(invitationsQuery);
+      const pendingUsers = invitationsSnapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data(), 
+        status: 'Pending',
+        name: `${doc.data().firstName} ${doc.data().lastName}`
+      }));
+
+      const allUsers = [...activeUsers, ...pendingUsers];
+      setUsers(allUsers);
+      setFilteredUsers(allUsers);
       setLoading(false);
     } catch (err) {
       console.error('Error fetching users:', err);
@@ -130,7 +154,7 @@ const SettingsUsers = () => {
   const handleInviteUser = async () => {
     try {
       await inviteUser({...newUser, company: currentUserCompany});
-      setUsers([...users, { ...newUser, id: Date.now().toString(), company: currentUserCompany }]);
+      setUsers([...users, { ...newUser, id: Date.now().toString(), company: currentUserCompany, status: 'Pending' }]);
       setInviteDialogOpen(false);
       setNewUser({
         email: '',
@@ -139,7 +163,7 @@ const SettingsUsers = () => {
         company: '',
         userType: 'Normal',
         teams: [],
-        status: 'pending'
+        status: 'Pending'
       });
     } catch (err) {
       console.error('Error inviting user:', err);
@@ -191,11 +215,11 @@ const SettingsUsers = () => {
           <TableBody>
             {currentUsers.map((user) => (
               <TableRow key={user.id}>
-                <TableCell>{`${user.firstName} ${user.lastName}`}</TableCell>
+                <TableCell>{user.name}</TableCell>
                 <TableCell>{user.email}</TableCell>
                 <TableCell>{user.teams ? user.teams.join(', ') : 'N/A'}</TableCell>
                 <TableCell>{user.userType || 'N/A'}</TableCell>
-                <TableCell>{user.status || 'Active'}</TableCell>
+                <TableCell>{user.status}</TableCell>
                 <TableCell>
                   <Button
                     startIcon={<Edit2 />}
@@ -301,7 +325,7 @@ const SettingsUsers = () => {
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to delete the user {deleteConfirmation?.firstName} {deleteConfirmation?.lastName}?
+            Are you sure you want to delete the user {deleteConfirmation?.name}?
           </DialogContentText>
         </DialogContent>
         <DialogActions>

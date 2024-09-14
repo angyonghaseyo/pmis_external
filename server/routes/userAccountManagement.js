@@ -108,7 +108,7 @@ router.post('/invite', adminCheck, async (req, res) => {
       company,
       userType: 'Normal',
       teams,
-      status: 'pending',
+      status: 'Pending',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       invitedBy: req.user.uid
     });
@@ -164,7 +164,7 @@ router.post('/accept-invitation', async (req, res) => {
 
     const invitationData = invitationDoc.data();
 
-    if (invitationData.status !== 'pending') {
+    if (invitationData.status !== 'Pending') {
       return res.status(400).json({ error: 'Invitation is no longer valid' });
     }
 
