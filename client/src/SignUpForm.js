@@ -105,7 +105,7 @@ function SignUpForm() {
                 photoURL: photoURL,
                 company: company,
                 teams: selectedTeams,
-                userType: 'admin',
+                userType: 'Admin',
                 createdAt: new Date()
             });
 

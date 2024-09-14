@@ -5,7 +5,7 @@ const admin = require('../config/firebaseAdmin');
 // Helper function to check if user is an admin
 const isAdmin = async (uid) => {
   const userDoc = await admin.firestore().collection('users').doc(uid).get();
-  return userDoc.exists && userDoc.data().userType === 'admin';
+  return userDoc.exists && userDoc.data().userType === 'Admin';
 };
 
 // Middleware to check if the user is an admin

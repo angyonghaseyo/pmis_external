@@ -224,19 +224,14 @@ function EditProfile() {
           />
         </Grid>
         <Grid item xs={12}>
-          <FormControl fullWidth margin="normal">
-            <InputLabel id="user-type-label">User Type</InputLabel>
-            <Select
-              labelId="user-type-label"
-              name="userType"
-              value={profile.userType}
-              onChange={handleChange}
-              disabled
-            >
-              <MenuItem value="Normal">Normal</MenuItem>
-              <MenuItem value="Admin">Admin</MenuItem>
-            </Select>
-          </FormControl>
+          <TextField
+            label="User Type"
+            name="userType"
+            value={profile.userType}
+            fullWidth
+            margin="normal"
+            disabled
+          />
         </Grid>
         <Grid item xs={12}>
           <Box sx={{ border: '1px solid #ccc', borderRadius: '4px', padding: '1rem', marginTop: '1rem' }}>
