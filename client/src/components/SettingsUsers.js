@@ -98,7 +98,7 @@ const SettingsUsers = () => {
       }));
 
       // Fetch pending invitations
-      const invitationsQuery = query(collection(db, 'invitations'), where('company', '==', company), where('status', '==', 'pending'));
+      const invitationsQuery = query(collection(db, 'invitations'), where('company', '==', company), where('status', '==', 'Pending'));
       const invitationsSnapshot = await getDocs(invitationsQuery);
       const pendingUsers = invitationsSnapshot.docs.map(doc => ({ 
         id: doc.id, 
