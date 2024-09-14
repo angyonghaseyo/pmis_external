@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Box, TextField, Typography, Button, MenuItem, Grid } from '@mui/material';
+import { Box, TextField, Typography, Button, MenuItem, Grid, Avatar, IconButton } from '@mui/material';
+import PhotoCamera from '@mui/icons-material/PhotoCamera';
 
 const currencies = [
   { value: 'USD', label: '$ - US Dollar' },
@@ -11,6 +12,7 @@ const currencies = [
 const CompanyInfo = () => {
   const [currency, setCurrency] = useState('USD');
   const [isEditable, setIsEditable] = useState(false);  
+  const [logoUrl, setLogoUrl] = useState(''); 
 
   const handleCurrencyChange = (event) => {
     setCurrency(event.target.value);
@@ -24,6 +26,13 @@ const CompanyInfo = () => {
     setIsEditable(false);
   };
 
+  const handleLogoChange = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      setLogoUrl(URL.createObjectURL(file)); 
+    }
+  };
+
   return (
     <Box sx={{ maxWidth: '1000px', mx: 'auto', p: 3 }}>
       {/* Company Information */}
@@ -31,33 +40,34 @@ const CompanyInfo = () => {
         Company Information
       </Typography>
 
-      {/* Edit Company Information Button */}
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-        {!isEditable ? (
-          <Button variant="contained" color="primary" onClick={handleEditClick}>
-            Edit Company Information
-          </Button>
-        ) : null}
-      </Box>
+      <Grid container spacing={2} alignItems="center">
+        <Grid item xs={2}>
+          {/* Company Logo Display */}
+          <IconButton
+            color="primary"
+            aria-label="upload picture"
+            component="label"
+            disabled={!isEditable}
+          >
+            <input hidden accept="image/*" type="file" onChange={handleLogoChange} />
+            <Avatar
+              alt="Company Logo"
+              src={logoUrl || undefined}
+              sx={{ width: 80, height: 80 }}
+            >
+              {!logoUrl && <Typography variant="h6">C</Typography>}
+            </Avatar>
+            {isEditable && <PhotoCamera />}
+          </IconButton>
+        </Grid>
 
-      <Grid container spacing={2}>
-        <Grid item xs={6}>
+        <Grid item xs={10}>
           <TextField
             label="Company Name"
             fullWidth
             margin="normal"
             InputProps={{
               readOnly: !isEditable,  
-            }}
-          />
-        </Grid>
-        <Grid item xs={6}>
-          <TextField
-            label="Company Logo URL"
-            fullWidth
-            margin="normal"
-            InputProps={{
-              readOnly: !isEditable,
             }}
           />
         </Grid>
@@ -167,6 +177,14 @@ const CompanyInfo = () => {
           </Button>
           <Button variant="contained" color="primary">
             Save
+          </Button>
+        </Box>
+      )}
+
+      {!isEditable && (
+        <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+          <Button variant="contained" color="primary" onClick={handleEditClick}>
+            Edit Company Information
           </Button>
         </Box>
       )}

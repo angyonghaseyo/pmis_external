@@ -15,7 +15,7 @@ const Sidebar = () => {
   const navItems = [
     { name: "Dashboard", icon: <Home />, path: "/", children: [] },
     { name: "Assets and Facilities", icon: <Briefcase />, path: "/assets", children: [] },
-    { name: "Manpower", icon: <Users />, path: "/manpower", children: ['Inquiries and Feedback'] },
+    { name: "Manpower", icon: <Users />, path: "/manpower", children: ['Inquiries and Feedback', 'Training Program'] },
     { name: "Vessel Visits", icon: <Anchor />, path: "/vessels", children: ['Subitem 1', 'Subitem 2'] },
     { name: "Port Operations and Resources", icon: <Clock />, path: "/operations", children: ['Subitem 1', 'Subitem 2'] },
     { name: "Cargos", icon: <Package />, path: "/cargos", children: ['Subitem 1', 'Subitem 2'] },
@@ -28,12 +28,10 @@ const Sidebar = () => {
     setExpandedItems(prev => ({ ...prev, [index]: !prev[index] }));
   };
 
-  // Click handler for items without children
   const handleMainItemClick = (path) => {
     navigate(path);
   };
 
-  // Click handler for sub-items (Profile, Users, Inquiries)
   const handleSubItemClick = (parentPath, subItem) => {
     const formattedSubItem = subItem.toLowerCase().replace(/\s/g, '-');  
     const subItemPath = `${parentPath}/${formattedSubItem}`;

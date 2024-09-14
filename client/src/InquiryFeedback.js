@@ -41,9 +41,9 @@ const InquiryFeedback = () => {
     // Simulate data fetching
     const simulateData = () => {
       const inquiryData = [
-        { id: 1, title: 'Issue with Docking', status: 'Open', dateFiled: '2023-09-15' },
-        { id: 2, title: 'Request for Additional Manpower', status: 'Pending User Action', dateFiled: '2023-09-10' },
-        { id: 3, title: 'Feedback on Cargo Handling', status: 'Closed', dateFiled: '2023-09-05' },
+        { id: 1, type: 'Inquiry', title: 'Issue with Docking', status: 'Open', dateFiled: '2023-09-15' },
+        { id: 2, type: 'Feedback', title: 'Request for Additional Manpower', status: 'Pending User Action', dateFiled: '2023-09-10' },
+        { id: 3, type: 'Inquiry', title: 'Feedback on Cargo Handling', status: 'Closed', dateFiled: '2023-09-05' },
       ];
 
       setInquiries(inquiryData);
@@ -135,6 +135,7 @@ const InquiryFeedback = () => {
             <TableHead>
               <TableRow>
                 <TableCell>ID</TableCell>
+                <TableCell>Type</TableCell>
                 <TableCell>Title</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell>Date Filed</TableCell>
@@ -144,6 +145,7 @@ const InquiryFeedback = () => {
               {inquiries.map((inquiry) => (
                 <TableRow key={inquiry.id} onClick={() => openDetailsPage(inquiry.id)} sx={{ cursor: 'pointer' }}>
                   <TableCell>{inquiry.id}</TableCell>
+                  <TableCell>{inquiry.type}</TableCell>
                   <TableCell>{inquiry.title}</TableCell>
                   <TableCell>{inquiry.status}</TableCell>
                   <TableCell>{inquiry.dateFiled}</TableCell>
