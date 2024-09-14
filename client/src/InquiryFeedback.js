@@ -108,7 +108,6 @@ const InquiryFeedback = () => {
         setLoading(true);
         setSubmitError(null);
         
-        // Create a new FormData object to handle the file
         const submissionData = {
           ...formData,
           file: formData.file instanceof File ? formData.file : null
@@ -116,7 +115,7 @@ const InquiryFeedback = () => {
   
         await createInquiryFeedback(submissionData);
         handleDialogClose();
-        fetchInquiriesFeedback(); // Refresh the list
+        fetchInquiriesFeedback();
       } catch (err) {
         console.error('Error creating inquiry/feedback:', err);
         setSubmitError(`Failed to create inquiry/feedback: ${err.message}`);
@@ -125,6 +124,9 @@ const InquiryFeedback = () => {
       }
     }
   };
+
+  const openInquiriesFeedback = inquiries.filter(item => item.status === 'Open').length;
+  const pendingUserAction = inquiries.filter(item => item.status === 'Pending User Action').length;
 
   if (loading && inquiries.length === 0) return <Box display="flex" justifyContent="center" alignItems="center" height="100vh"><CircularProgress /></Box>;
   if (error) return <Typography color="error" align="center">{error}</Typography>;
@@ -146,9 +148,9 @@ const InquiryFeedback = () => {
           <Grid item xs={12} sm={6} md={3}>
             <Card>
               <CardContent>
-                <Typography variant="subtitle1" color="textSecondary">Open Inquiries</Typography>
+                <Typography variant="subtitle1" color="textSecondary">Open Inquiries/Feedback</Typography>
                 <Typography variant="h4" component="p">
-                  {inquiries.filter(item => item.status === 'Open' && item.type === 'Inquiry').length}
+                  {openInquiriesFeedback}
                 </Typography>
               </CardContent>
             </Card>
@@ -156,9 +158,9 @@ const InquiryFeedback = () => {
           <Grid item xs={12} sm={6} md={3}>
             <Card>
               <CardContent>
-                <Typography variant="subtitle1" color="textSecondary">Open Feedback</Typography>
+                <Typography variant="subtitle1" color="textSecondary">Pending User Action</Typography>
                 <Typography variant="h4" component="p">
-                  {inquiries.filter(item => item.status === 'Open' && item.type === 'Feedback').length}
+                  {pendingUserAction}
                 </Typography>
               </CardContent>
             </Card>
