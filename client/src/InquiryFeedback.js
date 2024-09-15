@@ -173,18 +173,18 @@ const InquiryFeedback = () => {
               <TableRow>
                 <TableCell>ID</TableCell>
                 <TableCell>Type</TableCell>
-                <TableCell>Subject</TableCell>
+                <TableCell>Title</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell>Date Filed</TableCell>
                 <TableCell>Urgency</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {inquiries.map((inquiry, index) => (
-                <TableRow key={inquiry.id}>
-                  <TableCell>{index + 1}</TableCell>
+              {inquiries.map((inquiry) => (
+                <TableRow key={inquiry.id} onClick={() => openDetailsPage(inquiry.id)} sx={{ cursor: 'pointer' }}>
+                  <TableCell>{inquiry.id}</TableCell>
                   <TableCell>{inquiry.type}</TableCell>
-                  <TableCell>{inquiry.subject}</TableCell>
+                  <TableCell>{inquiry.title}</TableCell>
                   <TableCell>{inquiry.status}</TableCell>
                   <TableCell>{inquiry.createdAt.toDate().toLocaleDateString()}</TableCell>
                   <TableCell>{inquiry.urgency}</TableCell>

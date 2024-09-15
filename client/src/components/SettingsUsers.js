@@ -61,6 +61,13 @@ const SettingsUsers = () => {
     status: 'Pending'
   });
 
+  const [formErrors, setFormErrors] = useState({
+    email: false,
+    firstName: false,
+    lastName: false,
+    teams: false
+  });
+
   useEffect(() => {
     fetchUsers();
     fetchCurrentUserCompany();
@@ -137,24 +144,47 @@ const SettingsUsers = () => {
   };
 
   const handleInviteUser = async () => {
-    try {
-      await inviteUser({...newUser, company: currentUserCompany});
-      setUsers([...users, { ...newUser, id: Date.now().toString(), company: currentUserCompany, status: 'Pending' }]);
-      setInviteDialogOpen(false);
-      setNewUser({
-        email: '',
-        firstName: '',
-        lastName: '',
-        company: '',
-        userType: 'Normal',
-        teams: [],
-        status: 'Pending'
-      });
-    } catch (err) {
-      console.error('Error inviting user:', err);
-      setError('Failed to invite user. Please try again.');
+    // Validate form fields before inviting
+    const errors = {
+      email: newUser.email.trim() === '',
+      firstName: newUser.firstName.trim() === '',
+      lastName: newUser.lastName.trim() === '',
+      teams: newUser.teams.length === 0 
+    };
+  
+    setFormErrors(errors);
+  
+    // Proceed only if no errors
+    if (!Object.values(errors).some((error) => error)) {
+      try {
+        await inviteUser({ ...newUser, company: currentUserCompany });
+        setUsers([...users, { ...newUser, id: Date.now().toString(), company: currentUserCompany, status: 'Pending' }]);
+        setInviteDialogOpen(false);
+        setNewUser({
+          email: '',
+          firstName: '',
+          lastName: '',
+          company: '',
+          userType: 'Normal',
+          teams: [],
+          status: 'Pending'
+        });
+      } catch (err) {
+        console.error('Error inviting user:', err);
+        setError('Failed to invite user. Please try again.');
+      }
     }
-  }; 
+  };
+
+  const handleInputChange = (field, value) => {
+    setNewUser({ ...newUser, [field]: value });
+  
+    if (field === 'teams') {
+      setFormErrors({ ...formErrors, [field]: value.length === 0 });
+    } else {
+      setFormErrors({ ...formErrors, [field]: value.trim() === '' });
+    }
+  };
 
   const indexOfLastUser = currentPage * usersPerPage;
   const indexOfFirstUser = indexOfLastUser - usersPerPage;
@@ -210,7 +240,7 @@ const SettingsUsers = () => {
                     startIcon={<Edit2 />}
                     onClick={() => setEditingUser(user)}
                     size="small"
-                    style={{ marginRight: '8px' }} // Add space between buttons
+                    style={{ marginRight: '8px' }} 
                   >
                     Edit
                   </Button>
@@ -328,7 +358,9 @@ const SettingsUsers = () => {
             fullWidth
             variant="outlined"
             value={newUser.email}
-            onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+            onChange={(e) => handleInputChange('email', e.target.value)}
+            error={formErrors.email}
+            helperText={formErrors.email ? 'Email is required' : ''}
           />
           <TextField
             margin="dense"
@@ -336,7 +368,9 @@ const SettingsUsers = () => {
             fullWidth
             variant="outlined"
             value={newUser.firstName}
-            onChange={(e) => setNewUser({ ...newUser, firstName: e.target.value })}
+            onChange={(e) => handleInputChange('firstName', e.target.value)}
+            error={formErrors.firstName}
+            helperText={formErrors.firstName ? 'First name is required' : ''}
           />
           <TextField
             margin="dense"
@@ -344,7 +378,9 @@ const SettingsUsers = () => {
             fullWidth
             variant="outlined"
             value={newUser.lastName}
-            onChange={(e) => setNewUser({ ...newUser, lastName: e.target.value })}
+            onChange={(e) => handleInputChange('lastName', e.target.value)}
+            error={formErrors.lastName}
+            helperText={formErrors.lastName ? 'Last name is required' : ''}
           />
           <TextField
             margin="dense"
@@ -359,7 +395,7 @@ const SettingsUsers = () => {
             <Select
               multiple
               value={newUser.teams}
-              onChange={(e) => setNewUser({ ...newUser, teams: e.target.value })}
+              onChange={(e) => handleInputChange('teams', e.target.value)}
               renderValue={(selected) => selected.join(', ')}
               label="Teams"
             >
@@ -370,6 +406,7 @@ const SettingsUsers = () => {
                 </MenuItem>
               ))}
             </Select>
+            {formErrors.teams && <Typography color="error" variant="caption">At least one team must be selected</Typography>}
           </FormControl>
           <TextField
             margin="dense"

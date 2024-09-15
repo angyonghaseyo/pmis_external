@@ -12,6 +12,8 @@ import ForgotPassword from './ForgetPassword';
 import ResetPassword from './ResetPassword';
 import EditProfile from './EditProfile';
 import InquiryFeedback from './InquiryFeedback'; 
+import InquiryFeedbackDetail from './InquiryFeedbackDetail';
+import TrainingProgram from './TrainingProgram';
 import CompanyInfo from './CompanyInfo'; 
 import { Box, CssBaseline } from '@mui/material';
 
@@ -55,6 +57,8 @@ function App() {
               <>
                 <Route path="/" element={<UserWorkspace user={user} />} />
                 <Route path="/manpower/inquiries-and-feedback" element={<InquiryFeedback />} />
+                <Route path="/manpower/training-program" element={<TrainingProgram />} />
+                <Route path="/inquiries/:id" element={<InquiryFeedbackDetail />} /> 
                 <Route path="/settings/profile" element={<EditProfile user={user} />} />
                 <Route path="/settings/users" element={<SettingsUsers />} />
                 <Route path="/settings/company" element={<CompanyInfo />} /> 
