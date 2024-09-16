@@ -14,13 +14,13 @@ const Sidebar = () => {
 
   const navItems = [
     { name: "Dashboard", icon: <Home />, path: "/", children: [] },
-    { name: "Assets and Facilities", icon: <Briefcase />, path: "/assets", children: [] },
-    { name: "Manpower", icon: <Users />, path: "/manpower", children: ['Inquiries and Feedback', 'Training Program'] },
-    { name: "Vessel Visits", icon: <Anchor />, path: "/vessels", children: ['Subitem 1', 'Subitem 2'] },
-    { name: "Port Operations and Resources", icon: <Clock />, path: "/operations", children: ['Subitem 1', 'Subitem 2'] },
-    { name: "Cargos", icon: <Package />, path: "/cargos", children: ['Subitem 1', 'Subitem 2'] },
-    { name: "Financial", icon: <DollarSign />, path: "/financial", children: ['Subitem 1', 'Subitem 2'] },
-    { name: "Customs and Trade Documents", icon: <FileText />, path: "/documents", children: ['Subitem 1', 'Subitem 2'] },
+    { name: "Assets and Facilities", icon: <Briefcase />, path: "/assets", children: ['Subitem 1', 'Subitem 2'], disabledChildren: ['Subitem 1', 'Subitem 2'] },
+    { name: "Manpower", icon: <Users />, path: "/manpower", children: ['Inquiries and Feedback', 'Training Program', 'Operator Requisition'] },
+    { name: "Vessel Visits", icon: <Anchor />, path: "/vessels", children: ['Subitem 1', 'Subitem 2'], disabledChildren: ['Subitem 1', 'Subitem 2'] },
+    { name: "Port Operations and Resources", icon: <Clock />, path: "/operations", children: ['Subitem 1', 'Subitem 2'], disabledChildren: ['Subitem 1', 'Subitem 2'] },
+    { name: "Cargos", icon: <Package />, path: "/cargos", children: ['Subitem 1', 'Subitem 2'], disabledChildren: ['Subitem 1', 'Subitem 2'] },
+    { name: "Financial", icon: <DollarSign />, path: "/financial", children: ['Subitem 1', 'Subitem 2'], disabledChildren: ['Subitem 1', 'Subitem 2'] },
+    { name: "Customs and Trade Documents", icon: <FileText />, path: "/documents", children: ['Subitem 1', 'Subitem 2'], disabledChildren: ['Subitem 1', 'Subitem 2'] },
     { name: "Settings", icon: <Settings />, path: "/settings", children: ['Users', 'Company'] }
   ];
 
@@ -32,10 +32,12 @@ const Sidebar = () => {
     navigate(path);
   };
 
-  const handleSubItemClick = (parentPath, subItem) => {
-    const formattedSubItem = subItem.toLowerCase().replace(/\s/g, '-');  
-    const subItemPath = `${parentPath}/${formattedSubItem}`;
-    navigate(subItemPath);
+  const handleSubItemClick = (parentPath, subItem, isDisabled) => {
+    if (!isDisabled) {
+      const formattedSubItem = subItem.toLowerCase().replace(/\s/g, '-');  
+      const subItemPath = `${parentPath}/${formattedSubItem}`;
+      navigate(subItemPath);
+    }
   };
 
   return (
@@ -61,16 +63,19 @@ const Sidebar = () => {
               {item.children.length > 0 && (expandedItems[index] ? <ExpandLess /> : <ExpandMore />)}
             </ListItem>
             <Collapse in={expandedItems[index]} timeout="auto" unmountOnExit>
-              {item.children.map((subitem, subIndex) => (
-                <ListItem
-                  button
-                  key={subIndex}
-                  sx={{ pl: 4 }}
-                  onClick={() => handleSubItemClick(item.path, subitem)}
-                >
-                  <ListItemText primary={subitem} />
-                </ListItem>
-              ))}
+              {item.children.map((subitem, subIndex) => {
+                const isDisabled = item.disabledChildren?.includes(subitem);
+                return (
+                  <ListItem
+                    button={!isDisabled}
+                    key={subIndex}
+                    sx={{ pl: 4, ...(isDisabled && { pointerEvents: 'none', opacity: 0.5 }) }}
+                    onClick={() => handleSubItemClick(item.path, subitem, isDisabled)}
+                  >
+                    <ListItemText primary={subitem} />
+                  </ListItem>
+                );
+              })}
             </Collapse>
           </div>
         ))}

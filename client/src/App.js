@@ -15,6 +15,7 @@ import InquiryFeedback from './InquiryFeedback';
 import InquiryFeedbackDetail from './InquiryFeedbackDetail';
 import TrainingProgram from './TrainingProgram';
 import CompanyInfo from './CompanyInfo'; 
+import OperatorRequisition from './OperatorRequisition'; 
 import { Box, CssBaseline } from '@mui/material';
 
 const drawerWidth = 240;
@@ -58,6 +59,7 @@ function App() {
                 <Route path="/" element={<UserWorkspace user={user} />} />
                 <Route path="/manpower/inquiries-and-feedback" element={<InquiryFeedback />} />
                 <Route path="/manpower/training-program" element={<TrainingProgram />} />
+                <Route path="/manpower/operator-requisition" element={<OperatorRequisition />} /> 
                 <Route path="/inquiries/:id" element={<InquiryFeedbackDetail />} /> 
                 <Route path="/settings/profile" element={<EditProfile user={user} />} />
                 <Route path="/settings/users" element={<SettingsUsers />} />

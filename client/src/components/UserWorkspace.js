@@ -5,11 +5,12 @@ const UserWorkspace = ({ user }) => {
   const [leaveStats, setLeaveStats] = useState([]);
   const [timeLog, setTimeLog] = useState({});
   const [serviceOperations, setServiceOperations] = useState([]);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
     // Simulate data fetching
     const simulateData = () => {
-      // Mock data for leave statistics
+      // Hardcoded Data
       const leaveStatsData = [
         { title: 'Total leave allowance', value: 34, paid: 11, unpaid: 4 },
         { title: 'Total leave taken', value: 20, paid: 10, unpaid: 10 },
@@ -17,13 +18,13 @@ const UserWorkspace = ({ user }) => {
         { title: 'Leave request pending', value: 5, paid: 3, unpaid: 2 },
       ];
 
-      // Mock data for time log
+      // Hardcoded Data
       const timeLogData = {
         today: { Scheduled: '08:00', Balance: '12:00', Worked: '05:00' },
         month: { Total: 216, Shortage: 23, WorkedTime: 189, Overtime: 56 },
       };
 
-      // Mock data for service operations
+      // Hardcoded Data
       const serviceOpsData = [
         { title: 'Unload cargo', status: 'Ready', latestUpdate: 'Dec 7, 2023 23:26', description: 'Cargo unloading in progress.' },
         { title: 'Load cargo', status: 'In Progress', latestUpdate: 'Dec 7, 2023 18:40', description: 'Cargo loading ongoing.' },
@@ -39,11 +40,25 @@ const UserWorkspace = ({ user }) => {
     simulateData();
   }, []);
 
+  // Time
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer); 
+  }, []);
+
+  const formatTime = (date) => {
+    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       {/* Header */}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4" component="h2">Dashboard</Typography>
+        <Typography variant="h6" color="textSecondary">{formatTime(currentTime)}</Typography>
       </Box>
 
       {/* Welcome message */}
