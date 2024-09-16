@@ -40,7 +40,6 @@ const UserWorkspace = ({ user }) => {
     simulateData();
   }, []);
 
-  // Time
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -58,7 +57,10 @@ const UserWorkspace = ({ user }) => {
       {/* Header */}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4" component="h2">Dashboard</Typography>
-        <Typography variant="h6" color="textSecondary">{formatTime(currentTime)}</Typography>
+        {/* Display live time - Larger and more prominent */}
+        <Typography variant="h3" color="textPrimary" sx={{ fontWeight: 'bold' }}>
+          {formatTime(currentTime)}
+        </Typography>
       </Box>
 
       {/* Welcome message */}
