@@ -163,7 +163,7 @@ const InquiryFeedback = () => {
       setLoading(true);
       await updateInquiryFeedback(editingInquiry.id, { 
         userReply: replyText,
-        status: 'User Replied'
+        // Status remains unchanged
       });
       handleReplyClose();
       fetchInquiriesFeedback();
@@ -176,7 +176,7 @@ const InquiryFeedback = () => {
   };
 
   const openInquiriesFeedback = inquiries.filter(item => item.status === 'Open').length;
-  const pendingUserAction = inquiries.filter(item => ['Approved', 'Rejected'].includes(item.status)).length;
+  const pendingUserAction = inquiries.filter(item => ['Approved', 'Rejected'].includes(item.status) && !item.userReply).length;
 
   if (loading && inquiries.length === 0) return <Box display="flex" justifyContent="center" alignItems="center" height="100vh"><CircularProgress /></Box>;
   if (error) return <Typography color="error" align="center">{error}</Typography>;
@@ -330,7 +330,7 @@ const InquiryFeedback = () => {
           <DialogTitle>Reply to Admin Response</DialogTitle>
           <DialogContent>
             <Typography variant="body1" gutterBottom>
-              Status: {editingInquiry?.status}
+              Current Status: {editingInquiry?.status}
             </Typography>
             {editingInquiry?.adminReply && (
               <Typography variant="body1" gutterBottom>
@@ -340,14 +340,16 @@ const InquiryFeedback = () => {
             <TextField
               fullWidth
               margin="normal"
-              label="Your Reply"
+              label="Your Final Reply"
               multiline
               rows={4}
               value={replyText}
               onChange={(e) => setReplyText(e.target.value)}
             />
             <Typography variant="body2" color="textSecondary">
-              Note: This will be your final reply. If the issue is not resolved, please open a new inquiry.
+              Note: This will be your final reply to this {editingInquiry?.status.toLowerCase()} inquiry. 
+              The status will remain as {editingInquiry?.status}. 
+              If you need further assistance, please open a new inquiry.
             </Typography>
           </DialogContent>
           <DialogActions>
