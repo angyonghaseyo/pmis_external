@@ -19,7 +19,8 @@ import {
   updateDoc, 
   deleteDoc, 
   addDoc,
-  serverTimestamp
+  serverTimestamp,
+  increment
 } from 'firebase/firestore';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 
@@ -56,6 +57,16 @@ export const registerUser = async (email, password, userData) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
     await setDoc(doc(db, 'users', user.uid), { ...userData, uid: user.uid });
+    
+    // Update or create company document
+    const companyRef = doc(db, 'companies', userData.company);
+    const companyDoc = await getDoc(companyRef);
+    if (companyDoc.exists()) {
+      await updateDoc(companyRef, { userCount: increment(1) });
+    } else {
+      await setDoc(companyRef, { name: userData.company, userCount: 1 });
+    }
+    
     return userCredential;
   } catch (error) {
     return handleApiError(error);
@@ -285,6 +296,31 @@ export const deleteInquiryFeedback = async (id) => {
   }
 };
 
+// Company operations
+export const getCompanyInfo = async (companyName) => {
+  try {
+    const companyDoc = await getDoc(doc(db, 'companies', companyName));
+    if (companyDoc.exists()) {
+      return companyDoc.data();
+    } else {
+      throw new Error('Company not found');
+    }
+  } catch (error) {
+    console.error('Error fetching company info:', error);
+    throw error;
+  }
+};
+
+export const updateCompanyInfo = async (companyName, data) => {
+  try {
+    const companyRef = doc(db, 'companies', companyName);
+    await updateDoc(companyRef, data);
+  } catch (error) {
+    console.error('Error updating company info:', error);
+    throw new Error(`Failed to update company information: ${error.message}`);
+  }
+};
+
 // Dashboard data
 export const getLeaveStatistics = () => authAxios.get('/leave-statistics').catch(handleApiError);
 
@@ -364,6 +400,8 @@ const api = {
   createInquiryFeedback,
   updateInquiryFeedback,
   deleteInquiryFeedback,
+  getCompanyInfo,
+  updateCompanyInfo,
   getLeaveStatistics,
   getTimeLog,
   getServiceOperations,
