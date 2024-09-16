@@ -180,11 +180,11 @@ const InquiryFeedback = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {inquiries.map((inquiry) => (
-                <TableRow key={inquiry.id} onClick={() => openDetailsPage(inquiry.id)} sx={{ cursor: 'pointer' }}>
-                  <TableCell>{inquiry.id}</TableCell>
+              {inquiries.map((inquiry, index) => (
+                <TableRow key={inquiry.id}>
+                  <TableCell>{index + 1}</TableCell>
                   <TableCell>{inquiry.type}</TableCell>
-                  <TableCell>{inquiry.title}</TableCell>
+                  <TableCell>{inquiry.subject}</TableCell>
                   <TableCell>{inquiry.status}</TableCell>
                   <TableCell>{inquiry.createdAt.toDate().toLocaleDateString()}</TableCell>
                   <TableCell>{inquiry.urgency}</TableCell>
