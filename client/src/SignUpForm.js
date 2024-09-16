@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, increment } from 'firebase/firestore';
 import { auth, storage, db } from './firebaseConfig';
 import './AuthForms.css';
 
@@ -17,37 +17,36 @@ const teams = [
 ];
 
 function SignUpForm() {
-    const [email, setEmail] = useState('');
-    const [firstName, setFirstName] = useState('');
-    const [lastName, setLastName] = useState('');
-    const [password, setPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
+    const [formData, setFormData] = useState({
+        email: '',
+        password: '',
+        confirmPassword: '',
+        firstName: '',
+        lastName: '',
+        salutation: 'Mr',
+        company: '',
+        teams: [],
+    });
     const [photoFile, setPhotoFile] = useState(null);
-    const [salutation, setSalutation] = useState('Mr');
-    const [company, setCompany] = useState('');
-    const [selectedTeams, setSelectedTeams] = useState([]);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
-    const validateForm = () => {
-        if (!email || !firstName || !lastName || !password || !confirmPassword || !company) {
-            setError('Please fill in all required fields.');
-            return false;
-        }
-        if (password !== confirmPassword) {
-            setError("Passwords don't match");
-            return false;
-        }
-        if (password.length < 6) {
-            setError('Password should be at least 6 characters long');
-            return false;
-        }
-        if (selectedTeams.length === 0) {
-            setError('Please select at least one team');
-            return false;
-        }
-        return true;
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prevState => ({
+            ...prevState,
+            [name]: value
+        }));
+    };
+
+    const handleTeamChange = (team) => {
+        setFormData(prevState => ({
+            ...prevState,
+            teams: prevState.teams.includes(team)
+                ? prevState.teams.filter(t => t !== team)
+                : [...prevState.teams, team]
+        }));
     };
 
     const handlePhotoChange = (e) => {
@@ -61,12 +60,24 @@ function SignUpForm() {
         }
     };
 
-    const handleTeamChange = (team) => {
-        setSelectedTeams(prevTeams => 
-            prevTeams.includes(team)
-                ? prevTeams.filter(t => t !== team)
-                : [...prevTeams, team]
-        );
+    const validateForm = () => {
+        if (!formData.email || !formData.password || !formData.confirmPassword || !formData.firstName || !formData.lastName || !formData.company) {
+            setError('Please fill in all required fields.');
+            return false;
+        }
+        if (formData.password !== formData.confirmPassword) {
+            setError("Passwords don't match");
+            return false;
+        }
+        if (formData.password.length < 6) {
+            setError('Password should be at least 6 characters long');
+            return false;
+        }
+        if (formData.teams.length === 0) {
+            setError('Please select at least one team');
+            return false;
+        }
+        return true;
     };
 
     const handleSubmit = async (e) => {
@@ -79,7 +90,7 @@ function SignUpForm() {
 
         try {
             // Create user
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
             const user = userCredential.user;
 
             // Upload photo if provided
@@ -92,19 +103,36 @@ function SignUpForm() {
 
             // Update user profile
             await updateProfile(user, {
-                displayName: `${salutation} ${firstName} ${lastName}`,
+                displayName: `${formData.salutation} ${formData.firstName} ${formData.lastName}`,
                 photoURL: photoURL
             });
 
+            // Check if company exists and update or create accordingly
+            const companyRef = doc(db, 'companies', formData.company);
+            const companyDoc = await getDoc(companyRef);
+
+            if (companyDoc.exists()) {
+                // Company exists, increment user count
+                await updateDoc(companyRef, {
+                    userCount: increment(1)
+                });
+            } else {
+                // Company doesn't exist, create new company document
+                await setDoc(companyRef, {
+                    name: formData.company,
+                    userCount: 1
+                });
+            }
+
             // Store additional user info in Firestore
             await setDoc(doc(db, 'users', user.uid), {
-                email: email,
-                firstName: firstName,
-                lastName: lastName,
-                salutation: salutation,
+                email: formData.email,
+                firstName: formData.firstName,
+                lastName: formData.lastName,
+                salutation: formData.salutation,
                 photoURL: photoURL,
-                company: company,
-                teams: selectedTeams,
+                company: formData.company,
+                teams: formData.teams,
                 userType: 'Admin',
                 createdAt: new Date()
             });
@@ -130,8 +158,9 @@ function SignUpForm() {
                     <input
                         type="email"
                         id="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        name="email"
+                        value={formData.email}
+                        onChange={handleChange}
                         placeholder="bob@oceaniaport.com"
                         required
                     />
@@ -151,8 +180,9 @@ function SignUpForm() {
                         <label htmlFor="salutation">Salutation</label>
                         <select
                             id="salutation"
-                            value={salutation}
-                            onChange={(e) => setSalutation(e.target.value)}
+                            name="salutation"
+                            value={formData.salutation}
+                            onChange={handleChange}
                             required
                         >
                             <option value="Mr">Mr</option>
@@ -168,8 +198,9 @@ function SignUpForm() {
                         <input
                             type="text"
                             id="firstName"
-                            value={firstName}
-                            onChange={(e) => setFirstName(e.target.value)}
+                            name="firstName"
+                            value={formData.firstName}
+                            onChange={handleChange}
                             placeholder="First Name"
                             required
                         />
@@ -179,8 +210,9 @@ function SignUpForm() {
                         <input
                             type="text"
                             id="lastName"
-                            value={lastName}
-                            onChange={(e) => setLastName(e.target.value)}
+                            name="lastName"
+                            value={formData.lastName}
+                            onChange={handleChange}
                             placeholder="Last Name"
                             required
                         />
@@ -191,8 +223,9 @@ function SignUpForm() {
                     <input
                         type="text"
                         id="company"
-                        value={company}
-                        onChange={(e) => setCompany(e.target.value)}
+                        name="company"
+                        value={formData.company}
+                        onChange={handleChange}
                         placeholder="Enter your company name"
                         required
                     />
@@ -202,8 +235,9 @@ function SignUpForm() {
                     <input
                         type="password"
                         id="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        name="password"
+                        value={formData.password}
+                        onChange={handleChange}
                         placeholder="Password"
                         required
                     />
@@ -213,8 +247,9 @@ function SignUpForm() {
                     <input
                         type="password"
                         id="confirmPassword"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        name="confirmPassword"
+                        value={formData.confirmPassword}
+                        onChange={handleChange}
                         placeholder="Confirm Password"
                         required
                     />
@@ -227,7 +262,7 @@ function SignUpForm() {
                                 <input
                                     type="checkbox"
                                     id={team}
-                                    checked={selectedTeams.includes(team)}
+                                    checked={formData.teams.includes(team)}
                                     onChange={() => handleTeamChange(team)}
                                 />
                                 <label htmlFor={team}>{team}</label>
