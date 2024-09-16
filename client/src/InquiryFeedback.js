@@ -20,9 +20,11 @@ import {
   TextField,
   MenuItem,
   CircularProgress,
-  Alert
+  Alert,
+  IconButton
 } from '@mui/material';
-import { getUserInquiriesFeedback, createInquiryFeedback } from './services/api';
+import { Edit, Reply } from '@mui/icons-material';
+import { getUserInquiriesFeedback, createInquiryFeedback, updateInquiryFeedback } from './services/api';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import { auth } from './firebaseConfig';
@@ -42,6 +44,9 @@ const InquiryFeedback = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [submitError, setSubmitError] = useState(null);
+  const [editingInquiry, setEditingInquiry] = useState(null);
+  const [replyDialogOpen, setReplyDialogOpen] = useState(false);
+  const [replyText, setReplyText] = useState('');
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
@@ -68,7 +73,26 @@ const InquiryFeedback = () => {
     }
   };
 
-  const handleDialogOpen = () => {
+  const handleDialogOpen = (inquiry = null) => {
+    if (inquiry) {
+      setEditingInquiry(inquiry);
+      setFormData({
+        type: inquiry.type,
+        subject: inquiry.subject,
+        description: inquiry.description,
+        urgency: inquiry.urgency,
+        file: null
+      });
+    } else {
+      setEditingInquiry(null);
+      setFormData({
+        type: 'Inquiry',
+        subject: '',
+        description: '',
+        urgency: 'Normal',
+        file: null
+      });
+    }
     setOpenDialog(true);
     setSubmitError(null);
   };
@@ -77,13 +101,7 @@ const InquiryFeedback = () => {
     setOpenDialog(false);
     setFormErrors({ subject: false, description: false });
     setSubmitError(null);
-    setFormData({
-      type: 'Inquiry',
-      subject: '',
-      description: '',
-      urgency: 'Normal',
-      file: null
-    });
+    setEditingInquiry(null);
   };
 
   const handleInputChange = (e) => {
@@ -113,20 +131,52 @@ const InquiryFeedback = () => {
           file: formData.file instanceof File ? formData.file : null
         };
   
-        await createInquiryFeedback(submissionData);
+        if (editingInquiry) {
+          await updateInquiryFeedback(editingInquiry.id, submissionData);
+        } else {
+          await createInquiryFeedback(submissionData);
+        }
         handleDialogClose();
         fetchInquiriesFeedback();
       } catch (err) {
-        console.error('Error creating inquiry/feedback:', err);
-        setSubmitError(`Failed to create inquiry/feedback: ${err.message}`);
+        console.error('Error submitting inquiry/feedback:', err);
+        setSubmitError(`Failed to submit inquiry/feedback: ${err.message}`);
       } finally {
         setLoading(false);
       }
     }
   };
 
+  const handleReplyOpen = (inquiry) => {
+    setEditingInquiry(inquiry);
+    setReplyDialogOpen(true);
+  };
+
+  const handleReplyClose = () => {
+    setReplyDialogOpen(false);
+    setReplyText('');
+    setEditingInquiry(null);
+  };
+
+  const handleReplySubmit = async () => {
+    try {
+      setLoading(true);
+      await updateInquiryFeedback(editingInquiry.id, { 
+        userReply: replyText,
+        status: 'User Replied'
+      });
+      handleReplyClose();
+      fetchInquiriesFeedback();
+    } catch (err) {
+      console.error('Error submitting reply:', err);
+      setError(`Failed to submit reply: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const openInquiriesFeedback = inquiries.filter(item => item.status === 'Open').length;
-  const pendingUserAction = inquiries.filter(item => item.status === 'Pending User Action').length;
+  const pendingUserAction = inquiries.filter(item => ['Approved', 'Rejected'].includes(item.status)).length;
 
   if (loading && inquiries.length === 0) return <Box display="flex" justifyContent="center" alignItems="center" height="100vh"><CircularProgress /></Box>;
   if (error) return <Typography color="error" align="center">{error}</Typography>;
@@ -139,7 +189,7 @@ const InquiryFeedback = () => {
 
         <Box display="flex" justifyContent="space-between" alignItems="center" mt={2}>
           <Typography variant="h4" component="h2">Inquiries & Feedback</Typography>
-          <Button variant="contained" color="primary" onClick={handleDialogOpen}>
+          <Button variant="contained" color="primary" onClick={() => handleDialogOpen()}>
             Create New Inquiry / Feedback
           </Button>
         </Box>
@@ -158,7 +208,7 @@ const InquiryFeedback = () => {
           <Grid item xs={12} sm={6} md={3}>
             <Card>
               <CardContent>
-                <Typography variant="subtitle1" color="textSecondary">Pending User Action</Typography>
+                <Typography variant="subtitle1" color="textSecondary">Pending Your Action</Typography>
                 <Typography variant="h4" component="p">
                   {pendingUserAction}
                 </Typography>
@@ -173,10 +223,11 @@ const InquiryFeedback = () => {
               <TableRow>
                 <TableCell>ID</TableCell>
                 <TableCell>Type</TableCell>
-                <TableCell>Title</TableCell>
+                <TableCell>Subject</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell>Date Filed</TableCell>
                 <TableCell>Urgency</TableCell>
+                <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -188,6 +239,18 @@ const InquiryFeedback = () => {
                   <TableCell>{inquiry.status}</TableCell>
                   <TableCell>{inquiry.createdAt.toDate().toLocaleDateString()}</TableCell>
                   <TableCell>{inquiry.urgency}</TableCell>
+                  <TableCell>
+                    {inquiry.status === 'Open' && (
+                      <IconButton onClick={() => handleDialogOpen(inquiry)} size="small" title="Edit">
+                        <Edit />
+                      </IconButton>
+                    )}
+                    {['Approved', 'Rejected'].includes(inquiry.status) && !inquiry.userReply && (
+                      <IconButton onClick={() => handleReplyOpen(inquiry)} size="small" title="Reply">
+                        <Reply />
+                      </IconButton>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -195,7 +258,7 @@ const InquiryFeedback = () => {
         </TableContainer>
 
         <Dialog open={openDialog} onClose={handleDialogClose} maxWidth="sm" fullWidth>
-          <DialogTitle>Create New Inquiry / Feedback</DialogTitle>
+          <DialogTitle>{editingInquiry ? 'Edit Inquiry / Feedback' : 'Create New Inquiry / Feedback'}</DialogTitle>
           <DialogContent>
             {submitError && <Alert severity="error" sx={{ mb: 2 }}>{submitError}</Alert>}
             <TextField
@@ -258,7 +321,39 @@ const InquiryFeedback = () => {
           <DialogActions>
             <Button onClick={handleDialogClose}>Cancel</Button>
             <Button onClick={handleSubmit} variant="contained" color="primary" disabled={loading}>
-              {loading ? 'Submitting...' : 'Submit'}
+              {loading ? 'Submitting...' : (editingInquiry ? 'Update' : 'Submit')}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={replyDialogOpen} onClose={handleReplyClose} maxWidth="sm" fullWidth>
+          <DialogTitle>Reply to Admin Response</DialogTitle>
+          <DialogContent>
+            <Typography variant="body1" gutterBottom>
+              Status: {editingInquiry?.status}
+            </Typography>
+            {editingInquiry?.adminReply && (
+              <Typography variant="body1" gutterBottom>
+                Admin Reply: {editingInquiry.adminReply}
+              </Typography>
+            )}
+            <TextField
+              fullWidth
+              margin="normal"
+              label="Your Reply"
+              multiline
+              rows={4}
+              value={replyText}
+              onChange={(e) => setReplyText(e.target.value)}
+            />
+            <Typography variant="body2" color="textSecondary">
+              Note: This will be your final reply. If the issue is not resolved, please open a new inquiry.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleReplyClose}>Cancel</Button>
+            <Button onClick={handleReplySubmit} variant="contained" color="primary" disabled={loading}>
+              {loading ? 'Submitting...' : 'Send Reply'}
             </Button>
           </DialogActions>
         </Dialog>
