@@ -317,7 +317,7 @@ export const updateCompanyInfo = async (companyName, data) => {
     await updateDoc(companyRef, data);
   } catch (error) {
     console.error('Error updating company info:', error);
-    throw error;
+    throw new Error(`Failed to update company information: ${error.message}`);
   }
 };
 

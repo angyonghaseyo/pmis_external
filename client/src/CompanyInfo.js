@@ -13,7 +13,7 @@ import {
   Alert
 } from '@mui/material';
 import PhotoCamera from '@mui/icons-material/PhotoCamera';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { db, auth } from './firebaseConfig';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from './firebaseConfig';
@@ -61,7 +61,7 @@ const CompanyInfo = () => {
       setCompanyData({ ...companyInfo, name: userData.company });
     } catch (err) {
       console.error('Error fetching company data:', err);
-      setError('Failed to load company information');
+      setError('Failed to load company information: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -82,7 +82,7 @@ const CompanyInfo = () => {
         setCompanyData(prev => ({ ...prev, logoUrl }));
       } catch (err) {
         console.error('Error uploading logo:', err);
-        setError('Failed to upload logo');
+        setError('Failed to upload logo: ' + err.message);
       }
     }
   };
@@ -90,7 +90,7 @@ const CompanyInfo = () => {
   const handleSave = async () => {
     try {
       setLoading(true);
-      await updateCompanyInfo(companyData.name, {
+      const updatedData = {
         country: companyData.country,
         state: companyData.state,
         city: companyData.city,
@@ -99,12 +99,21 @@ const CompanyInfo = () => {
         zipCode: companyData.zipCode,
         currencySymbol: companyData.currencySymbol,
         logoUrl: companyData.logoUrl
-      });
+      };
+
+      // Check if all required fields are filled
+      const requiredFields = ['country', 'city', 'address', 'zipCode'];
+      const missingFields = requiredFields.filter(field => !updatedData[field]);
+      if (missingFields.length > 0) {
+        throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+      }
+
+      await updateCompanyInfo(companyData.name, updatedData);
       setIsEditable(false);
       setSuccessMessage('Company information updated successfully');
     } catch (err) {
       console.error('Error updating company info:', err);
-      setError('Failed to update company information');
+      setError('Failed to update company information: ' + err.message);
     } finally {
       setLoading(false);
     }
