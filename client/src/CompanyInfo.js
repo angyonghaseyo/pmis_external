@@ -1,6 +1,23 @@
-import React, { useState } from 'react';
-import { Box, TextField, Typography, Button, MenuItem, Grid, Avatar, IconButton } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { 
+  Box, 
+  TextField, 
+  Typography, 
+  Button, 
+  MenuItem, 
+  Grid, 
+  Avatar, 
+  IconButton,
+  CircularProgress,
+  Snackbar,
+  Alert
+} from '@mui/material';
 import PhotoCamera from '@mui/icons-material/PhotoCamera';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { db, auth } from './firebaseConfig';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from './firebaseConfig';
+import { getCompanyInfo, updateCompanyInfo } from './services/api';
 
 const currencies = [
   { value: 'USD', label: '$ - US Dollar' },
@@ -10,39 +27,99 @@ const currencies = [
 ];
 
 const CompanyInfo = () => {
-  const [currency, setCurrency] = useState('USD');
-  const [isEditable, setIsEditable] = useState(false);  
-  const [logoUrl, setLogoUrl] = useState(''); 
+  const [companyData, setCompanyData] = useState({
+    name: '',
+    country: '',
+    state: '',
+    city: '',
+    area: '',
+    address: '',
+    zipCode: '',
+    currencySymbol: 'USD',
+    logoUrl: ''
+  });
+  const [isEditable, setIsEditable] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
-  const handleCurrencyChange = (event) => {
-    setCurrency(event.target.value);
-  };
+  useEffect(() => {
+    fetchCompanyData();
+  }, []);
 
-  const handleEditClick = () => {
-    setIsEditable(true);
-  };
+  const fetchCompanyData = async () => {
+    try {
+      setLoading(true);
+      const user = auth.currentUser;
+      if (!user) throw new Error('No authenticated user');
 
-  const handleCancelClick = () => {
-    setIsEditable(false);
-  };
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      const userData = userDoc.data();
+      if (!userData || !userData.company) throw new Error('User company not found');
 
-  const handleLogoChange = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      setLogoUrl(URL.createObjectURL(file)); 
+      const companyInfo = await getCompanyInfo(userData.company);
+      setCompanyData({ ...companyInfo, name: userData.company });
+    } catch (err) {
+      console.error('Error fetching company data:', err);
+      setError('Failed to load company information');
+    } finally {
+      setLoading(false);
     }
   };
 
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setCompanyData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleLogoChange = async (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      try {
+        const storageRef = ref(storage, `company_logos/${companyData.name}`);
+        await uploadBytes(storageRef, file);
+        const logoUrl = await getDownloadURL(storageRef);
+        setCompanyData(prev => ({ ...prev, logoUrl }));
+      } catch (err) {
+        console.error('Error uploading logo:', err);
+        setError('Failed to upload logo');
+      }
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      setLoading(true);
+      await updateCompanyInfo(companyData.name, {
+        country: companyData.country,
+        state: companyData.state,
+        city: companyData.city,
+        area: companyData.area,
+        address: companyData.address,
+        zipCode: companyData.zipCode,
+        currencySymbol: companyData.currencySymbol,
+        logoUrl: companyData.logoUrl
+      });
+      setIsEditable(false);
+      setSuccessMessage('Company information updated successfully');
+    } catch (err) {
+      console.error('Error updating company info:', err);
+      setError('Failed to update company information');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) return <Box display="flex" justifyContent="center" alignItems="center" height="100vh"><CircularProgress /></Box>;
+
   return (
     <Box sx={{ maxWidth: '1000px', mx: 'auto', p: 3 }}>
-      {/* Company Information */}
       <Typography variant="h4" gutterBottom>
         Company Information
       </Typography>
 
       <Grid container spacing={2} alignItems="center">
         <Grid item xs={2}>
-          {/* Company Logo Display */}
           <IconButton
             color="primary"
             aria-label="upload picture"
@@ -52,10 +129,10 @@ const CompanyInfo = () => {
             <input hidden accept="image/*" type="file" onChange={handleLogoChange} />
             <Avatar
               alt="Company Logo"
-              src={logoUrl || undefined}
+              src={companyData.logoUrl || undefined}
               sx={{ width: 80, height: 80 }}
             >
-              {!logoUrl && <Typography variant="h6">C</Typography>}
+              {!companyData.logoUrl && <Typography variant="h6">{companyData.name[0]}</Typography>}
             </Avatar>
             {isEditable && <PhotoCamera />}
           </IconButton>
@@ -66,82 +143,36 @@ const CompanyInfo = () => {
             label="Company Name"
             fullWidth
             margin="normal"
+            value={companyData.name}
             InputProps={{
-              readOnly: !isEditable,  
+              readOnly: true,
             }}
           />
         </Grid>
       </Grid>
 
-      {/* Address Details */}
-      <Typography variant="h4" gutterBottom sx={{ mt: 4 }}>
+      <Typography variant="h5" gutterBottom sx={{ mt: 4 }}>
         Address Details
       </Typography>
       <Grid container spacing={2}>
-        <Grid item xs={6}>
-          <TextField
-            label="Country"
-            fullWidth
-            margin="normal"
-            InputProps={{
-              readOnly: !isEditable,
-            }}
-          />
-        </Grid>
-        <Grid item xs={6}>
-          <TextField
-            label="State"
-            fullWidth
-            margin="normal"
-            InputProps={{
-              readOnly: !isEditable,
-            }}
-          />
-        </Grid>
-        <Grid item xs={6}>
-          <TextField
-            label="City"
-            fullWidth
-            margin="normal"
-            InputProps={{
-              readOnly: !isEditable,
-            }}
-          />
-        </Grid>
-        <Grid item xs={6}>
-          <TextField
-            label="Area"
-            fullWidth
-            margin="normal"
-            InputProps={{
-              readOnly: !isEditable,
-            }}
-          />
-        </Grid>
-        <Grid item xs={6}>
-          <TextField
-            label="Address"
-            fullWidth
-            margin="normal"
-            InputProps={{
-              readOnly: !isEditable,
-            }}
-          />
-        </Grid>
-        <Grid item xs={6}>
-          <TextField
-            label="Zip Code"
-            fullWidth
-            margin="normal"
-            InputProps={{
-              readOnly: !isEditable,
-            }}
-          />
-        </Grid>
+        {['country', 'state', 'city', 'area', 'address', 'zipCode'].map((field) => (
+          <Grid item xs={12} sm={6} key={field}>
+            <TextField
+              label={field.charAt(0).toUpperCase() + field.slice(1)}
+              fullWidth
+              margin="normal"
+              name={field}
+              value={companyData[field]}
+              onChange={handleInputChange}
+              InputProps={{
+                readOnly: !isEditable,
+              }}
+            />
+          </Grid>
+        ))}
       </Grid>
 
-      {/* Currency Setting */}
-      <Typography variant="h4" gutterBottom sx={{ mt: 4 }}>
+      <Typography variant="h5" gutterBottom sx={{ mt: 4 }}>
         Currency Setting
       </Typography>
       <Grid container spacing={2}>
@@ -149,8 +180,9 @@ const CompanyInfo = () => {
           <TextField
             select
             label="Currency Symbol"
-            value={currency}
-            onChange={handleCurrencyChange}
+            name="currencySymbol"
+            value={companyData.currencySymbol}
+            onChange={handleInputChange}
             fullWidth
             margin="normal"
             InputProps={{
@@ -169,25 +201,36 @@ const CompanyInfo = () => {
         </Grid>
       </Grid>
 
-      {/* Save and Cancel buttons */}
-      {isEditable && (
+      {isEditable ? (
         <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-          <Button variant="outlined" color="secondary" onClick={handleCancelClick}>
+          <Button variant="outlined" color="secondary" onClick={() => setIsEditable(false)}>
             Cancel
           </Button>
-          <Button variant="contained" color="primary">
+          <Button variant="contained" color="primary" onClick={handleSave}>
             Save
           </Button>
         </Box>
-      )}
-
-      {!isEditable && (
+      ) : (
         <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-          <Button variant="contained" color="primary" onClick={handleEditClick}>
+          <Button variant="contained" color="primary" onClick={() => setIsEditable(true)}>
             Edit Company Information
           </Button>
         </Box>
       )}
+
+      <Snackbar 
+        open={!!error || !!successMessage} 
+        autoHideDuration={6000} 
+        onClose={() => {setError(''); setSuccessMessage('');}}
+      >
+        <Alert 
+          onClose={() => {setError(''); setSuccessMessage('');}} 
+          severity={error ? "error" : "success"} 
+          sx={{ width: '100%' }}
+        >
+          {error || successMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

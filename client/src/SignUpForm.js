@@ -2,9 +2,26 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, increment } from 'firebase/firestore';
 import { auth, storage, db } from './firebaseConfig';
-import './AuthForms.css';
+import {
+  TextField,
+  Button,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Checkbox,
+  FormControlLabel,
+  Typography,
+  Box,
+  Grid,
+  Container,
+  Avatar,
+  Alert,
+  CircularProgress
+} from '@mui/material';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 
 const teams = [
   'Assets and Facilities',
@@ -17,233 +34,301 @@ const teams = [
 ];
 
 function SignUpForm() {
-    const [email, setEmail] = useState('');
-    const [firstName, setFirstName] = useState('');
-    const [lastName, setLastName] = useState('');
-    const [password, setPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-    const [photoFile, setPhotoFile] = useState(null);
-    const [salutation, setSalutation] = useState('Mr');
-    const [company, setCompany] = useState('');
-    const [selectedTeams, setSelectedTeams] = useState([]);
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
-    const navigate = useNavigate();
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    confirmPassword: '',
+    firstName: '',
+    lastName: '',
+    salutation: 'Mr',
+    company: '',
+    teams: [],
+  });
+  const [photoFile, setPhotoFile] = useState(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
-    const validateForm = () => {
-        if (!email || !firstName || !lastName || !password || !confirmPassword || !company) {
-            setError('Please fill in all required fields.');
-            return false;
-        }
-        if (password !== confirmPassword) {
-            setError("Passwords don't match");
-            return false;
-        }
-        if (password.length < 6) {
-            setError('Password should be at least 6 characters long');
-            return false;
-        }
-        if (selectedTeams.length === 0) {
-            setError('Please select at least one team');
-            return false;
-        }
-        return true;
-    };
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prevState => ({
+      ...prevState,
+      [name]: value
+    }));
+  };
 
-    const handlePhotoChange = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            if (file.size > 5 * 1024 * 1024) { // 5MB limit
-                setError("File size should not exceed 5MB");
-                return;
-            }
-            setPhotoFile(file);
-        }
-    };
+  const handleTeamChange = (event) => {
+    const { value } = event.target;
+    setFormData(prevState => ({
+      ...prevState,
+      teams: typeof value === 'string' ? value.split(',') : value,
+    }));
+  };
 
-    const handleTeamChange = (team) => {
-        setSelectedTeams(prevTeams => 
-            prevTeams.includes(team)
-                ? prevTeams.filter(t => t !== team)
-                : [...prevTeams, team]
-        );
-    };
+  const handlePhotoChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        setError("File size should not exceed 5MB");
+        return;
+      }
+      setPhotoFile(file);
+    }
+  };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setError('');
+  const validateForm = () => {
+    if (!formData.email || !formData.password || !formData.confirmPassword || !formData.firstName || !formData.lastName || !formData.company) {
+      setError('Please fill in all required fields.');
+      return false;
+    }
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords don't match");
+      return false;
+    }
+    if (formData.password.length < 6) {
+      setError('Password should be at least 6 characters long');
+      return false;
+    }
+    if (formData.teams.length === 0) {
+      setError('Please select at least one team');
+      return false;
+    }
+    return true;
+  };
 
-        if (!validateForm()) return;
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
 
-        setLoading(true);
+    if (!validateForm()) return;
 
-        try {
-            // Create user
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            const user = userCredential.user;
+    setLoading(true);
 
-            // Upload photo if provided
-            let photoURL = '';
-            if (photoFile) {
-                const storageRef = ref(storage, `profile_photos/${user.uid}`);
-                await uploadBytes(storageRef, photoFile);
-                photoURL = await getDownloadURL(storageRef);
-            }
+    try {
+      // Create user
+      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+      const user = userCredential.user;
 
-            // Update user profile
-            await updateProfile(user, {
-                displayName: `${salutation} ${firstName} ${lastName}`,
-                photoURL: photoURL
-            });
+      // Upload photo if provided
+      let photoURL = '';
+      if (photoFile) {
+        const storageRef = ref(storage, `profile_photos/${user.uid}`);
+        await uploadBytes(storageRef, photoFile);
+        photoURL = await getDownloadURL(storageRef);
+      }
 
-            // Store additional user info in Firestore
-            await setDoc(doc(db, 'users', user.uid), {
-                email: email,
-                firstName: firstName,
-                lastName: lastName,
-                salutation: salutation,
-                photoURL: photoURL,
-                company: company,
-                teams: selectedTeams,
-                userType: 'Admin',
-                createdAt: new Date()
-            });
+      // Update user profile
+      await updateProfile(user, {
+        displayName: `${formData.salutation} ${formData.firstName} ${formData.lastName}`,
+        photoURL: photoURL
+      });
 
-            // Navigate to home page or dashboard
-            navigate('/');
-        } catch (error) {
-            console.error("Error during sign up:", error);
-            setError(error.message);
-        } finally {
-            setLoading(false);
-        }
-    };
+      // Check if company exists and update or create accordingly
+      const companyRef = doc(db, 'companies', formData.company);
+      const companyDoc = await getDoc(companyRef);
 
-    return (
-        <div className="auth-form">
-            <h2>🚢 Oceania PMIS</h2>
-            <p>Set up your account</p>
-            {error && <p className="error-message">{error}</p>}
-            <form onSubmit={handleSubmit}>
-                <div className="form-group">
-                    <label htmlFor="email">Email Address*</label>
-                    <input
-                        type="email"
-                        id="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="bob@oceaniaport.com"
-                        required
-                    />
-                </div>
-                <div className="form-row">
-                    <div className="form-group">
-                        <label htmlFor="profilePhoto">Profile Photo</label>
-                        <input
-                            type="file"
-                            id="profilePhoto"
-                            onChange={handlePhotoChange}
-                            accept="image/*"
-                        />
-                        <small>Recommended size: 210 x 50 px. Max size: 5MB</small>
-                    </div>
-                    <div className="form-group">
-                        <label htmlFor="salutation">Salutation</label>
-                        <select
-                            id="salutation"
-                            value={salutation}
-                            onChange={(e) => setSalutation(e.target.value)}
-                            required
-                        >
-                            <option value="Mr">Mr</option>
-                            <option value="Mrs">Mrs</option>
-                            <option value="Ms">Ms</option>
-                            <option value="Dr">Dr</option>
-                        </select>
-                    </div>
-                </div>
-                <div className="form-row">
-                    <div className="form-group">
-                        <label htmlFor="firstName">First Name*</label>
-                        <input
-                            type="text"
-                            id="firstName"
-                            value={firstName}
-                            onChange={(e) => setFirstName(e.target.value)}
-                            placeholder="First Name"
-                            required
-                        />
-                    </div>
-                    <div className="form-group">
-                        <label htmlFor="lastName">Last Name*</label>
-                        <input
-                            type="text"
-                            id="lastName"
-                            value={lastName}
-                            onChange={(e) => setLastName(e.target.value)}
-                            placeholder="Last Name"
-                            required
-                        />
-                    </div>
-                </div>
-                <div className="form-group">
-                    <label htmlFor="company">Company*</label>
-                    <input
-                        type="text"
-                        id="company"
-                        value={company}
-                        onChange={(e) => setCompany(e.target.value)}
-                        placeholder="Enter your company name"
-                        required
-                    />
-                </div>
-                <div className="form-group">
-                    <label htmlFor="password">Password*</label>
-                    <input
-                        type="password"
-                        id="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Password"
-                        required
-                    />
-                </div>
-                <div className="form-group">
-                    <label htmlFor="confirmPassword">Confirm Password*</label>
-                    <input
-                        type="password"
-                        id="confirmPassword"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Confirm Password"
-                        required
-                    />
-                </div>
-                <div className="form-group">
-                    <label>Teams*</label>
-                    <div className="teams-container">
-                        {teams.map((team) => (
-                            <div key={team} className="team-checkbox">
-                                <input
-                                    type="checkbox"
-                                    id={team}
-                                    checked={selectedTeams.includes(team)}
-                                    onChange={() => handleTeamChange(team)}
-                                />
-                                <label htmlFor={team}>{team}</label>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-                <button type="submit" className="auth-button" disabled={loading}>
-                    {loading ? 'Signing Up...' : 'Sign Up'}
-                </button>
-            </form>
-            <p className="auth-switch">
-                Already have an account? <Link to="/login">Log in</Link>
-            </p>
-        </div>
-    );
+      if (companyDoc.exists()) {
+        // Company exists, increment user count
+        await updateDoc(companyRef, {
+          userCount: increment(1)
+        });
+      } else {
+        // Company doesn't exist, create new company document
+        await setDoc(companyRef, {
+          name: formData.company,
+          userCount: 1
+        });
+      }
+
+      // Store additional user info in Firestore
+      await setDoc(doc(db, 'users', user.uid), {
+        email: formData.email,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        salutation: formData.salutation,
+        photoURL: photoURL,
+        company: formData.company,
+        teams: formData.teams,
+        userType: 'Admin',
+        createdAt: new Date()
+      });
+
+      // Navigate to home page or dashboard
+      navigate('/');
+    } catch (error) {
+      console.error("Error during sign up:", error);
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Container component="main" maxWidth="xs">
+      <Box
+        sx={{
+          marginTop: 8,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+        }}
+      >
+        <Avatar sx={{ m: 1, bgcolor: 'secondary.main' }}>
+          <LockOutlinedIcon />
+        </Avatar>
+        <Typography component="h1" variant="h5">
+          Sign up
+        </Typography>
+        {error && <Alert severity="error" sx={{ mt: 2, width: '100%' }}>{error}</Alert>}
+        <Box component="form" noValidate onSubmit={handleSubmit} sx={{ mt: 3 }}>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={4}>
+              <FormControl fullWidth>
+                <InputLabel id="salutation-label">Salutation</InputLabel>
+                <Select
+                  labelId="salutation-label"
+                  id="salutation"
+                  name="salutation"
+                  value={formData.salutation}
+                  onChange={handleChange}
+                  label="Salutation"
+                >
+                  <MenuItem value="Mr">Mr</MenuItem>
+                  <MenuItem value="Mrs">Mrs</MenuItem>
+                  <MenuItem value="Ms">Ms</MenuItem>
+                  <MenuItem value="Dr">Dr</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField
+                autoComplete="given-name"
+                name="firstName"
+                required
+                fullWidth
+                id="firstName"
+                label="First Name"
+                autoFocus
+                value={formData.firstName}
+                onChange={handleChange}
+              />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField
+                required
+                fullWidth
+                id="lastName"
+                label="Last Name"
+                name="lastName"
+                autoComplete="family-name"
+                value={formData.lastName}
+                onChange={handleChange}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                required
+                fullWidth
+                id="email"
+                label="Email Address"
+                name="email"
+                autoComplete="email"
+                value={formData.email}
+                onChange={handleChange}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                required
+                fullWidth
+                name="password"
+                label="Password"
+                type="password"
+                id="password"
+                autoComplete="new-password"
+                value={formData.password}
+                onChange={handleChange}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                required
+                fullWidth
+                name="confirmPassword"
+                label="Confirm Password"
+                type="password"
+                id="confirmPassword"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                required
+                fullWidth
+                name="company"
+                label="Company"
+                id="company"
+                value={formData.company}
+                onChange={handleChange}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel id="teams-label">Teams</InputLabel>
+                <Select
+                  labelId="teams-label"
+                  id="teams"
+                  multiple
+                  value={formData.teams}
+                  onChange={handleTeamChange}
+                  renderValue={(selected) => selected.join(', ')}
+                >
+                  {teams.map((team) => (
+                    <MenuItem key={team} value={team}>
+                      <Checkbox checked={formData.teams.indexOf(team) > -1} />
+                      <Typography>{team}</Typography>
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <Button
+                variant="contained"
+                component="label"
+              >
+                Upload Profile Photo
+                <input
+                  type="file"
+                  hidden
+                  accept="image/*"
+                  onChange={handlePhotoChange}
+                />
+              </Button>
+              {photoFile && <Typography variant="caption" display="block">File selected: {photoFile.name}</Typography>}
+            </Grid>
+          </Grid>
+          <Button
+            type="submit"
+            fullWidth
+            variant="contained"
+            sx={{ mt: 3, mb: 2 }}
+            disabled={loading}
+          >
+            {loading ? <CircularProgress size={24} /> : 'Sign Up'}
+          </Button>
+          <Grid container justifyContent="flex-end">
+            <Grid item>
+              <Link to="/login" variant="body2">
+                Already have an account? Sign in
+              </Link>
+            </Grid>
+          </Grid>
+        </Box>
+      </Box>
+    </Container>
+  );
 }
 
 export default SignUpForm;
