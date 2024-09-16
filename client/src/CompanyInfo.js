@@ -10,7 +10,8 @@ import {
   IconButton,
   CircularProgress,
   Snackbar,
-  Alert
+  Alert,
+  FormHelperText
 } from '@mui/material';
 import PhotoCamera from '@mui/icons-material/PhotoCamera';
 import { doc, getDoc } from 'firebase/firestore';
@@ -98,8 +99,12 @@ const CompanyInfo = () => {
         address: companyData.address,
         zipCode: companyData.zipCode,
         currencySymbol: companyData.currencySymbol,
-        logoUrl: companyData.logoUrl
       };
+
+      // Only include logoUrl if it's set
+      if (companyData.logoUrl) {
+        updatedData.logoUrl = companyData.logoUrl;
+      }
 
       // Check if all required fields are filled
       const requiredFields = ['country', 'city', 'address', 'zipCode'];
@@ -128,26 +133,42 @@ const CompanyInfo = () => {
       </Typography>
 
       <Grid container spacing={2} alignItems="center">
-        <Grid item xs={2}>
-          <IconButton
-            color="primary"
-            aria-label="upload picture"
-            component="label"
-            disabled={!isEditable}
-          >
-            <input hidden accept="image/*" type="file" onChange={handleLogoChange} />
+        <Grid item xs={12} sm={6} md={4}>
+          <Box display="flex" flexDirection="column" alignItems="center">
             <Avatar
               alt="Company Logo"
               src={companyData.logoUrl || undefined}
-              sx={{ width: 80, height: 80 }}
+              sx={{ width: 100, height: 100, mb: 2 }}
             >
-              {!companyData.logoUrl && <Typography variant="h6">{companyData.name[0]}</Typography>}
+              {!companyData.logoUrl && <Typography variant="h4">{companyData.name[0]}</Typography>}
             </Avatar>
-            {isEditable && <PhotoCamera />}
-          </IconButton>
+            {isEditable && (
+              <>
+                <input
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  id="logo-upload"
+                  type="file"
+                  onChange={handleLogoChange}
+                />
+                <label htmlFor="logo-upload">
+                  <Button
+                    variant="outlined"
+                    component="span"
+                    startIcon={<PhotoCamera />}
+                  >
+                    Upload Logo
+                  </Button>
+                </label>
+                <FormHelperText>
+                  {companyData.logoUrl ? 'Click to change logo' : 'Please upload a company logo'}
+                </FormHelperText>
+              </>
+            )}
+          </Box>
         </Grid>
 
-        <Grid item xs={10}>
+        <Grid item xs={12} sm={6} md={8}>
           <TextField
             label="Company Name"
             fullWidth
