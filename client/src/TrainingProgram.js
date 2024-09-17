@@ -14,9 +14,20 @@ const TrainingProgram = () => {
   const [availablePrograms, setAvailablePrograms] = useState([]);
   const [completedPrograms, setCompletedPrograms] = useState([]);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
-    fetchTrainingPrograms();
+    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        fetchTrainingPrograms();
+      } else {
+        setLoading(false);
+        setError('Please log in to view training programs.');
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const fetchTrainingPrograms = async () => {
@@ -113,7 +124,7 @@ const TrainingProgram = () => {
     <Box sx={{ display: 'flex' }}>
       <Sidebar />
       <Box sx={{ flexGrow: 1, p: 3 }}>
-        <Header />
+        <Header user={user} />
 
         <Typography variant="h4" gutterBottom>
           Training Programs
