@@ -49,53 +49,66 @@ const OperatorRequisition = () => {
   const [isEditing, setIsEditing] = useState(null);
   const [tabValue, setTabValue] = useState(0);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+  const [logs, setLogs] = useState([]);
+
+  const addLog = (message) => {
+    setLogs(prevLogs => [...prevLogs, `${new Date().toISOString()}: ${message}`]);
+    console.log(message);
+  };
 
   const fetchRequisitions = useCallback(async () => {
-    console.log('Fetching requisitions...');
+    addLog('Starting to fetch requisitions...');
     try {
       setLoading(true);
       setError(null);
       const user = auth.currentUser;
       if (!user) {
-        console.error('No authenticated user found');
-        setError('Please log in to view requisitions.');
+        const noUserError = 'No authenticated user found';
+        addLog(noUserError);
+        setError(noUserError);
         return;
       }
-      console.log('Current user:', user);
-      console.log('Fetching requisitions for user:', user.uid);
+      addLog(`Current user: ${user.uid}`);
+      addLog(`Fetching requisitions for user: ${user.uid}`);
       const requisitions = await getOperatorRequisitions(user.uid);
-      console.log('Fetched requisitions:', requisitions);
+      addLog(`Fetched ${requisitions.length} requisitions`);
       
       const active = requisitions.filter(req => req.status === 'Active');
       const completed = requisitions.filter(req => ['Completed', 'Cancelled'].includes(req.status));
       
-      console.log('Active requests:', active);
-      console.log('Completed/Cancelled requests:', completed);
+      addLog(`Active requests: ${active.length}`);
+      addLog(`Completed/Cancelled requests: ${completed.length}`);
       
       setActiveRequests(active);
       setCompletedRequests(completed);
     } catch (err) {
-      console.error('Error fetching requisitions:', err);
-      console.error('Error details:', JSON.stringify(err, null, 2));
-      setError('Failed to load requisitions. Please try again.');
+      const errorMessage = `Error fetching requisitions: ${err.message}`;
+      addLog(errorMessage);
+      addLog(`Error details: ${JSON.stringify(err, null, 2)}`);
+      setError(errorMessage);
     } finally {
       setLoading(false);
+      addLog('Finished fetching requisitions');
     }
   }, []);
 
   useEffect(() => {
+    addLog('Component mounted, setting up auth listener');
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
-        console.log('User authenticated:', user.uid);
+        addLog(`User authenticated: ${user.uid}`);
         fetchRequisitions();
       } else {
-        console.log('No authenticated user');
+        addLog('No authenticated user');
         setError('Please log in to view requisitions.');
         setLoading(false);
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      addLog('Component unmounting, unsubscribing from auth listener');
+      unsubscribe();
+    };
   }, [fetchRequisitions]);
 
   const handleInputChange = (e) => {
@@ -117,70 +130,70 @@ const OperatorRequisition = () => {
   };
 
   const handleSubmit = async () => {
-    console.log('Submitting form:', formData);
+    addLog(`Submitting form: ${JSON.stringify(formData)}`);
     try {
       const user = auth.currentUser;
       if (!user) throw new Error('No authenticated user');
 
       if (isEditing !== null) {
         await updateOperatorRequisition(isEditing, { ...formData, userId: user.uid });
-        console.log('Updated requisition:', isEditing);
+        addLog(`Updated requisition: ${isEditing}`);
       } else {
-        await createOperatorRequisition({ ...formData, userId: user.uid, status: 'Active' });
-        console.log('Created new requisition');
+        const newRequisitionId = await createOperatorRequisition({ ...formData, userId: user.uid, status: 'Active' });
+        addLog(`Created new requisition with ID: ${newRequisitionId}`);
       }
       handleCloseDialog();
       await fetchRequisitions();
       setSnackbar({ open: true, message: 'Requisition saved successfully', severity: 'success' });
     } catch (err) {
-      console.error('Error submitting requisition:', err);
-      console.error('Error details:', JSON.stringify(err, null, 2));
+      addLog(`Error submitting requisition: ${err.message}`);
+      addLog(`Error details: ${JSON.stringify(err, null, 2)}`);
       setSnackbar({ open: true, message: 'Failed to save requisition', severity: 'error' });
     }
   };
 
   const handleDelete = async (id) => {
-    console.log('Deleting requisition:', id);
+    addLog(`Deleting requisition: ${id}`);
     try {
       await deleteOperatorRequisition(id);
       await fetchRequisitions();
       setSnackbar({ open: true, message: 'Requisition deleted successfully', severity: 'success' });
     } catch (err) {
-      console.error('Error deleting requisition:', err);
-      console.error('Error details:', JSON.stringify(err, null, 2));
+      addLog(`Error deleting requisition: ${err.message}`);
+      addLog(`Error details: ${JSON.stringify(err, null, 2)}`);
       setSnackbar({ open: true, message: 'Failed to delete requisition', severity: 'error' });
     }
   };
 
   const handleEdit = (request) => {
-    console.log('Editing requisition:', request);
+    addLog(`Editing requisition: ${JSON.stringify(request)}`);
     setFormData(request);
     setIsEditing(request.id);
     handleOpenDialog();
   };
 
   const handleComplete = async (id) => {
-    console.log('Completing requisition:', id);
+    addLog(`Completing requisition: ${id}`);
     try {
       await updateOperatorRequisition(id, { status: 'Completed' });
       await fetchRequisitions();
       setSnackbar({ open: true, message: 'Requisition marked as completed', severity: 'success' });
     } catch (err) {
-      console.error('Error completing requisition:', err);
-      console.error('Error details:', JSON.stringify(err, null, 2));
+      addLog(`Error completing requisition: ${err.message}`);
+      addLog(`Error details: ${JSON.stringify(err, null, 2)}`);
       setSnackbar({ open: true, message: 'Failed to complete requisition', severity: 'error' });
     }
   };
 
   const handleCancel = async (id) => {
-    console.log('Cancelling requisition:', id);
+    addLog(`Cancelling requisition: ${id}`);
     try {
       await updateOperatorRequisition(id, { status: 'Cancelled' });
       await fetchRequisitions();
       setSnackbar({ open: true, message: 'Requisition cancelled successfully', severity: 'success' });
     } catch (err) {
-      console.error('Error cancelling requisition:', err);
-      console.error('Error details:', JSON.stringify(err, null, 2));
+      addLog(`Error cancelling requisition: ${err.message}`);
+      addLog(`Error details: ${JSON.stringify(err, null, 2)}`);
       setSnackbar({ open: true, message: 'Failed to cancel requisition', severity: 'error' });
     }
   };
@@ -394,6 +407,16 @@ const OperatorRequisition = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+     {/* Logs Section */}
+     <Box mt={4}>
+        <Typography variant="h6">Logs</Typography>
+        <Paper style={{ maxHeight: 200, overflow: 'auto', padding: 10 }}>
+          {logs.map((log, index) => (
+            <Typography key={index} variant="body2">{log}</Typography>
+          ))}
+        </Paper>
+      </Box>
     </Box>
   );
 };

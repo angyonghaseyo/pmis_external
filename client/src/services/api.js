@@ -337,7 +337,9 @@ export const getOperatorRequisitions = async (userId) => {
     return results;
   } catch (error) {
     console.error('Error fetching operator requisitions:', error);
-    console.error('Error details:', JSON.stringify(error));
+    if (error.code === 'failed-precondition') {
+      console.error('This query requires an index. Please check the Firebase console for a link to create the index, or create it manually.');
+    }
     throw error;
   }
 };
@@ -349,6 +351,7 @@ export const createOperatorRequisition = async (requisitionData) => {
       createdAt: serverTimestamp(),
       status: 'Active'
     });
+    console.log('Created new requisition with ID:', docRef.id);
     return docRef.id;
   } catch (error) {
     console.error('Error creating operator requisition:', error);
@@ -360,6 +363,7 @@ export const updateOperatorRequisition = async (requisitionId, updateData) => {
   try {
     const requisitionRef = doc(db, 'operator_requisitions', requisitionId);
     await updateDoc(requisitionRef, updateData);
+    console.log('Updated requisition:', requisitionId);
   } catch (error) {
     console.error('Error updating operator requisition:', error);
     throw error;
@@ -369,6 +373,7 @@ export const updateOperatorRequisition = async (requisitionId, updateData) => {
 export const deleteOperatorRequisition = async (requisitionId) => {
   try {
     await deleteDoc(doc(db, 'operator_requisitions', requisitionId));
+    console.log('Deleted requisition:', requisitionId);
   } catch (error) {
     console.error('Error deleting operator requisition:', error);
     throw error;
