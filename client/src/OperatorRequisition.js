@@ -34,7 +34,7 @@ const operatorSkills = ['Crane Operator', 'Forklift Operator', 'Equipment Techni
 
 const OperatorRequisition = () => {
   const [activeRequests, setActiveRequests] = useState([]);
-  const [completedRequests, setCompletedRequests] = useState([]);
+  const [resolvedRequests, setResolvedRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [formData, setFormData] = useState({
@@ -62,10 +62,10 @@ const OperatorRequisition = () => {
       const requisitions = await getOperatorRequisitions(user.uid);
       
       const active = requisitions.filter(req => req.status === 'Active');
-      const completed = requisitions.filter(req => ['Completed', 'Cancelled'].includes(req.status));
+      const resolved = requisitions.filter(req => ['Approved', 'Rejected'].includes(req.status));
       
       setActiveRequests(active);
-      setCompletedRequests(completed);
+      setResolvedRequests(resolved);
     } catch (err) {
       setError(`Error fetching requisitions: ${err.message}`);
     } finally {
@@ -172,7 +172,7 @@ const OperatorRequisition = () => {
 
       <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 2 }}>
         <Tab label="Active Requests" />
-        <Tab label="Completed/Cancelled Requests" />
+        <Tab label="Approved/Rejected Requests" />
       </Tabs>
 
       {tabValue === 0 && (
@@ -233,14 +233,14 @@ const OperatorRequisition = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {completedRequests.length === 0 ? (
+              {resolvedRequests.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} align="center">
-                    No completed or cancelled requests found
+                    No approved or rejected requests found
                   </TableCell>
                 </TableRow>
               ) : (
-                completedRequests.map((request) => (
+                resolvedRequests.map((request) => (
                   <TableRow key={request.id}>
                     <TableCell>{request.operatorSkill}</TableCell>
                     <TableCell>{request.date}</TableCell>
