@@ -20,7 +20,8 @@ import {
   deleteDoc, 
   addDoc,
   serverTimestamp,
-  increment
+  increment,
+  orderBy
 } from 'firebase/firestore';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 
@@ -318,6 +319,59 @@ export const updateCompanyInfo = async (companyName, data) => {
   } catch (error) {
     console.error('Error updating company info:', error);
     throw new Error(`Failed to update company information: ${error.message}`);
+  }
+};
+
+export const getOperatorRequisitions = async (userId) => {
+  try {
+    console.log('Fetching operator requisitions for user:', userId);
+    const q = query(
+      collection(db, 'operator_requisitions'),
+      where('userId', '==', userId),
+      orderBy('createdAt', 'desc')
+    );
+    const querySnapshot = await getDocs(q);
+    console.log('Query snapshot:', querySnapshot);
+    const results = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    console.log('Fetched requisitions:', results);
+    return results;
+  } catch (error) {
+    console.error('Error fetching operator requisitions:', error);
+    console.error('Error details:', JSON.stringify(error));
+    throw error;
+  }
+};
+
+export const createOperatorRequisition = async (requisitionData) => {
+  try {
+    const docRef = await addDoc(collection(db, 'operator_requisitions'), {
+      ...requisitionData,
+      createdAt: serverTimestamp(),
+      status: 'Active'
+    });
+    return docRef.id;
+  } catch (error) {
+    console.error('Error creating operator requisition:', error);
+    throw error;
+  }
+};
+
+export const updateOperatorRequisition = async (requisitionId, updateData) => {
+  try {
+    const requisitionRef = doc(db, 'operator_requisitions', requisitionId);
+    await updateDoc(requisitionRef, updateData);
+  } catch (error) {
+    console.error('Error updating operator requisition:', error);
+    throw error;
+  }
+};
+
+export const deleteOperatorRequisition = async (requisitionId) => {
+  try {
+    await deleteDoc(doc(db, 'operator_requisitions', requisitionId));
+  } catch (error) {
+    console.error('Error deleting operator requisition:', error);
+    throw error;
   }
 };
 
