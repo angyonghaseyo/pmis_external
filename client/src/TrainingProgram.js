@@ -1,40 +1,113 @@
-import React, { useState } from 'react';
-import { Box, Typography, Button, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { Box, Typography, Button, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, CircularProgress, Snackbar, Alert } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import { getTrainingPrograms, registerForProgram, withdrawFromProgram, getUserData } from './services/api';
+import { auth } from './firebaseConfig';
 
 const TrainingProgram = () => {
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [enrolledPrograms, setEnrolledPrograms] = useState([]);
+  const [availablePrograms, setAvailablePrograms] = useState([]);
+  const [completedPrograms, setCompletedPrograms] = useState([]);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
 
-  // Hardcoded data 
-  const [enrolledPrograms, setEnrolledPrograms] = useState([
-    { id: 1, title: 'Basic Safety Training', status: 'Completed', startDate: '2023-08-01', endDate: '2023-08-15' },
-    { id: 2, title: 'Advanced Docking Techniques', status: 'Ongoing', startDate: '2023-09-01', endDate: '2023-09-10' },
-  ]);
+  useEffect(() => {
+    fetchTrainingPrograms();
+  }, []);
 
-  const availablePrograms = [
-    { id: 3, title: 'Hazardous Material Handling', status: 'Available', startDate: '2023-10-01', endDate: '2023-10-15' },
-    { id: 4, title: 'Fire Safety Protocols', status: 'Available', startDate: '2023-10-20', endDate: '2023-10-30' },
-    { id: 5, title: 'Advanced Cargo Management', status: 'Available', startDate: '2023-11-01', endDate: '2023-11-10' },
-  ];
+  const fetchTrainingPrograms = async () => {
+    try {
+      setLoading(true);
+      const user = auth.currentUser;
+      if (!user) {
+        setError('No authenticated user found');
+        setLoading(false);
+        return;
+      }
 
-  const [myPrograms, setMyPrograms] = useState([
-    { id: 1, title: 'Basic Safety Training', status: 'Completed', completionDate: '2023-08-15' },
-  ]);
+      const userData = await getUserData(user.uid);
+      const allPrograms = await getTrainingPrograms();
 
-  const handleRegisterClick = (programId) => {
-    console.log(`Registering for program ID: ${programId}`);
-    //Need to implement logic
+      const now = new Date();
+      const enrolled = [];
+      const available = [];
+      const completed = [];
+
+      allPrograms.forEach((program) => {
+        const startDate = program.startDate.toDate();
+        const endDate = program.endDate.toDate();
+        const userEnrollment = userData.enrolledPrograms?.find(ep => ep.programId === program.id);
+
+        if (userEnrollment) {
+          if (now <= endDate) {
+            enrolled.push({ ...program, enrollmentDate: userEnrollment.enrollmentDate });
+          } else {
+            completed.push({ ...program, enrollmentDate: userEnrollment.enrollmentDate });
+          }
+        } else if (now < startDate && program.numberOfCurrentRegistrations < program.participantCapacity) {
+          available.push(program);
+        }
+      });
+
+      setEnrolledPrograms(enrolled);
+      setAvailablePrograms(available);
+      setCompletedPrograms(completed);
+    } catch (err) {
+      console.error('Error fetching training programs:', err);
+      setError('Failed to fetch training programs. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleWithdrawClick = (programId) => {
-    console.log(`Withdrawing from program ID: ${programId}`);
-    //Need to implement logic
+  const handleRegisterClick = async (programId) => {
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        setSnackbar({ open: true, message: 'You must be logged in to register', severity: 'error' });
+        return;
+      }
+      await registerForProgram(programId, user.uid);
+      setSnackbar({ open: true, message: 'Successfully registered for the program', severity: 'success' });
+      fetchTrainingPrograms(); // Refresh the programs list
+    } catch (error) {
+      setSnackbar({ open: true, message: 'Failed to register for the program', severity: 'error' });
+    }
   };
 
-  // Filter only ongoing enrolled programs
-  const ongoingEnrolledPrograms = enrolledPrograms.filter(program => program.status === 'Ongoing');
+  const handleWithdrawClick = async (programId) => {
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        setSnackbar({ open: true, message: 'You must be logged in to withdraw', severity: 'error' });
+        return;
+      }
+      await withdrawFromProgram(programId, user.uid);
+      setSnackbar({ open: true, message: 'Successfully withdrawn from the program', severity: 'success' });
+      fetchTrainingPrograms(); // Refresh the programs list
+    } catch (error) {
+      setSnackbar({ open: true, message: 'Failed to withdraw from the program', severity: 'error' });
+    }
+  };
+
+  const handleCloseSnackbar = (event, reason) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+    setSnackbar({ ...snackbar, open: false });
+  };
+
+  if (loading) {
+    return <Box display="flex" justifyContent="center" alignItems="center" height="100vh"><CircularProgress /></Box>;
+  }
+
+  if (error) {
+    return <Typography color="error" align="center">{error}</Typography>;
+  }
 
   return (
     <Box sx={{ display: 'flex' }}>
@@ -46,35 +119,37 @@ const TrainingProgram = () => {
           Training Programs
         </Typography>
 
-        {/* Ongoing Enrolled Training Programs */}
+        {/* Enrolled Training Programs */}
         <Typography variant="h6" gutterBottom>
-          Ongoing Enrolled Training Programs
+          Enrolled Training Programs
         </Typography>
         <TableContainer component={Paper} sx={{ mb: 4 }}>
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>ID</TableCell>
-                <TableCell>Title</TableCell>
-                <TableCell>Status</TableCell>
+                <TableCell>Name</TableCell>
+                <TableCell>Description</TableCell>
                 <TableCell>Start Date</TableCell>
                 <TableCell>End Date</TableCell>
-                <TableCell>Action</TableCell> 
+                <TableCell>Mode</TableCell>
+                <TableCell>Enrollment Date</TableCell>
+                <TableCell>Action</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {ongoingEnrolledPrograms.length === 0 ? (
+              {enrolledPrograms.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center">No ongoing enrolled programs</TableCell>
+                  <TableCell colSpan={7} align="center">No enrolled programs</TableCell>
                 </TableRow>
               ) : (
-                ongoingEnrolledPrograms.map((program) => (
+                enrolledPrograms.map((program) => (
                   <TableRow key={program.id}>
-                    <TableCell>{program.id}</TableCell>
-                    <TableCell>{program.title}</TableCell>
-                    <TableCell>{program.status}</TableCell>
-                    <TableCell>{program.startDate}</TableCell>
-                    <TableCell>{program.endDate}</TableCell>
+                    <TableCell>{program.name}</TableCell>
+                    <TableCell>{program.description}</TableCell>
+                    <TableCell>{program.startDate.toDate().toLocaleDateString()}</TableCell>
+                    <TableCell>{program.endDate.toDate().toLocaleDateString()}</TableCell>
+                    <TableCell>{program.mode}</TableCell>
+                    <TableCell>{program.enrollmentDate.toDate().toLocaleDateString()}</TableCell>
                     <TableCell>
                       <Button 
                         variant="contained" 
@@ -91,7 +166,7 @@ const TrainingProgram = () => {
           </Table>
         </TableContainer>
 
-        {/* Available Training Programs Table */}
+        {/* Available Training Programs */}
         <Typography variant="h6" gutterBottom>
           Available Training Programs
         </Typography>
@@ -99,69 +174,87 @@ const TrainingProgram = () => {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>ID</TableCell>
-                <TableCell>Title</TableCell>
-                <TableCell>Status</TableCell>
+                <TableCell>Name</TableCell>
+                <TableCell>Description</TableCell>
                 <TableCell>Start Date</TableCell>
                 <TableCell>End Date</TableCell>
-                <TableCell>Action</TableCell> 
+                <TableCell>Mode</TableCell>
+                <TableCell>Available Slots</TableCell>
+                <TableCell>Action</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {availablePrograms.map((program) => (
-                <TableRow key={program.id}>
-                  <TableCell>{program.id}</TableCell>
-                  <TableCell>{program.title}</TableCell>
-                  <TableCell>{program.status}</TableCell>
-                  <TableCell>{program.startDate}</TableCell>
-                  <TableCell>{program.endDate}</TableCell>
-                  <TableCell>
-                    <Button 
-                      variant="contained" 
-                      color="primary" 
-                      onClick={() => handleRegisterClick(program.id)}
-                    >
-                      Register
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-
-        {/* My Training Programs */}
-        <Typography variant="h6" gutterBottom>
-          My Training Programs (Completed or Withdrawn)
-        </Typography>
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>ID</TableCell>
-                <TableCell>Title</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Completion / Withdrawal Date</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {myPrograms.length === 0 ? (
+              {availablePrograms.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} align="center">No completed or withdrawn programs</TableCell>
+                  <TableCell colSpan={7} align="center">No available programs</TableCell>
                 </TableRow>
               ) : (
-                myPrograms.map((program) => (
+                availablePrograms.map((program) => (
                   <TableRow key={program.id}>
-                    <TableCell>{program.id}</TableCell>
-                    <TableCell>{program.title}</TableCell>
-                    <TableCell>{program.status}</TableCell>
-                    <TableCell>{program.completionDate}</TableCell>
+                    <TableCell>{program.name}</TableCell>
+                    <TableCell>{program.description}</TableCell>
+                    <TableCell>{program.startDate.toDate().toLocaleDateString()}</TableCell>
+                    <TableCell>{program.endDate.toDate().toLocaleDateString()}</TableCell>
+                    <TableCell>{program.mode}</TableCell>
+                    <TableCell>{program.participantCapacity - program.numberOfCurrentRegistrations}</TableCell>
+                    <TableCell>
+                      <Button 
+                        variant="contained" 
+                        color="primary" 
+                        onClick={() => handleRegisterClick(program.id)}
+                      >
+                        Register
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
             </TableBody>
           </Table>
         </TableContainer>
+
+        {/* Completed Training Programs */}
+        <Typography variant="h6" gutterBottom>
+          Completed Training Programs
+        </Typography>
+        <TableContainer component={Paper}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Name</TableCell>
+                <TableCell>Description</TableCell>
+                <TableCell>Start Date</TableCell>
+                <TableCell>End Date</TableCell>
+                <TableCell>Mode</TableCell>
+                <TableCell>Enrollment Date</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {completedPrograms.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} align="center">No completed programs</TableCell>
+                </TableRow>
+              ) : (
+                completedPrograms.map((program) => (
+                  <TableRow key={program.id}>
+                    <TableCell>{program.name}</TableCell>
+                    <TableCell>{program.description}</TableCell>
+                    <TableCell>{program.startDate.toDate().toLocaleDateString()}</TableCell>
+                    <TableCell>{program.endDate.toDate().toLocaleDateString()}</TableCell>
+                    <TableCell>{program.mode}</TableCell>
+                    <TableCell>{program.enrollmentDate.toDate().toLocaleDateString()}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+
+        <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={handleCloseSnackbar}>
+          <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
       </Box>
     </Box>
   );

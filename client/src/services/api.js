@@ -21,6 +21,9 @@ import {
   addDoc,
   serverTimestamp,
   increment,
+  arrayUnion,
+  Timestamp,
+  arrayRemove,
   orderBy
 } from 'firebase/firestore';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -380,6 +383,123 @@ export const deleteOperatorRequisition = async (requisitionId) => {
   }
 };
 
+export const getTrainingPrograms = async () => {
+  try {
+    const programsRef = collection(db, 'training_programs');
+    const programsSnapshot = await getDocs(programsRef);
+    return programsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  } catch (error) {
+    console.error('Error fetching training programs:', error);
+    throw error;
+  }
+};
+
+// Get user data including enrolled programs
+export const getUserData = async (userId) => {
+  try {
+    const userRef = doc(db, 'users', userId);
+    const userDoc = await getDoc(userRef);
+    if (userDoc.exists()) {
+      return userDoc.data();
+    } else {
+      throw new Error('User not found');
+    }
+  } catch (error) {
+    console.error('Error fetching user data:', error);
+    throw error;
+  }
+};
+
+// Register user for a training program
+export const registerForProgram = async (programId, userId) => {
+  try {
+    const userRef = doc(db, 'users', userId);
+    const programRef = doc(db, 'training_programs', programId);
+
+    // Update user document
+    await updateDoc(userRef, {
+      enrolledPrograms: arrayUnion({
+        programId: programId,
+        enrollmentDate: Timestamp.now(),
+        status: 'Enrolled'
+      })
+    });
+
+    // Update program document
+    await updateDoc(programRef, {
+      numberOfCurrentRegistrations: increment(1)
+    });
+  } catch (error) {
+    console.error('Error registering for program:', error);
+    throw error;
+  }
+};
+
+// Withdraw user from a training program
+export const withdrawFromProgram = async (programId, userId) => {
+  try {
+    const userRef = doc(db, 'users', userId);
+    const programRef = doc(db, 'training_programs', programId);
+
+    // Get user data to find the specific enrollment to remove
+    const userDoc = await getDoc(userRef);
+    const userData = userDoc.data();
+    const enrollmentToRemove = userData.enrolledPrograms.find(ep => ep.programId === programId);
+
+    if (!enrollmentToRemove) {
+      throw new Error('User is not enrolled in this program');
+    }
+
+    // Update user document
+    await updateDoc(userRef, {
+      enrolledPrograms: arrayRemove(enrollmentToRemove)
+    });
+
+    // Update program document
+    await updateDoc(programRef, {
+      numberOfCurrentRegistrations: increment(-1)
+    });
+  } catch (error) {
+    console.error('Error withdrawing from program:', error);
+    throw error;
+  }
+};
+
+// Update program completion status
+export const updateProgramCompletionStatus = async () => {
+  try {
+    const now = Timestamp.now();
+    const usersRef = collection(db, 'users');
+    const usersSnapshot = await getDocs(usersRef);
+
+    for (const userDoc of usersSnapshot.docs) {
+      const userData = userDoc.data();
+      if (userData.enrolledPrograms) {
+        const updatedEnrollments = userData.enrolledPrograms.map(enrollment => {
+          if (enrollment.status === 'Enrolled') {
+            const programRef = doc(db, 'training_programs', enrollment.programId);
+            return getDoc(programRef).then(programDoc => {
+              const programData = programDoc.data();
+              if (programData.endDate.toDate() <= now.toDate()) {
+                return { ...enrollment, status: 'Completed' };
+              }
+              return enrollment;
+            });
+          }
+          return enrollment;
+        });
+
+        const resolvedEnrollments = await Promise.all(updatedEnrollments);
+        await updateDoc(userDoc.ref, { enrolledPrograms: resolvedEnrollments });
+      }
+    }
+  } catch (error) {
+    console.error('Error updating program completion status:', error);
+    throw error;
+  }
+};
+
+
 // Dashboard data
 export const getLeaveStatistics = () => authAxios.get('/leave-statistics').catch(handleApiError);
 
@@ -461,6 +581,10 @@ const api = {
   deleteInquiryFeedback,
   getCompanyInfo,
   updateCompanyInfo,
+  getOperatorRequisitions,
+  createOperatorRequisition,
+  updateOperatorRequisition,
+  deleteOperatorRequisition,
   getLeaveStatistics,
   getTimeLog,
   getServiceOperations,
