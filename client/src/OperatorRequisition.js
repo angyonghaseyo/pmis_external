@@ -49,66 +49,41 @@ const OperatorRequisition = () => {
   const [isEditing, setIsEditing] = useState(null);
   const [tabValue, setTabValue] = useState(0);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
-  const [logs, setLogs] = useState([]);
-
-  const addLog = (message) => {
-    setLogs(prevLogs => [...prevLogs, `${new Date().toISOString()}: ${message}`]);
-    console.log(message);
-  };
 
   const fetchRequisitions = useCallback(async () => {
-    addLog('Starting to fetch requisitions...');
     try {
       setLoading(true);
       setError(null);
       const user = auth.currentUser;
       if (!user) {
-        const noUserError = 'No authenticated user found';
-        addLog(noUserError);
-        setError(noUserError);
+        setError('No authenticated user found');
         return;
       }
-      addLog(`Current user: ${user.uid}`);
-      addLog(`Fetching requisitions for user: ${user.uid}`);
       const requisitions = await getOperatorRequisitions(user.uid);
-      addLog(`Fetched ${requisitions.length} requisitions`);
       
       const active = requisitions.filter(req => req.status === 'Active');
       const completed = requisitions.filter(req => ['Completed', 'Cancelled'].includes(req.status));
       
-      addLog(`Active requests: ${active.length}`);
-      addLog(`Completed/Cancelled requests: ${completed.length}`);
-      
       setActiveRequests(active);
       setCompletedRequests(completed);
     } catch (err) {
-      const errorMessage = `Error fetching requisitions: ${err.message}`;
-      addLog(errorMessage);
-      addLog(`Error details: ${JSON.stringify(err, null, 2)}`);
-      setError(errorMessage);
+      setError(`Error fetching requisitions: ${err.message}`);
     } finally {
       setLoading(false);
-      addLog('Finished fetching requisitions');
     }
   }, []);
 
   useEffect(() => {
-    addLog('Component mounted, setting up auth listener');
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
-        addLog(`User authenticated: ${user.uid}`);
         fetchRequisitions();
       } else {
-        addLog('No authenticated user');
         setError('Please log in to view requisitions.');
         setLoading(false);
       }
     });
 
-    return () => {
-      addLog('Component unmounting, unsubscribing from auth listener');
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, [fetchRequisitions]);
 
   const handleInputChange = (e) => {
@@ -130,72 +105,37 @@ const OperatorRequisition = () => {
   };
 
   const handleSubmit = async () => {
-    addLog(`Submitting form: ${JSON.stringify(formData)}`);
     try {
       const user = auth.currentUser;
       if (!user) throw new Error('No authenticated user');
 
       if (isEditing !== null) {
         await updateOperatorRequisition(isEditing, { ...formData, userId: user.uid });
-        addLog(`Updated requisition: ${isEditing}`);
       } else {
-        const newRequisitionId = await createOperatorRequisition({ ...formData, userId: user.uid, status: 'Active' });
-        addLog(`Created new requisition with ID: ${newRequisitionId}`);
+        await createOperatorRequisition({ ...formData, userId: user.uid, status: 'Active' });
       }
       handleCloseDialog();
       await fetchRequisitions();
       setSnackbar({ open: true, message: 'Requisition saved successfully', severity: 'success' });
     } catch (err) {
-      addLog(`Error submitting requisition: ${err.message}`);
-      addLog(`Error details: ${JSON.stringify(err, null, 2)}`);
       setSnackbar({ open: true, message: 'Failed to save requisition', severity: 'error' });
     }
   };
 
   const handleDelete = async (id) => {
-    addLog(`Deleting requisition: ${id}`);
     try {
       await deleteOperatorRequisition(id);
       await fetchRequisitions();
       setSnackbar({ open: true, message: 'Requisition deleted successfully', severity: 'success' });
     } catch (err) {
-      addLog(`Error deleting requisition: ${err.message}`);
-      addLog(`Error details: ${JSON.stringify(err, null, 2)}`);
       setSnackbar({ open: true, message: 'Failed to delete requisition', severity: 'error' });
     }
   };
 
   const handleEdit = (request) => {
-    addLog(`Editing requisition: ${JSON.stringify(request)}`);
     setFormData(request);
     setIsEditing(request.id);
     handleOpenDialog();
-  };
-
-  const handleComplete = async (id) => {
-    addLog(`Completing requisition: ${id}`);
-    try {
-      await updateOperatorRequisition(id, { status: 'Completed' });
-      await fetchRequisitions();
-      setSnackbar({ open: true, message: 'Requisition marked as completed', severity: 'success' });
-    } catch (err) {
-      addLog(`Error completing requisition: ${err.message}`);
-      addLog(`Error details: ${JSON.stringify(err, null, 2)}`);
-      setSnackbar({ open: true, message: 'Failed to complete requisition', severity: 'error' });
-    }
-  };
-
-  const handleCancel = async (id) => {
-    addLog(`Cancelling requisition: ${id}`);
-    try {
-      await updateOperatorRequisition(id, { status: 'Cancelled' });
-      await fetchRequisitions();
-      setSnackbar({ open: true, message: 'Requisition cancelled successfully', severity: 'success' });
-    } catch (err) {
-      addLog(`Error cancelling requisition: ${err.message}`);
-      addLog(`Error details: ${JSON.stringify(err, null, 2)}`);
-      setSnackbar({ open: true, message: 'Failed to cancel requisition', severity: 'error' });
-    }
   };
 
   const handleTabChange = (event, newValue) => setTabValue(newValue);
@@ -270,8 +210,6 @@ const OperatorRequisition = () => {
                       <IconButton color="error" onClick={() => handleDelete(request.id)}>
                         <DeleteIcon />
                       </IconButton>
-                      <Button onClick={() => handleComplete(request.id)}>Complete</Button>
-                      <Button onClick={() => handleCancel(request.id)}>Cancel</Button>
                     </TableCell>
                   </TableRow>
                 ))
@@ -407,16 +345,6 @@ const OperatorRequisition = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
-
-     {/* Logs Section */}
-     <Box mt={4}>
-        <Typography variant="h6">Logs</Typography>
-        <Paper style={{ maxHeight: 200, overflow: 'auto', padding: 10 }}>
-          {logs.map((log, index) => (
-            <Typography key={index} variant="body2">{log}</Typography>
-          ))}
-        </Paper>
-      </Box>
     </Box>
   );
 };
