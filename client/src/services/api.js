@@ -118,28 +118,28 @@ export const getUsers = async () => {
       throw new Error('User company information not found');
     }
 
+    // Fetch users from the 'users' collection
     const usersQuery = query(
       collection(db, 'users'),
       where('company', '==', currentUserData.company)
     );
-
     const usersSnapshot = await getDocs(usersQuery);
     const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), status: 'Active' }));
 
+    // Fetch invitations - pending, approved, and rejected ones
     const invitationsQuery = query(
       collection(db, 'invitations'),
       where('company', '==', currentUserData.company),
-      where('status', '==', 'Pending')
+      where('status', 'in', ['Pending', 'Approved', 'Rejected']) 
     );
-
     const invitationsSnapshot = await getDocs(invitationsQuery);
-    const pendingUsers = invitationsSnapshot.docs.map(doc => ({ 
-      id: doc.id, 
-      ...doc.data(), 
-      status: 'Pending'
+    const invitationUsers = invitationsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      status: doc.data().status === 'Rejected' ? 'Rejected' : doc.data().status === 'Approved' ? 'Approved' : 'Pending',
     }));
 
-    return [...users, ...pendingUsers];
+    return [...users, ...invitationUsers];
   } catch (error) {
     console.error('Error fetching users:', error);
     throw error;
@@ -358,7 +358,7 @@ export const createOperatorRequisition = async (requisitionData) => {
     const docRef = await addDoc(collection(db, 'operator_requisitions'), {
       ...requisitionData,
       createdAt: serverTimestamp(),
-      status: 'Active'
+      status: 'Pending'  
     });
     console.log('Created new requisition with ID:', docRef.id);
     return docRef.id;

@@ -29,11 +29,11 @@ import { Close } from '@mui/icons-material';
 import { getOperatorRequisitions, createOperatorRequisition, updateOperatorRequisition, deleteOperatorRequisition } from './services/api';
 import { auth } from './firebaseConfig';
 
-const equipmentTypes = ['Crane', 'Forklift', 'Container Handler'];
 const operatorSkills = ['Crane Operator', 'Forklift Operator', 'Equipment Technician'];
+const durations = ['1 Hour', '2 Hours', '3 Hours', '4 Hours']; // Fixed duration options
 
 const OperatorRequisition = () => {
-  const [activeRequests, setActiveRequests] = useState([]);
+  const [pendingRequests, setPendingRequests] = useState([]);
   const [resolvedRequests, setResolvedRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -42,7 +42,6 @@ const OperatorRequisition = () => {
     date: '',
     time: '',
     duration: '',
-    equipmentType: '',
   });
 
   const [open, setOpen] = useState(false);
@@ -61,10 +60,11 @@ const OperatorRequisition = () => {
       }
       const requisitions = await getOperatorRequisitions(user.uid);
       
-      const active = requisitions.filter(req => req.status === 'Active');
+      // Filter pending, approved, and rejected requests
+      const pending = requisitions.filter(req => req.status === 'Pending');
       const resolved = requisitions.filter(req => ['Approved', 'Rejected'].includes(req.status));
       
-      setActiveRequests(active);
+      setPendingRequests(pending);
       setResolvedRequests(resolved);
     } catch (err) {
       setError(`Error fetching requisitions: ${err.message}`);
@@ -99,7 +99,6 @@ const OperatorRequisition = () => {
       date: '',
       time: '',
       duration: '',
-      equipmentType: '',
     });
     setIsEditing(null);
   };
@@ -108,24 +107,38 @@ const OperatorRequisition = () => {
     try {
       const user = auth.currentUser;
       if (!user) throw new Error('No authenticated user');
-
+  
+      if (!formData.time) {
+        setSnackbar({ open: true, message: 'Time is a required field', severity: 'error' });
+        return;
+      }
+  
+      // Validate if the selected date and time is in the past
+      const selectedDateTime = new Date(`${formData.date}T${formData.time}`);
+      const currentDateTime = new Date();
+      if (selectedDateTime < currentDateTime) {
+        setSnackbar({ open: true, message: 'Date and time cannot be in the past', severity: 'error' });
+        return;
+      }
+  
       if (isEditing !== null) {
         await updateOperatorRequisition(isEditing, { ...formData, userId: user.uid });
       } else {
-        await createOperatorRequisition({ ...formData, userId: user.uid, status: 'Active' });
+        await createOperatorRequisition({ ...formData, userId: user.uid, status: 'Pending' });
       }
       handleCloseDialog();
-      await fetchRequisitions();
+      await fetchRequisitions(); 
       setSnackbar({ open: true, message: 'Requisition saved successfully', severity: 'success' });
     } catch (err) {
       setSnackbar({ open: true, message: 'Failed to save requisition', severity: 'error' });
     }
   };
+  
 
   const handleDelete = async (id) => {
     try {
       await deleteOperatorRequisition(id);
-      await fetchRequisitions();
+      await fetchRequisitions(); // Refetch after deletion
       setSnackbar({ open: true, message: 'Requisition deleted successfully', severity: 'success' });
     } catch (err) {
       setSnackbar({ open: true, message: 'Failed to delete requisition', severity: 'error' });
@@ -171,7 +184,7 @@ const OperatorRequisition = () => {
       </Box>
 
       <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 2 }}>
-        <Tab label="Active Requests" />
+        <Tab label="Pending Requests" />
         <Tab label="Approved/Rejected Requests" />
       </Tabs>
 
@@ -184,25 +197,25 @@ const OperatorRequisition = () => {
                 <TableCell>Date</TableCell>
                 <TableCell>Time</TableCell>
                 <TableCell>Duration</TableCell>
-                <TableCell>Equipment Type</TableCell>
+                <TableCell>Status</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {activeRequests.length === 0 ? (
+              {pendingRequests.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} align="center">
-                    No active requests found
+                    No pending requests found
                   </TableCell>
                 </TableRow>
               ) : (
-                activeRequests.map((request) => (
+                pendingRequests.map((request) => (
                   <TableRow key={request.id}>
                     <TableCell>{request.operatorSkill}</TableCell>
                     <TableCell>{request.date}</TableCell>
                     <TableCell>{request.time}</TableCell>
                     <TableCell>{request.duration}</TableCell>
-                    <TableCell>{request.equipmentType}</TableCell>
+                    <TableCell>{request.status}</TableCell>
                     <TableCell>
                       <IconButton color="primary" onClick={() => handleEdit(request)}>
                         <EditIcon />
@@ -228,14 +241,13 @@ const OperatorRequisition = () => {
                 <TableCell>Date</TableCell>
                 <TableCell>Time</TableCell>
                 <TableCell>Duration</TableCell>
-                <TableCell>Equipment Type</TableCell>
                 <TableCell>Status</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {resolvedRequests.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center">
+                  <TableCell colSpan={5} align="center">
                     No approved or rejected requests found
                   </TableCell>
                 </TableRow>
@@ -246,7 +258,6 @@ const OperatorRequisition = () => {
                     <TableCell>{request.date}</TableCell>
                     <TableCell>{request.time}</TableCell>
                     <TableCell>{request.duration}</TableCell>
-                    <TableCell>{request.equipmentType}</TableCell>
                     <TableCell>{request.status}</TableCell>
                   </TableRow>
                 ))
@@ -309,25 +320,17 @@ const OperatorRequisition = () => {
             InputLabelProps={{ shrink: true }}
           />
           <TextField
-            label="Duration (hours)"
+            select
+            label="Duration"
             name="duration"
             value={formData.duration}
             onChange={handleInputChange}
             fullWidth
             margin="normal"
-          />
-          <TextField
-            select
-            label="Equipment Type"
-            name="equipmentType"
-            value={formData.equipmentType}
-            onChange={handleInputChange}
-            fullWidth
-            margin="normal"
           >
-            {equipmentTypes.map((type) => (
-              <MenuItem key={type} value={type}>
-                {type}
+            {durations.map((duration) => (
+              <MenuItem key={duration} value={duration}>
+                {duration}
               </MenuItem>
             ))}
           </TextField>

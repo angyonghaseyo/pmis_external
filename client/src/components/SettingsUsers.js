@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Edit2, Trash2, UserPlus } from 'lucide-react';
 import { 
   Table, 
   TableBody, 
@@ -23,8 +22,11 @@ import {
   FormControl,
   InputLabel,
   Checkbox,
-  ListItemText
+  ListItemText,
+  Tabs,
+  Tab
 } from '@mui/material';
+import { Edit2, Trash2, UserPlus } from 'lucide-react';
 import { getUsers, updateUser, deleteUser, inviteUser, getCurrentUser, cancelInvitation } from '../services/api';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
@@ -44,7 +46,7 @@ const SettingsUsers = () => {
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [usersPerPage] = useState(10);
+  const [usersPerPage] = useState(10); // 10 users per page
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editingUser, setEditingUser] = useState(null);
@@ -60,6 +62,7 @@ const SettingsUsers = () => {
     teams: [],
     status: 'Pending'
   });
+  const [selectedTab, setSelectedTab] = useState(0); 
 
   const [formErrors, setFormErrors] = useState({
     email: false,
@@ -112,7 +115,7 @@ const SettingsUsers = () => {
   const handleUpdateUser = async (userId, updatedData) => {
     try {
       const { email, status, ...dataToUpdate } = updatedData;
-      dataToUpdate.userType = 'Normal'; // Ensure userType is always 'Normal'
+      dataToUpdate.userType = 'Normal'; 
       if (status === 'Pending') {
         await updateUser(userId, dataToUpdate, true);
       } else {
@@ -144,7 +147,6 @@ const SettingsUsers = () => {
   };
 
   const handleInviteUser = async () => {
-    // Validate form fields before inviting
     const errors = {
       email: newUser.email.trim() === '',
       firstName: newUser.firstName.trim() === '',
@@ -154,7 +156,6 @@ const SettingsUsers = () => {
   
     setFormErrors(errors);
   
-    // Proceed only if no errors
     if (!Object.values(errors).some((error) => error)) {
       try {
         await inviteUser({ ...newUser, company: currentUserCompany });
@@ -190,6 +191,18 @@ const SettingsUsers = () => {
   const indexOfFirstUser = indexOfLastUser - usersPerPage;
   const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
 
+  // Filter users based on the selected tab
+  const filteredByStatus = currentUsers.filter((user) => {
+    if (selectedTab === 0) {
+      return user.status === 'Pending';
+    } else if (selectedTab === 1) {
+      return user.status === 'Approved';
+    } else {
+      return user.status === 'Rejected';
+    }
+  });
+
+  // Define the paginate function
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   if (loading) return <Box display="flex" justifyContent="center" alignItems="center" height="100vh"><CircularProgress /></Box>;
@@ -198,15 +211,18 @@ const SettingsUsers = () => {
   return (
     <Box sx={{ p: 3 }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-      <Typography variant="h4" gutterBottom>Users</Typography>
-      <Button
-          variant="contained"
-          startIcon={<UserPlus />}
-          onClick={() => setInviteDialogOpen(true)}
-        >
+        <Typography variant="h4" gutterBottom>Users</Typography>
+        <Button variant="contained" onClick={() => setInviteDialogOpen(true)}>
           Invite User
         </Button>
       </Box>
+      
+      <Tabs value={selectedTab} onChange={(e, newValue) => setSelectedTab(newValue)} aria-label="user status tabs">
+        <Tab label="Pending Requests" />
+        <Tab label="Approved Requests" />
+        <Tab label="Rejected Requests" />
+      </Tabs>
+
       <TextField
         label="Search users"
         variant="outlined"
@@ -215,6 +231,7 @@ const SettingsUsers = () => {
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.target.value)}
       />
+      
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
@@ -224,40 +241,51 @@ const SettingsUsers = () => {
               <TableCell style={{ width: '25%' }}>Teams</TableCell>
               <TableCell style={{ width: '10%' }}>User Type</TableCell>
               <TableCell style={{ width: '10%' }}>Status</TableCell>
-              <TableCell style={{ width: '20%' }}>Actions</TableCell>
+              {selectedTab === 2 && (
+                <TableCell style={{ width: '10%' }}>Rejection Reason</TableCell> 
+              )}
+              {selectedTab === 0 && (
+                <TableCell style={{ width: '20%' }}>Actions</TableCell> 
+              )}
             </TableRow>
           </TableHead>
           <TableBody>
-            {currentUsers.map((user) => (
+            {filteredByStatus.map((user) => (
               <TableRow key={user.id}>
                 <TableCell>{`${user.firstName} ${user.lastName}`}</TableCell>
                 <TableCell>{user.email}</TableCell>
                 <TableCell>{user.teams ? user.teams.join(', ') : 'N/A'}</TableCell>
                 <TableCell>{user.userType || 'Normal'}</TableCell>
                 <TableCell>{user.status}</TableCell>
-                <TableCell>
-                  <Button
-                    startIcon={<Edit2 />}
-                    onClick={() => setEditingUser(user)}
-                    size="small"
-                    style={{ marginRight: '8px' }} 
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    startIcon={<Trash2 />}
-                    onClick={() => setDeleteConfirmation(user)}
-                    color="error"
-                    size="small"
-                  >
-                    {user.status === 'Pending' ? 'Cancel' : 'Delete'}
-                  </Button>
-                </TableCell>
+                {selectedTab === 2 && (
+                  <TableCell>{user.rejectionReason || 'N/A'}</TableCell> 
+                )}
+                {selectedTab === 0 && (
+                  <TableCell>
+                    <Button
+                      startIcon={<Edit2 />}
+                      onClick={() => setEditingUser(user)}
+                      size="small"
+                      style={{ marginRight: '8px' }} 
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      startIcon={<Trash2 />}
+                      onClick={() => setDeleteConfirmation(user)}
+                      color="error"
+                      size="small"
+                    >
+                      {user.status === 'Pending' ? 'Cancel' : 'Delete'}
+                    </Button>
+                  </TableCell>
+                )}
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </TableContainer>
+
       <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
         {Array.from({ length: Math.ceil(filteredUsers.length / usersPerPage) }, (_, i) => (
           <Button key={i} onClick={() => paginate(i + 1)} variant={currentPage === i + 1 ? 'contained' : 'outlined'} sx={{ mx: 0.5 }}>
@@ -328,10 +356,7 @@ const SettingsUsers = () => {
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={!!deleteConfirmation}
-        onClose={() => setDeleteConfirmation(null)}
-      >
+      <Dialog open={!!deleteConfirmation} onClose={() => setDeleteConfirmation(null)}>
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
           <DialogContentText>
