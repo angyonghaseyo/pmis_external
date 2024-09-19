@@ -231,7 +231,7 @@ const InquiryFeedback = () => {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>Incremental ID</TableCell>
+                <TableCell>ID</TableCell>
                 <TableCell>Type</TableCell>
                 <TableCell>Subject</TableCell>
                 <TableCell>Status</TableCell>

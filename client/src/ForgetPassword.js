@@ -1,7 +1,16 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { auth, sendPasswordResetEmail } from './firebaseConfig';
-import './AuthForms.css';
+import {
+    TextField,
+    Button,
+    Typography,
+    Alert,
+    CircularProgress,
+    Box,
+    Paper,
+    Container
+} from '@mui/material';
 
 function ForgotPassword() {
     const [email, setEmail] = useState('');
@@ -44,45 +53,61 @@ function ForgotPassword() {
 
     if (isSubmitted) {
         return (
-            <div className="auth-form">
-                <h2>🚢 Oceania PMIS</h2>
-                <p>Forgot Password?</p>
-                <p>Reset password instructions have been sent to your inbox!</p>
-                <p>Please check your email and follow the instructions to reset your password.</p>
-                <button className="auth-button" onClick={handleTryAgain}>Send Again</button>
-                <p>
-                    <Link to="/login">Back to Login</Link>
-                </p>
-            </div>
+            <Container component="main" maxWidth="xs">
+                <Paper elevation={3} sx={{ padding: 4, marginTop: 8 }}>
+                    <Box mb={3}>
+                        <Typography variant="h5" align="center" gutterBottom>🚢 Oceania PMIS</Typography>
+                        <Typography variant="h6" align="center" gutterBottom>Reset password instructions have been sent to your inbox!</Typography>
+                    </Box>
+                    <Button variant="contained" fullWidth onClick={handleTryAgain}>
+                        Send Again
+                    </Button>
+                    <Box mt={3} textAlign="center">
+                        <Link to="/login">Back to Login</Link>
+                    </Box>
+                </Paper>
+            </Container>
         );
     }
 
     return (
-        <div className="auth-form">
-            <h2>🚢 Oceania PMIS</h2>
-            <p>Forgot Password?</p>
-            <p>Enter your email address and we will send you instructions to reset your password.</p>
-            {error && <p className="error-message">{error}</p>}
-            <form onSubmit={handleSubmit}>
-                <div className="form-group">
-                    <label htmlFor="email">Email Address*</label>
-                    <input
+        <Container component="main" maxWidth="xs">
+            <Paper elevation={3} sx={{ padding: 4, marginTop: 8 }}>
+                <Box mb={3}>
+                    <Typography variant="h5" align="center" gutterBottom sx={{ mb: 2 }}>🚢 Oceania PMIS</Typography>
+                    <Typography variant="h6" align="center" gutterBottom sx={{ mb: 2 }}>Forgot Password?</Typography>
+                    <Typography align="center" sx={{ mb: 3 }}>
+                        Enter your email address and we will send you instructions to reset your password.
+                    </Typography>
+                </Box>
+                {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+                <form onSubmit={handleSubmit}>
+                    <TextField
+                        label="Email Address"
+                        variant="outlined"
+                        fullWidth
+                        margin="normal"
                         type="email"
-                        id="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        placeholder="Enter your email address"
                         required
                     />
-                </div>
-                <button type="submit" className="auth-button" disabled={isLoading}>
-                    {isLoading ? 'Sending...' : 'Send Reset Link'}
-                </button>
-            </form>
-            <p>
-                Remember your password? <Link to="/login">Back to Login</Link>
-            </p>
-        </div>
+                    <Button
+                        type="submit"
+                        variant="contained"
+                        color="primary"
+                        fullWidth
+                        disabled={isLoading}
+                        sx={{ mt: 2 }}
+                    >
+                        {isLoading ? <CircularProgress size={24} /> : 'Send Reset Link'}
+                    </Button>
+                </form>
+                <Box mt={3} textAlign="center">
+                    Remember your password? <Link to="/login">Back to Login</Link>
+                </Box>
+            </Paper>
+        </Container>
     );
 }
 

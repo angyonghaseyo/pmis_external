@@ -11,12 +11,12 @@ import SignUpForm from './SignUpForm';
 import ForgotPassword from './ForgetPassword';
 import ResetPassword from './ResetPassword';
 import EditProfile from './EditProfile';
-import InquiryFeedback from './InquiryFeedback'; 
+import InquiryFeedback from './InquiryFeedback';
 import InquiryFeedbackDetail from './InquiryFeedbackDetail';
 import TrainingProgram from './TrainingProgram';
-import CompanyInfo from './CompanyInfo'; 
-import OperatorRequisition from './OperatorRequisition'; 
-import { Box, CssBaseline } from '@mui/material';
+import CompanyInfo from './CompanyInfo';
+import OperatorRequisition from './OperatorRequisition';
+import { Box, CssBaseline, CircularProgress } from '@mui/material';
 
 const drawerWidth = 240;
 
@@ -34,7 +34,18 @@ function App() {
   }, []);
 
   if (loading) {
-    return <div className="loading">Loading...</div>;
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '100vh',
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
   }
 
   return (
@@ -46,10 +57,10 @@ function App() {
           component="main"
           sx={{
             flexGrow: 1,
-            padding: '1rem',
-            width: '100%',
-            maxWidth: `calc(100% - ${drawerWidth}px)`,
+            p: 3,
+            width: user ? `calc(100% - ${drawerWidth}px)` : '100%',
             mt: '80px',
+            minHeight: '100vh', // Ensure full height
           }}
         >
           <Header user={user} />
@@ -59,11 +70,11 @@ function App() {
                 <Route path="/" element={<UserWorkspace user={user} />} />
                 <Route path="/manpower/inquiries-and-feedback" element={<InquiryFeedback />} />
                 <Route path="/manpower/training-program" element={<TrainingProgram />} />
-                <Route path="/manpower/operator-requisition" element={<OperatorRequisition />} /> 
-                <Route path="/inquiries/:id" element={<InquiryFeedbackDetail />} /> 
+                <Route path="/manpower/operator-requisition" element={<OperatorRequisition />} />
+                <Route path="/inquiries/:id" element={<InquiryFeedbackDetail />} />
                 <Route path="/settings/profile" element={<EditProfile user={user} />} />
                 <Route path="/settings/users" element={<SettingsUsers />} />
-                <Route path="/settings/company" element={<CompanyInfo />} /> 
+                <Route path="/settings/company" element={<CompanyInfo />} />
                 <Route path="*" element={<Navigate to="/" />} />
               </>
             ) : (

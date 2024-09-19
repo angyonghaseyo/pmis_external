@@ -2,7 +2,16 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from './firebaseConfig';
-import './AuthForms.css';
+import { 
+  TextField, 
+  Button, 
+  Typography, 
+  Alert, 
+  CircularProgress, 
+  Box, 
+  Container, 
+  Paper 
+} from '@mui/material';
 
 function LoginForm() {
     const [email, setEmail] = useState('');
@@ -18,7 +27,6 @@ function LoginForm() {
 
         try {
             await signInWithEmailAndPassword(auth, email, password);
-            // Login successful
             setLoading(false);
             navigate('/'); // Redirect to home page or dashboard
         } catch (error) {
@@ -43,44 +51,62 @@ function LoginForm() {
     };
 
     return (
-        <div className="auth-form">
-            <h2>🚢 Oceania PMIS</h2>
-            <p>Sign in to your account</p>
-            {error && <p className="error-message">{error}</p>}
-            <form onSubmit={handleSubmit}>
-                <div className="form-group">
-                    <label htmlFor="email">Email Address*</label>
-                    <input
-                        type="email"
-                        id="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="Email Address*"
-                        required
-                    />
-                </div>
-                <div className="form-group">
-                    <label htmlFor="password">Password*</label>
-                    <input
-                        type="password"
-                        id="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Password*"
-                        required
-                    />
-                </div>
-                <div className="forgot-password">
-                    <Link to="/forgot-password">Forgot Password?</Link>
-                </div>
-                <button type="submit" className="auth-button" disabled={loading}>
-                    {loading ? 'Logging in...' : 'Login'}
-                </button>
-            </form>
-            <p className="auth-switch">
-                Don't have an account? <Link to="/signup">Sign up</Link>
-            </p>
-        </div>
+        <Box>
+            <Container maxWidth="xs">
+                <Paper elevation={3} sx={{ padding: 4, width: '100%' }}>
+                    <Typography component="h1" variant="h4" gutterBottom>
+                        🚢  Oceania PMIS
+                    </Typography>
+                    <Typography component="h2" variant="h6" gutterBottom>
+                        Sign in to your account
+                    </Typography>
+                    {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+                    <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 1 }}>
+                        <TextField
+                            margin="normal"
+                            required
+                            fullWidth
+                            id="email"
+                            label="Email Address"
+                            name="email"
+                            autoComplete="email"
+                            autoFocus
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                        />
+                        <TextField
+                            margin="normal"
+                            required
+                            fullWidth
+                            name="password"
+                            label="Password"
+                            type="password"
+                            id="password"
+                            autoComplete="current-password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                        />
+                        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+                            <Link to="/forgot-password" style={{ color: 'inherit' }}>Forgot Password?</Link>
+                        </Box>
+                        <Button
+                            type="submit"
+                            fullWidth
+                            variant="contained"
+                            color="primary"
+                            disabled={loading}
+                            sx={{ mt: 3, mb: 2 }}
+                        >
+                            {loading ? <CircularProgress size={24} /> : 'Login'}
+                        </Button>
+                        <Box sx={{ mt: 2 }}>
+                            Don't have an account?{' '}
+                            <Link to="/signup" style={{ color: 'inherit' }}>Sign up</Link>
+                        </Box>
+                    </Box>
+                </Paper>
+            </Container>
+        </Box>
     );
 }
 
