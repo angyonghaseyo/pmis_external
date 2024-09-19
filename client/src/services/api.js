@@ -227,7 +227,7 @@ export const getUserInquiriesFeedback = async () => {
   }
 };
 
-// Create new inquiry or feedback
+// Create new inquiry or feedback with auto-incrementing ID
 export const createInquiryFeedback = async (data) => {
   try {
     const user = auth.currentUser;
@@ -251,15 +251,21 @@ export const createInquiryFeedback = async (data) => {
       }
     }
 
+    // Count the number of existing documents to assign the next incremental ID
+    const inquiriesRef = collection(db, 'inquiries_feedback');
+    const snapshot = await getDocs(inquiriesRef);
+    const newId = snapshot.size + 1; 
+
     // Create a new object without the 'file' property
     const { file, ...dataWithoutFile } = data;
 
     const docData = {
       ...dataWithoutFile,
+      id: newId, 
       userId: user.uid,
       createdAt: serverTimestamp(),
       status: 'Open',
-      fileURL: fileURL
+      fileURL: fileURL,
     };
 
     console.log('Attempting to add document with data:', JSON.stringify(docData, null, 2));

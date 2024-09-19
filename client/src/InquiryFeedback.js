@@ -34,10 +34,12 @@ const InquiryFeedback = () => {
   const [inquiries, setInquiries] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [formData, setFormData] = useState({
+    id: '',
     type: 'Inquiry',
     subject: '',
     description: '',
-    urgency: 'Normal',
+    status: 'Pending',
+    urgency: 'Medium',
     file: null
   });
   const [formErrors, setFormErrors] = useState({ subject: false, description: false });
@@ -77,19 +79,23 @@ const InquiryFeedback = () => {
     if (inquiry) {
       setEditingInquiry(inquiry);
       setFormData({
+        id: inquiry.id,
         type: inquiry.type,
         subject: inquiry.subject,
         description: inquiry.description,
+        status: inquiry.status,
         urgency: inquiry.urgency,
         file: null
       });
     } else {
       setEditingInquiry(null);
       setFormData({
+        id: '',
         type: 'Inquiry',
         subject: '',
         description: '',
-        urgency: 'Normal',
+        status: 'Pending',
+        urgency: 'Medium',
         file: null
       });
     }
@@ -118,19 +124,19 @@ const InquiryFeedback = () => {
       subject: formData.subject.trim() === '',
       description: formData.description.trim() === ''
     };
-  
+
     setFormErrors(errors);
-  
+
     if (!errors.subject && !errors.description) {
       try {
         setLoading(true);
         setSubmitError(null);
-        
+
         const submissionData = {
           ...formData,
           file: formData.file instanceof File ? formData.file : null
         };
-  
+
         if (editingInquiry) {
           await updateInquiryFeedback(editingInquiry.id, submissionData);
         } else {
@@ -161,7 +167,7 @@ const InquiryFeedback = () => {
   const handleReplySubmit = async () => {
     try {
       setLoading(true);
-      await updateInquiryFeedback(editingInquiry.id, { 
+      await updateInquiryFeedback(editingInquiry.id, {
         userReply: replyText,
         // Status remains unchanged
       });
@@ -175,8 +181,8 @@ const InquiryFeedback = () => {
     }
   };
 
-  const openInquiriesFeedback = inquiries.filter(item => item.status === 'Open').length;
-  const pendingUserAction = inquiries.filter(item => ['Approved', 'Rejected'].includes(item.status) && !item.userReply).length;
+  const openInquiriesFeedback = inquiries.filter((item) => item.status === 'Open').length;
+  const pendingUserAction = inquiries.filter((item) => ['Approved', 'Rejected'].includes(item.status) && !item.userReply).length;
 
   if (loading && inquiries.length === 0) return <Box display="flex" justifyContent="center" alignItems="center" height="100vh"><CircularProgress /></Box>;
   if (error) return <Typography color="error" align="center">{error}</Typography>;
@@ -233,7 +239,7 @@ const InquiryFeedback = () => {
             <TableBody>
               {inquiries.map((inquiry, index) => (
                 <TableRow key={inquiry.id}>
-                  <TableCell>{index + 1}</TableCell>
+                  <TableCell>{inquiry.id}</TableCell>
                   <TableCell>{inquiry.type}</TableCell>
                   <TableCell>{inquiry.subject}</TableCell>
                   <TableCell>{inquiry.status}</TableCell>
@@ -308,8 +314,23 @@ const InquiryFeedback = () => {
               onChange={handleInputChange}
             >
               <MenuItem value="Low">Low</MenuItem>
-              <MenuItem value="Normal">Normal</MenuItem>
+              <MenuItem value="Medium">Medium</MenuItem>
               <MenuItem value="High">High</MenuItem>
+            </TextField>
+
+            <TextField
+              select
+              fullWidth
+              margin="normal"
+              label="Status"
+              name="status"
+              value={formData.status}
+              onChange={handleInputChange}
+            >
+              <MenuItem value="Pending">Pending</MenuItem>
+              <MenuItem value="In Progress">In Progress</MenuItem>
+              <MenuItem value="Resolved">Resolved</MenuItem>
+              <MenuItem value="Archived">Archived</MenuItem>
             </TextField>
 
             <input
