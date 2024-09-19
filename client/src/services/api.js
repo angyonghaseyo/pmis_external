@@ -232,51 +232,43 @@ export const createInquiryFeedback = async (data) => {
   try {
     const user = auth.currentUser;
     if (!user) {
-      console.error('No authenticated user');
       throw new Error('No authenticated user');
     }
 
     let fileURL = null;
-    if (data.file) {
+
+    // Process file upload if a file exists
+    if (data.file && data.file instanceof File) {
       try {
         const fileExtension = data.file.name.split('.').pop();
         const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 15)}.${fileExtension}`;
         const fileRef = storageRef(storage, `inquiries_feedback/${fileName}`);
         const snapshot = await uploadBytes(fileRef, data.file);
         fileURL = await getDownloadURL(snapshot.ref);
-        console.log('File uploaded successfully:', fileURL);
       } catch (uploadError) {
         console.error('Error uploading file:', uploadError);
         throw new Error('Failed to upload file: ' + uploadError.message);
       }
     }
 
-    // Count the number of existing documents to assign the next incremental ID
+    const { file, ...dataWithoutFile } = data;
     const inquiriesRef = collection(db, 'inquiries_feedback');
     const snapshot = await getDocs(inquiriesRef);
     const newIncrementalId = snapshot.size + 1; 
-
-    const { file, ...dataWithoutFile } = data;
 
     const docData = {
       ...dataWithoutFile,
       incrementalId: newIncrementalId, 
       userId: user.uid,
       createdAt: serverTimestamp(),
-      status: 'Open',
+      status: 'Pending',
       fileURL: fileURL,
     };
 
-    console.log('Attempting to add document with data:', JSON.stringify(docData, null, 2));
+    console.log('Final document data:', docData);
 
-    try {
-      const docRef = await addDoc(collection(db, 'inquiries_feedback'), docData);
-      console.log('Document written with ID:', docRef.id);
-      return docRef.id;
-    } catch (firestoreError) {
-      console.error('Error adding document to Firestore:', firestoreError);
-      throw new Error('Failed to save inquiry/feedback data: ' + firestoreError.message);
-    }
+    const docRef = await addDoc(inquiriesRef, docData);
+    return docRef.id;
   } catch (error) {
     console.error('Error in createInquiryFeedback:', error);
     throw error;
@@ -284,10 +276,52 @@ export const createInquiryFeedback = async (data) => {
 };
 
 // Update inquiry or feedback
-export const updateInquiryFeedback = async (id, data) => {
+export const updateInquiryFeedback = async (incrementalId, data) => {
   try {
-    const docRef = doc(db, 'inquiries_feedback', id);
-    await updateDoc(docRef, data);
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error('No authenticated user');
+    }
+
+    const inquiriesRef = collection(db, 'inquiries_feedback');
+    const querySnapshot = await getDocs(inquiriesRef);
+    let docId = null;
+
+    querySnapshot.forEach((doc) => {
+      const inquiryData = doc.data();
+      if (inquiryData.incrementalId === incrementalId) {
+        docId = doc.id; 
+      }
+    });
+
+    if (!docId) {
+      throw new Error(`No inquiry/feedback found with incremental ID: ${incrementalId}`);
+    }
+
+    // Process file upload if there is a new file
+    let fileURL = data.fileURL || null;  // Preserve existing file URL if not replaced
+    if (data.file && data.file instanceof File) {
+      try {
+        const fileExtension = data.file.name.split('.').pop();
+        const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 15)}.${fileExtension}`;
+        const fileRef = storageRef(storage, `inquiries_feedback/${fileName}`);
+        const snapshot = await uploadBytes(fileRef, data.file);
+        fileURL = await getDownloadURL(snapshot.ref);
+      } catch (uploadError) {
+        console.error('Error uploading file:', uploadError);
+        throw new Error('Failed to upload file: ' + uploadError.message);
+      }
+    }
+
+    // Prepare the data for update
+    const { file, ...dataWithoutFile } = data;
+    const updateData = {
+      ...dataWithoutFile,
+      fileURL: fileURL,
+    };
+
+    const docRef = doc(db, 'inquiries_feedback', docId);
+    await updateDoc(docRef, updateData);
   } catch (error) {
     console.error('Error updating inquiry/feedback:', error);
     throw error;

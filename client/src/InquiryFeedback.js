@@ -28,6 +28,7 @@ import { getUserInquiriesFeedback, createInquiryFeedback, updateInquiryFeedback 
 import Sidebar from './Sidebar';
 import Header from './Header';
 import { auth } from './firebaseConfig';
+import { format } from 'date-fns'; 
 
 const InquiryFeedback = () => {
   const [user, setUser] = useState(null);
@@ -136,17 +137,20 @@ const InquiryFeedback = () => {
           type: formData.type,
           subject: formData.subject,
           description: formData.description,
-          status: formData.status,
+          status: 'Pending', 
           urgency: formData.urgency,
           file: formData.file instanceof File ? formData.file : null
         };
+  
+        // Log submission data for debugging
+        console.log('Submitting the following data:', submissionData);
   
         if (editingInquiry) {
           await updateInquiryFeedback(editingInquiry.incrementalId, submissionData);
         } else {
           await createInquiryFeedback(submissionData);
         }
-        
+  
         handleDialogClose();
         fetchInquiriesFeedback();
       } catch (err) {
@@ -247,10 +251,12 @@ const InquiryFeedback = () => {
                   <TableCell>{inquiry.type}</TableCell>
                   <TableCell>{inquiry.subject}</TableCell>
                   <TableCell>{inquiry.status}</TableCell>
-                  <TableCell>{inquiry.createdAt.toDate().toLocaleDateString()}</TableCell>
+                  <TableCell>
+                    {format(inquiry.createdAt.toDate(), 'yyyy-MM-dd HH:mm')} 
+                  </TableCell>
                   <TableCell>{inquiry.urgency}</TableCell>
                   <TableCell>
-                    {inquiry.status === 'Open' && (
+                    {inquiry.status === 'Pending' && (
                       <IconButton onClick={() => handleDialogOpen(inquiry)} size="small" title="Edit">
                         <Edit />
                       </IconButton>
@@ -323,19 +329,13 @@ const InquiryFeedback = () => {
             </TextField>
 
             <TextField
-              select
               fullWidth
               margin="normal"
               label="Status"
               name="status"
               value={formData.status}
-              onChange={handleInputChange}
-            >
-              <MenuItem value="Pending">Pending</MenuItem>
-              <MenuItem value="In Progress">In Progress</MenuItem>
-              <MenuItem value="Resolved">Resolved</MenuItem>
-              <MenuItem value="Archived">Archived</MenuItem>
-            </TextField>
+              InputProps={{ readOnly: true }}  
+            />
 
             <input
               type="file"
