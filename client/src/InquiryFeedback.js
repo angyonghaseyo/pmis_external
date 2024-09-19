@@ -34,7 +34,7 @@ const InquiryFeedback = () => {
   const [inquiries, setInquiries] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [formData, setFormData] = useState({
-    id: '',
+    incrementalId: '',
     type: 'Inquiry',
     subject: '',
     description: '',
@@ -79,7 +79,7 @@ const InquiryFeedback = () => {
     if (inquiry) {
       setEditingInquiry(inquiry);
       setFormData({
-        id: inquiry.id,
+        incrementalId: inquiry.incrementalId,
         type: inquiry.type,
         subject: inquiry.subject,
         description: inquiry.description,
@@ -90,7 +90,7 @@ const InquiryFeedback = () => {
     } else {
       setEditingInquiry(null);
       setFormData({
-        id: '',
+        incrementalId: '',
         type: 'Inquiry',
         subject: '',
         description: '',
@@ -124,24 +124,29 @@ const InquiryFeedback = () => {
       subject: formData.subject.trim() === '',
       description: formData.description.trim() === ''
     };
-
+  
     setFormErrors(errors);
-
+  
     if (!errors.subject && !errors.description) {
       try {
         setLoading(true);
         setSubmitError(null);
-
+  
         const submissionData = {
-          ...formData,
+          type: formData.type,
+          subject: formData.subject,
+          description: formData.description,
+          status: formData.status,
+          urgency: formData.urgency,
           file: formData.file instanceof File ? formData.file : null
         };
-
+  
         if (editingInquiry) {
-          await updateInquiryFeedback(editingInquiry.id, submissionData);
+          await updateInquiryFeedback(editingInquiry.incrementalId, submissionData);
         } else {
           await createInquiryFeedback(submissionData);
         }
+        
         handleDialogClose();
         fetchInquiriesFeedback();
       } catch (err) {
@@ -167,9 +172,8 @@ const InquiryFeedback = () => {
   const handleReplySubmit = async () => {
     try {
       setLoading(true);
-      await updateInquiryFeedback(editingInquiry.id, {
+      await updateInquiryFeedback(editingInquiry.incrementalId, {
         userReply: replyText,
-        // Status remains unchanged
       });
       handleReplyClose();
       fetchInquiriesFeedback();
@@ -227,7 +231,7 @@ const InquiryFeedback = () => {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>ID</TableCell>
+                <TableCell>Incremental ID</TableCell>
                 <TableCell>Type</TableCell>
                 <TableCell>Subject</TableCell>
                 <TableCell>Status</TableCell>
@@ -238,8 +242,8 @@ const InquiryFeedback = () => {
             </TableHead>
             <TableBody>
               {inquiries.map((inquiry, index) => (
-                <TableRow key={inquiry.id}>
-                  <TableCell>{inquiry.id}</TableCell>
+                <TableRow key={inquiry.incrementalId}>
+                  <TableCell>{inquiry.incrementalId}</TableCell>
                   <TableCell>{inquiry.type}</TableCell>
                   <TableCell>{inquiry.subject}</TableCell>
                   <TableCell>{inquiry.status}</TableCell>

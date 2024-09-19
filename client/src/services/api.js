@@ -159,7 +159,7 @@ export const updateUser = async (userId, userData, isPending = false) => {
   try {
     const dataToUpdate = {
       ...userData,
-      userType: 'Normal' // Ensure userType is always 'Normal'
+      userType: 'Normal' 
     };
     
     if (isPending) {
@@ -194,7 +194,7 @@ export const inviteUser = async (userData) => {
   try {
     const invitationRef = await addDoc(collection(db, 'invitations'), {
       ...userData,
-      userType: 'Normal', // Ensure userType is always 'Normal'
+      userType: 'Normal', 
       createdAt: new Date(),
       status: 'Pending'
     });
@@ -254,14 +254,13 @@ export const createInquiryFeedback = async (data) => {
     // Count the number of existing documents to assign the next incremental ID
     const inquiriesRef = collection(db, 'inquiries_feedback');
     const snapshot = await getDocs(inquiriesRef);
-    const newId = snapshot.size + 1; 
+    const newIncrementalId = snapshot.size + 1; 
 
-    // Create a new object without the 'file' property
     const { file, ...dataWithoutFile } = data;
 
     const docData = {
       ...dataWithoutFile,
-      id: newId, 
+      incrementalId: newIncrementalId, 
       userId: user.uid,
       createdAt: serverTimestamp(),
       status: 'Open',
