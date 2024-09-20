@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebaseConfig';
+import { getCurrentUser, getUserData } from './services/api';
 import Header from './Header';
 import Sidebar from './Sidebar';
 import UserWorkspace from './components/UserWorkspace';
@@ -22,12 +23,30 @@ const drawerWidth = 240;
 
 function App() {
   const [user, setUser] = useState(null);
+  const [userType, setUserType] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setLoading(false);
+    const fetchUserData = async (currentUser) => {
+      try {
+        const userData = await getUserData(currentUser.uid);
+        setUserType(userData.userType);
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        setUser(currentUser);
+        await fetchUserData(currentUser);
+      } else {
+        setUser(null);
+        setUserType(null);
+        setLoading(false);
+      }
     });
 
     return () => unsubscribe();
@@ -52,7 +71,7 @@ function App() {
     <Router>
       <Box sx={{ display: 'flex' }}>
         <CssBaseline />
-        {user && <Sidebar />}
+        {user && <Sidebar userType={userType} />}
         <Box
           component="main"
           sx={{
@@ -85,11 +104,12 @@ function App() {
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="*" element={<Navigate to="/login" />} />
               </>
-            )}
-          </Routes>
-        </Box>
-      </Box>
-    </Router>
+            )
+            }
+          </Routes >
+        </Box >
+      </Box >
+    </Router >
   );
 }
 

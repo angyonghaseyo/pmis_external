@@ -45,7 +45,7 @@ const UserWorkspace = ({ user }) => {
       setCurrentTime(new Date());
     }, 1000);
 
-    return () => clearInterval(timer); 
+    return () => clearInterval(timer);
   }, []);
 
   const formatTime = (date) => {
@@ -64,7 +64,7 @@ const UserWorkspace = ({ user }) => {
       </Box>
 
       {/* Welcome message */}
-      <Typography variant="h5" gutterBottom>Good to see you, {user.displayName} 👋</Typography>
+      <Typography variant="h5" gutterBottom>Good to see you, {user.email} 👋</Typography>
 
       {/* Leave statistics */}
       <Grid container spacing={3} mb={3}>

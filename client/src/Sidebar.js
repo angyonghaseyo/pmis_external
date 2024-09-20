@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, Briefcase, Users, Anchor, Clock, Package, DollarSign, FileText, Settings } from 'lucide-react';
+import { Home, Briefcase, Users, Anchor, Clock, Package, Settings, FileText } from 'lucide-react';
 import { List, ListItem, ListItemIcon, ListItemText, Collapse, Drawer, Box } from '@mui/material';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
@@ -8,7 +8,7 @@ import ExpandMore from '@mui/icons-material/ExpandMore';
 const drawerWidth = 240;
 const headerHeight = 64;
 
-const Sidebar = () => {
+const Sidebar = ({ userType }) => {
   const [expandedItems, setExpandedItems] = useState({});
   const navigate = useNavigate();
 
@@ -19,10 +19,13 @@ const Sidebar = () => {
     { name: "Vessel Visits", icon: <Anchor />, path: "/vessels", children: ['Subitem 1', 'Subitem 2'] },
     { name: "Port Operations and Resources", icon: <Clock />, path: "/operations", children: ['Subitem 1', 'Subitem 2'] },
     { name: "Cargos", icon: <Package />, path: "/cargos", children: ['Subitem 1', 'Subitem 2'] },
-    { name: "Financial", icon: <DollarSign />, path: "/financial", children: ['Subitem 1', 'Subitem 2'] },
     { name: "Customs and Trade Documents", icon: <FileText />, path: "/documents", children: ['Subitem 1', 'Subitem 2'] },
-    { name: "Settings", icon: <Settings />, path: "/settings", children: ['Users', 'Company'] }
   ];
+
+  // Only show Settings for Admin users
+  if (userType === 'Admin') {
+    navItems.push({ name: "Settings", icon: <Settings />, path: "/settings", children: ['Users', 'Company'] });
+  }
 
   const toggleExpand = (index) => {
     setExpandedItems(prev => ({ ...prev, [index]: !prev[index] }));
@@ -57,8 +60,8 @@ const Sidebar = () => {
         <List>
           {navItems.map((item, index) => (
             <div key={index}>
-              <ListItem 
-                button 
+              <ListItem
+                button
                 onClick={() => item.children.length > 0 ? toggleExpand(index) : handleNavigation(item.path)}
               >
                 <ListItemIcon>{item.icon}</ListItemIcon>
