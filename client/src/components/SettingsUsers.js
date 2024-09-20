@@ -43,8 +43,11 @@ const teams = [
 
 const SettingsUsers = () => {
   const [users, setUsers] = useState([]);
-  const [filteredUsers, setFilteredUsers] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [allCompanyUsers, setAllCompanyUsers] = useState([]);
+  const [filteredAllUsers, setFilteredAllUsers] = useState([]);
+  const [filteredStatusUsers, setFilteredStatusUsers] = useState([]);
+  const [searchAllUsers, setSearchAllUsers] = useState(''); // Search for "All Users"
+  const [searchStatusUsers, setSearchStatusUsers] = useState(''); // Search for status tables
   const [currentPage, setCurrentPage] = useState(1);
   const [usersPerPage] = useState(10);
   const [loading, setLoading] = useState(true);
@@ -63,15 +66,12 @@ const SettingsUsers = () => {
     status: 'Pending'
   });
   const [selectedTab, setSelectedTab] = useState(0);
-
   const [formErrors, setFormErrors] = useState({
     email: false,
     firstName: false,
     lastName: false,
     teams: false
   });
-
-  const [allCompanyUsers, setAllCompanyUsers] = useState([]);
 
   useEffect(() => {
     fetchUsers();
@@ -80,23 +80,36 @@ const SettingsUsers = () => {
   }, []);
 
   useEffect(() => {
-    const filtered = users.filter(user =>
-      user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (user.teams && user.teams.some(team => team.toLowerCase().includes(searchTerm.toLowerCase()))) ||
-      (user.userType && user.userType.toLowerCase().includes(searchTerm.toLowerCase()))
+    // Filter for All Users search bar
+    const filtered = allCompanyUsers.filter(user =>
+      user.firstName.toLowerCase().includes(searchAllUsers.toLowerCase()) ||
+      user.lastName.toLowerCase().includes(searchAllUsers.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchAllUsers.toLowerCase()) ||
+      (user.teams && user.teams.some(team => team.toLowerCase().includes(searchAllUsers.toLowerCase()))) ||
+      (user.userType && user.userType.toLowerCase().includes(searchAllUsers.toLowerCase()))
     );
-    setFilteredUsers(filtered);
+    setFilteredAllUsers(filtered);
     setCurrentPage(1);
-  }, [searchTerm, users]);
+  }, [searchAllUsers, allCompanyUsers]);
+
+  useEffect(() => {
+    // Filter for Status search bar
+    const filtered = users.filter(user =>
+      user.firstName.toLowerCase().includes(searchStatusUsers.toLowerCase()) ||
+      user.lastName.toLowerCase().includes(searchStatusUsers.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchStatusUsers.toLowerCase()) ||
+      (user.teams && user.teams.some(team => team.toLowerCase().includes(searchStatusUsers.toLowerCase()))) ||
+      (user.userType && user.userType.toLowerCase().includes(searchStatusUsers.toLowerCase()))
+    );
+    setFilteredStatusUsers(filtered);
+  }, [searchStatusUsers, users]);
 
   const fetchUsers = async () => {
     try {
       setLoading(true);
       const fetchedUsers = await getUsers();
       setUsers(fetchedUsers);
-      setFilteredUsers(fetchedUsers);
+      setFilteredStatusUsers(fetchedUsers);
       setLoading(false);
     } catch (err) {
       console.error('Error fetching users:', err);
@@ -111,8 +124,7 @@ const SettingsUsers = () => {
       const companyUsers = await getAllUsersInCompany(); 
       
       setAllCompanyUsers(companyUsers); 
-      setFilteredUsers(companyUsers);   
-  
+      setFilteredAllUsers(companyUsers); 
       setLoading(false);
     } catch (err) {
       console.error('Error fetching users:', err);
@@ -120,7 +132,6 @@ const SettingsUsers = () => {
       setLoading(false);
     }
   };
-  
 
   const fetchCurrentUserCompany = async () => {
     try {
@@ -162,7 +173,7 @@ const SettingsUsers = () => {
       const updatedAllCompanyUsers = allCompanyUsers.filter(user => user.id !== userId);
   
       setUsers(updatedUsers); 
-      setFilteredUsers(updatedAllCompanyUsers); 
+      setFilteredAllUsers(updatedAllCompanyUsers); 
       setAllCompanyUsers(updatedAllCompanyUsers); 
   
       setDeleteConfirmation(null);
@@ -215,9 +226,9 @@ const SettingsUsers = () => {
 
   const indexOfLastUser = currentPage * usersPerPage;
   const indexOfFirstUser = indexOfLastUser - usersPerPage;
-  const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
+  const currentAllUsers = filteredAllUsers.slice(indexOfFirstUser, indexOfLastUser);
 
-  const filteredByStatus = currentUsers.filter((user) => {
+  const filteredByStatus = filteredStatusUsers.filter((user) => {
     if (selectedTab === 0) {
       return user.status === 'Pending';
     } else if (selectedTab === 1) {
@@ -239,13 +250,14 @@ const SettingsUsers = () => {
         <Typography variant="h4" gutterBottom>All Users</Typography>
       </Box>
 
+      {/* Search bar for All Users */}
       <TextField
         label="Search all users"
         variant="outlined"
         fullWidth
         margin="normal"
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
+        value={searchAllUsers}
+        onChange={(e) => setSearchAllUsers(e.target.value)}
       />
 
       <TableContainer component={Paper}>
@@ -260,7 +272,7 @@ const SettingsUsers = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {allCompanyUsers.map((user) => (
+            {currentAllUsers.map((user) => (
               <TableRow key={user.id}>
                 <TableCell>{`${user.firstName} ${user.lastName}`}</TableCell>
                 <TableCell>{user.email}</TableCell>
@@ -281,7 +293,7 @@ const SettingsUsers = () => {
       </TableContainer>
 
       <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
-        {Array.from({ length: Math.ceil(filteredUsers.length / usersPerPage) }, (_, i) => (
+        {Array.from({ length: Math.ceil(filteredAllUsers.length / usersPerPage) }, (_, i) => (
           <Button key={i} onClick={() => paginate(i + 1)} variant={currentPage === i + 1 ? 'contained' : 'outlined'} sx={{ mx: 0.5 }}>
             {i + 1}
           </Button>
@@ -301,6 +313,16 @@ const SettingsUsers = () => {
         <Tab label="Approved Requests" />
         <Tab label="Rejected Requests" />
       </Tabs>
+
+      {/* Search bar for Status-based Users */}
+      <TextField
+        label={`Search ${selectedTab === 0 ? 'Pending' : selectedTab === 1 ? 'Approved' : 'Rejected'} users`}
+        variant="outlined"
+        fullWidth
+        margin="normal"
+        value={searchStatusUsers}
+        onChange={(e) => setSearchStatusUsers(e.target.value)}
+      />
 
       <TableContainer component={Paper} sx={{ mt: 2 }}>
         <Table>
@@ -408,7 +430,6 @@ const SettingsUsers = () => {
           <Button onClick={() => setEditingUser(null)}>Close</Button> 
         </DialogActions>
       </Dialog>
-
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!deleteConfirmation} onClose={() => setDeleteConfirmation(null)}>

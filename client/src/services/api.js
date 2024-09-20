@@ -153,7 +153,6 @@ export const getAllUsersInCompany = async () => {
       throw new Error('No authenticated user');
     }
 
-    // Get the current user's data from the 'users' collection
     const userDocRef = doc(db, 'users', currentUser.uid);
     const userDocSnap = await getDoc(userDocRef);
     const currentUserData = userDocSnap.data();
@@ -162,17 +161,15 @@ export const getAllUsersInCompany = async () => {
       throw new Error('User company information not found');
     }
 
-    // Query all users in the same company from the 'users' collection
     const usersQuery = query(
       collection(db, 'users'),
       where('company', '==', currentUserData.company)
     );
     const usersSnapshot = await getDocs(usersQuery);
 
-    // Map users to an array with their data
     const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-    return users; // Return the users found in the company
+    return users; 
   } catch (error) {
     console.error('Error fetching users in company:', error);
     throw error;
@@ -333,7 +330,7 @@ export const updateInquiryFeedback = async (incrementalId, data) => {
     }
 
     // Process file upload if there is a new file
-    let fileURL = data.fileURL || null;  // Preserve existing file URL if not replaced
+    let fileURL = data.fileURL || null;  
     if (data.file && data.file instanceof File) {
       try {
         const fileExtension = data.file.name.split('.').pop();
@@ -347,7 +344,6 @@ export const updateInquiryFeedback = async (incrementalId, data) => {
       }
     }
 
-    // Prepare the data for update
     const { file, ...dataWithoutFile } = data;
     const updateData = {
       ...dataWithoutFile,
