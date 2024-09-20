@@ -146,6 +146,40 @@ export const getUsers = async () => {
   }
 };
 
+export const getAllUsersInCompany = async () => {
+  try {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      throw new Error('No authenticated user');
+    }
+
+    // Get the current user's data from the 'users' collection
+    const userDocRef = doc(db, 'users', currentUser.uid);
+    const userDocSnap = await getDoc(userDocRef);
+    const currentUserData = userDocSnap.data();
+
+    if (!currentUserData || !currentUserData.company) {
+      throw new Error('User company information not found');
+    }
+
+    // Query all users in the same company from the 'users' collection
+    const usersQuery = query(
+      collection(db, 'users'),
+      where('company', '==', currentUserData.company)
+    );
+    const usersSnapshot = await getDocs(usersQuery);
+
+    // Map users to an array with their data
+    const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    return users; // Return the users found in the company
+  } catch (error) {
+    console.error('Error fetching users in company:', error);
+    throw error;
+  }
+};
+
+
 export const createUser = async (userData) => {
   try {
     const docRef = await addDoc(collection(db, 'users'), { ...userData, userType: 'Normal' });
@@ -645,6 +679,7 @@ const api = {
   submitCustomsDocument,
   getUserSettings,
   updateUserSettings,
+  getAllUsersInCompany
 };
 
 export default api;

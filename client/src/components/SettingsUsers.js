@@ -26,8 +26,8 @@ import {
   Tabs,
   Tab
 } from '@mui/material';
-import { Edit2, Trash2, UserPlus } from 'lucide-react';
-import { getUsers, updateUser, deleteUser, inviteUser, getCurrentUser, cancelInvitation } from '../services/api';
+import { Edit2, Trash2 } from 'lucide-react';
+import { getUsers, updateUser, deleteUser, inviteUser, getCurrentUser, cancelInvitation, getAllUsersInCompany } from '../services/api';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 
@@ -46,7 +46,7 @@ const SettingsUsers = () => {
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [usersPerPage] = useState(10); // 10 users per page
+  const [usersPerPage] = useState(10);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editingUser, setEditingUser] = useState(null);
@@ -62,7 +62,7 @@ const SettingsUsers = () => {
     teams: [],
     status: 'Pending'
   });
-  const [selectedTab, setSelectedTab] = useState(0); 
+  const [selectedTab, setSelectedTab] = useState(0);
 
   const [formErrors, setFormErrors] = useState({
     email: false,
@@ -71,9 +71,12 @@ const SettingsUsers = () => {
     teams: false
   });
 
+  const [allCompanyUsers, setAllCompanyUsers] = useState([]);
+
   useEffect(() => {
     fetchUsers();
     fetchCurrentUserCompany();
+    fetchUsersInCompany();
   }, []);
 
   useEffect(() => {
@@ -102,6 +105,23 @@ const SettingsUsers = () => {
     }
   };
 
+  const fetchUsersInCompany = async () => {
+    try {
+      setLoading(true);
+      const companyUsers = await getAllUsersInCompany(); 
+      
+      setAllCompanyUsers(companyUsers); 
+      setFilteredUsers(companyUsers);   
+  
+      setLoading(false);
+    } catch (err) {
+      console.error('Error fetching users:', err);
+      setError('Failed to fetch users. Please try again later.');
+      setLoading(false);
+    }
+  };
+  
+
   const fetchCurrentUserCompany = async () => {
     try {
       const user = await getCurrentUser();
@@ -115,7 +135,7 @@ const SettingsUsers = () => {
   const handleUpdateUser = async (userId, updatedData) => {
     try {
       const { email, status, ...dataToUpdate } = updatedData;
-      dataToUpdate.userType = 'Normal'; 
+      dataToUpdate.userType = 'Normal';
       if (status === 'Pending') {
         await updateUser(userId, dataToUpdate, true);
       } else {
@@ -138,7 +158,13 @@ const SettingsUsers = () => {
         await deleteUser(userId);
       }
   
-      setUsers(users.filter(user => user.id !== userId));
+      const updatedUsers = users.filter(user => user.id !== userId);
+      const updatedAllCompanyUsers = allCompanyUsers.filter(user => user.id !== userId);
+  
+      setUsers(updatedUsers); 
+      setFilteredUsers(updatedAllCompanyUsers); 
+      setAllCompanyUsers(updatedAllCompanyUsers); 
+  
       setDeleteConfirmation(null);
     } catch (err) {
       console.error('Error deleting user:', err);
@@ -191,7 +217,6 @@ const SettingsUsers = () => {
   const indexOfFirstUser = indexOfLastUser - usersPerPage;
   const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
 
-  // Filter users based on the selected tab
   const filteredByStatus = currentUsers.filter((user) => {
     if (selectedTab === 0) {
       return user.status === 'Pending';
@@ -202,7 +227,6 @@ const SettingsUsers = () => {
     }
   });
 
-  // Define the paginate function
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   if (loading) return <Box display="flex" justifyContent="center" alignItems="center" height="100vh"><CircularProgress /></Box>;
@@ -210,43 +234,85 @@ const SettingsUsers = () => {
 
   return (
     <Box sx={{ p: 3 }}>
+      {/* All Users Table */}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-        <Typography variant="h4" gutterBottom>Users</Typography>
-        <Button variant="contained" onClick={() => setInviteDialogOpen(true)}>
-          Invite User
-        </Button>
+        <Typography variant="h4" gutterBottom>All Users</Typography>
       </Box>
-      
-      <Tabs value={selectedTab} onChange={(e, newValue) => setSelectedTab(newValue)} aria-label="user status tabs">
-        <Tab label="Pending Requests" />
-        <Tab label="Approved Requests" />
-        <Tab label="Rejected Requests" />
-      </Tabs>
 
       <TextField
-        label="Search users"
+        label="Search all users"
         variant="outlined"
         fullWidth
         margin="normal"
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.target.value)}
       />
-      
+
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell style={{ width: '15%' }}>Name</TableCell>
-              <TableCell style={{ width: '20%' }}>Email</TableCell>
-              <TableCell style={{ width: '25%' }}>Teams</TableCell>
-              <TableCell style={{ width: '10%' }}>User Type</TableCell>
-              <TableCell style={{ width: '10%' }}>Status</TableCell>
-              {selectedTab === 2 && (
-                <TableCell style={{ width: '10%' }}>Rejection Reason</TableCell> 
-              )}
-              {selectedTab === 0 && (
-                <TableCell style={{ width: '20%' }}>Actions</TableCell> 
-              )}
+              <TableCell>Name</TableCell>
+              <TableCell>Email</TableCell>
+              <TableCell>Teams</TableCell>
+              <TableCell>User Type</TableCell>
+              <TableCell>Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {allCompanyUsers.map((user) => (
+              <TableRow key={user.id}>
+                <TableCell>{`${user.firstName} ${user.lastName}`}</TableCell>
+                <TableCell>{user.email}</TableCell>
+                <TableCell>{user.teams ? user.teams.join(', ') : 'N/A'}</TableCell>
+                <TableCell>{user.userType || 'Normal'}</TableCell>
+                <TableCell>
+                  <Button startIcon={<Edit2 />} onClick={() => setEditingUser(user)} size="small" style={{ marginRight: '8px' }}>
+                    Edit
+                  </Button>
+                  <Button startIcon={<Trash2 />} onClick={() => setDeleteConfirmation(user)} color="error" size="small">
+                    Delete
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+        {Array.from({ length: Math.ceil(filteredUsers.length / usersPerPage) }, (_, i) => (
+          <Button key={i} onClick={() => paginate(i + 1)} variant={currentPage === i + 1 ? 'contained' : 'outlined'} sx={{ mx: 0.5 }}>
+            {i + 1}
+          </Button>
+        ))}
+      </Box>
+
+      <Box display="flex" justifyContent="space-between" alignItems="center" mt={4} mb={2}>
+        <Typography variant="h4" gutterBottom>Invite Users</Typography>
+        <Button variant="contained" onClick={() => setInviteDialogOpen(true)}>
+          Invite User
+        </Button>
+      </Box>
+
+      {/* Tabs and Pending, Approved, Rejected tables */}
+      <Tabs value={selectedTab} onChange={(e, newValue) => setSelectedTab(newValue)} aria-label="user status tabs" sx={{ mt: 4 }}>
+        <Tab label="Pending Requests" />
+        <Tab label="Approved Requests" />
+        <Tab label="Rejected Requests" />
+      </Tabs>
+
+      <TableContainer component={Paper} sx={{ mt: 2 }}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>Name</TableCell>
+              <TableCell>Email</TableCell>
+              <TableCell>Teams</TableCell>
+              <TableCell>User Type</TableCell>
+              <TableCell>Status</TableCell>
+              {selectedTab === 2 && <TableCell>Rejection Reason</TableCell>}
+              {selectedTab === 0 && <TableCell>Actions</TableCell>}
             </TableRow>
           </TableHead>
           <TableBody>
@@ -257,25 +323,13 @@ const SettingsUsers = () => {
                 <TableCell>{user.teams ? user.teams.join(', ') : 'N/A'}</TableCell>
                 <TableCell>{user.userType || 'Normal'}</TableCell>
                 <TableCell>{user.status}</TableCell>
-                {selectedTab === 2 && (
-                  <TableCell>{user.rejectionReason || 'N/A'}</TableCell> 
-                )}
+                {selectedTab === 2 && <TableCell>{user.rejectionReason || 'N/A'}</TableCell>}
                 {selectedTab === 0 && (
                   <TableCell>
-                    <Button
-                      startIcon={<Edit2 />}
-                      onClick={() => setEditingUser(user)}
-                      size="small"
-                      style={{ marginRight: '8px' }} 
-                    >
+                    <Button startIcon={<Edit2 />} onClick={() => setEditingUser(user)} size="small" style={{ marginRight: '8px' }}>
                       Edit
                     </Button>
-                    <Button
-                      startIcon={<Trash2 />}
-                      onClick={() => setDeleteConfirmation(user)}
-                      color="error"
-                      size="small"
-                    >
+                    <Button startIcon={<Trash2 />} onClick={() => setDeleteConfirmation(user)} color="error" size="small">
                       {user.status === 'Pending' ? 'Cancel' : 'Delete'}
                     </Button>
                   </TableCell>
@@ -287,7 +341,7 @@ const SettingsUsers = () => {
       </TableContainer>
 
       <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
-        {Array.from({ length: Math.ceil(filteredUsers.length / usersPerPage) }, (_, i) => (
+        {Array.from({ length: Math.ceil(filteredByStatus.length / usersPerPage) }, (_, i) => (
           <Button key={i} onClick={() => paginate(i + 1)} variant={currentPage === i + 1 ? 'contained' : 'outlined'} sx={{ mx: 0.5 }}>
             {i + 1}
           </Button>
