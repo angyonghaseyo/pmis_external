@@ -33,6 +33,10 @@ const Sidebar = () => {
     navigate(fullPath);
   };
 
+  const isSubitemBuilt = (subitem) => {
+    return subitem !== 'Subitem 1' && subitem !== 'Subitem 2';
+  };
+
   return (
     <Drawer
       variant="permanent"
@@ -67,10 +71,19 @@ const Sidebar = () => {
                     <ListItem
                       button
                       key={subIndex}
-                      sx={{ pl: 4 }}
-                      onClick={() => handleNavigation(item.path, subitem)}
+                      sx={{ 
+                        pl: 4,
+                        color: !isSubitemBuilt(subitem) ? 'grey.500' : 'inherit' 
+                      }}
+                      onClick={() => isSubitemBuilt(subitem) && handleNavigation(item.path, subitem)}
+                      disabled={!isSubitemBuilt(subitem)} 
                     >
-                      <ListItemText primary={subitem} />
+                      <ListItemText 
+                        primary={subitem} 
+                        sx={{
+                          color: !isSubitemBuilt(subitem) ? 'grey.500' : 'inherit' 
+                        }} 
+                      />
                     </ListItem>
                   ))}
                 </List>

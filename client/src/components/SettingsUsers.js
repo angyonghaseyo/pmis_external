@@ -268,7 +268,7 @@ const SettingsUsers = () => {
                 <TableCell>{user.userType || 'Normal'}</TableCell>
                 <TableCell>
                   <Button startIcon={<Edit2 />} onClick={() => setEditingUser(user)} size="small" style={{ marginRight: '8px' }}>
-                    Edit
+                    View 
                   </Button>
                   <Button startIcon={<Trash2 />} onClick={() => setDeleteConfirmation(user)} color="error" size="small">
                     Delete
@@ -350,7 +350,7 @@ const SettingsUsers = () => {
 
       {/* Edit User Dialog */}
       <Dialog open={!!editingUser} onClose={() => setEditingUser(null)}>
-        <DialogTitle>Edit User</DialogTitle>
+        <DialogTitle>View User</DialogTitle> {/* Change the title to 'View User' */}
         <DialogContent>
           <TextField
             autoFocus
@@ -359,7 +359,7 @@ const SettingsUsers = () => {
             fullWidth
             variant="outlined"
             value={editingUser?.firstName || ''}
-            onChange={(e) => setEditingUser({ ...editingUser, firstName: e.target.value })}
+            disabled 
           />
           <TextField
             margin="dense"
@@ -367,7 +367,7 @@ const SettingsUsers = () => {
             fullWidth
             variant="outlined"
             value={editingUser?.lastName || ''}
-            onChange={(e) => setEditingUser({ ...editingUser, lastName: e.target.value })}
+            disabled 
           />
           <TextField
             margin="dense"
@@ -375,16 +375,17 @@ const SettingsUsers = () => {
             fullWidth
             variant="outlined"
             value={editingUser?.email || ''}
-            disabled
+            disabled 
           />
-          <FormControl fullWidth margin="dense">
+          <FormControl fullWidth margin="dense" disabled>
+            {/* Disable the Teams selection */}
             <InputLabel>Teams</InputLabel>
             <Select
               multiple
               value={editingUser?.teams || []}
-              onChange={(e) => setEditingUser({ ...editingUser, teams: e.target.value })}
               renderValue={(selected) => selected.join(', ')}
               label="Teams"
+              disabled 
             >
               {teams.map((team) => (
                 <MenuItem key={team} value={team}>
@@ -400,14 +401,14 @@ const SettingsUsers = () => {
             fullWidth
             variant="outlined"
             value="Normal"
-            disabled
+            disabled 
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setEditingUser(null)}>Cancel</Button>
-          <Button onClick={() => handleUpdateUser(editingUser.id, editingUser)}>Save</Button>
+          <Button onClick={() => setEditingUser(null)}>Close</Button> 
         </DialogActions>
       </Dialog>
+
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!deleteConfirmation} onClose={() => setDeleteConfirmation(null)}>
