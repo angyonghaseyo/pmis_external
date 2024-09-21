@@ -467,6 +467,7 @@ export const getTrainingPrograms = async () => {
 export const getUserData = async (userId) => {
   try {
     const userRef = doc(db, 'users', userId);
+    await new Promise(resolve => setTimeout(resolve, 1500));
     const userDoc = await getDoc(userRef);
     if (userDoc.exists()) {
       return userDoc.data();
