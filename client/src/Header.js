@@ -1,14 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { auth, signOut } from './firebaseConfig';
-import { Box, AppBar, Toolbar, IconButton, Menu, MenuItem, Typography, Avatar, Button, Select, FormControl } from '@mui/material';
+import { Box, AppBar, Toolbar, IconButton, Menu, MenuItem, Typography, Avatar, Button, Select, FormControl, CircularProgress } from '@mui/material';
 import { Notifications, Logout, Person, DirectionsBoat } from '@mui/icons-material';
 
-function Header({ user }) {
-  const [anchorEl, setAnchorEl] = useState(null); // For user profile menu
-  const [notificationAnchorEl, setNotificationAnchorEl] = useState(null); // For notifications
+function Header() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [notificationAnchorEl, setNotificationAnchorEl] = useState(null);
   const [language, setLanguage] = useState('EN');
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+      setUser(currentUser);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -38,6 +49,16 @@ function Header({ user }) {
   const handleNotificationClose = () => {
     setNotificationAnchorEl(null);
   };
+
+  if (loading) {
+    return (
+      <AppBar position="fixed" sx={{ backgroundColor: '#ffffff', boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)', zIndex: 1300 }}>
+        <Toolbar>
+          <CircularProgress />
+        </Toolbar>
+      </AppBar>
+    );
+  }
 
   return (
     <AppBar position="fixed" sx={{ backgroundColor: '#ffffff', boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)', zIndex: 1300 }}>
@@ -104,10 +125,10 @@ function Header({ user }) {
                 onClose={handleProfileMenuClose}
                 keepMounted
               >
-                <MenuItem onClick={() => navigate('/settings/profile')}>
+                <MenuItem onClick={() => { navigate('/settings/profile'); handleProfileMenuClose(); }}>
                   <Person sx={{ marginRight: 1 }} /> Edit Profile
                 </MenuItem>
-                <MenuItem onClick={handleLogout}>
+                <MenuItem onClick={() => { handleLogout(); handleProfileMenuClose(); }}>
                   <Logout sx={{ marginRight: 1 }} /> Logout
                 </MenuItem>
               </Menu>
