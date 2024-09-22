@@ -16,7 +16,7 @@ const Sidebar = ({ userType }) => {
     { name: "Dashboard", icon: <Home />, path: "/", children: [] },
     { name: "Assets and Facilities", icon: <Briefcase />, path: "/assets", children: ['Subitem 1', 'Subitem 2'] },
     { name: "Manpower", icon: <Users />, path: "/manpower", children: ['Inquiries and Feedback', 'Training Program', 'Operator Requisition'] },
-    { name: "Vessel Visits", icon: <Anchor />, path: "/vessels", children: ['Subitem 1', 'Subitem 2'] },
+    { name: "Vessel Visits", icon: <Anchor />, path: "/vessels", children: ['Vessel Visit Request'] }, 
     { name: "Port Operations and Resources", icon: <Clock />, path: "/operations", children: ['Subitem 1', 'Subitem 2'] },
     { name: "Cargos", icon: <Package />, path: "/cargos", children: ['Subitem 1', 'Subitem 2'] },
     { name: "Customs and Trade Documents", icon: <FileText />, path: "/documents", children: ['Subitem 1', 'Subitem 2'] },

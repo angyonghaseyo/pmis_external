@@ -17,6 +17,7 @@ import InquiryFeedbackDetail from './InquiryFeedbackDetail';
 import TrainingProgram from './TrainingProgram';
 import CompanyInfo from './CompanyInfo';
 import OperatorRequisition from './OperatorRequisition';
+import VesselVisits from './VesselVisits'; 
 import { Box, CssBaseline, CircularProgress } from '@mui/material';
 
 const drawerWidth = 240;
@@ -94,6 +95,7 @@ function App() {
                 <Route path="/settings/profile" element={<EditProfile user={user} />} />
                 <Route path="/settings/users" element={<SettingsUsers />} />
                 <Route path="/settings/company" element={<CompanyInfo />} />
+                <Route path="/vessels/vessel-visit-request" element={<VesselVisits />} />
                 <Route path="*" element={<Navigate to="/" />} />
               </>
             ) : (
