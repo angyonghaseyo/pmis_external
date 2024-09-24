@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableContainer, 
-  TableHead, 
-  TableRow, 
-  Paper, 
-  TextField, 
-  Button, 
-  Typography, 
-  Box, 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  TextField,
+  Button,
+  Typography,
+  Box,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -24,12 +24,15 @@ import {
   Checkbox,
   ListItemText,
   Tabs,
-  Tab
+  Tab,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import { Edit2, Trash2 } from 'lucide-react';
 import { getUsers, updateUser, deleteUser, inviteUser, getCurrentUser, cancelInvitation, getAllUsersInCompany } from '../services/api';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
+import Pagination from '@mui/material/Pagination';
 
 const teams = [
   'Assets and Facilities',
@@ -41,6 +44,8 @@ const teams = [
   'Customs and Trade Documents'
 ];
 
+const RECORDS_PER_PAGE = 10;
+
 const SettingsUsers = () => {
   const [users, setUsers] = useState([]);
   const [allCompanyUsers, setAllCompanyUsers] = useState([]);
@@ -48,8 +53,11 @@ const SettingsUsers = () => {
   const [filteredStatusUsers, setFilteredStatusUsers] = useState([]);
   const [searchAllUsers, setSearchAllUsers] = useState(''); // Search for "All Users"
   const [searchStatusUsers, setSearchStatusUsers] = useState(''); // Search for status tables
-  const [currentPage, setCurrentPage] = useState(1);
-  const [usersPerPage] = useState(10);
+  const [allUsersPage, setAllUsersPage] = useState(1);
+  const [statusUsersPage, setStatusUsersPage] = useState(1);
+  const [allUsersTotalPages, setAllUsersTotalPages] = useState(1);
+  const [statusUsersTotalPages, setStatusUsersTotalPages] = useState(1);
+  const [filteredByStatus, setFilteredByStatus] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editingUser, setEditingUser] = useState(null);
@@ -72,6 +80,11 @@ const SettingsUsers = () => {
     lastName: false,
     teams: false
   });
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
 
   useEffect(() => {
     fetchUsers();
@@ -89,7 +102,7 @@ const SettingsUsers = () => {
       (user.userType && user.userType.toLowerCase().includes(searchAllUsers.toLowerCase()))
     );
     setFilteredAllUsers(filtered);
-    setCurrentPage(1);
+    setAllUsersPage(1); // Reset to first page when filtering
   }, [searchAllUsers, allCompanyUsers]);
 
   useEffect(() => {
@@ -102,7 +115,17 @@ const SettingsUsers = () => {
       (user.userType && user.userType.toLowerCase().includes(searchStatusUsers.toLowerCase()))
     );
     setFilteredStatusUsers(filtered);
+    setStatusUsersPage(1); // Reset to first page when filtering
   }, [searchStatusUsers, users]);
+
+  useEffect(() => {
+    const filteredStatus = filteredStatusUsers.filter((user) => {
+      if (selectedTab === 0) return user.status === 'Pending';
+      if (selectedTab === 1) return user.status === 'Approved';
+      return user.status === 'Rejected';
+    });
+    setFilteredByStatus(filteredStatus);
+  }, [filteredStatusUsers, selectedTab]);
 
   const fetchUsers = async () => {
     try {
@@ -121,10 +144,10 @@ const SettingsUsers = () => {
   const fetchUsersInCompany = async () => {
     try {
       setLoading(true);
-      const companyUsers = await getAllUsersInCompany(); 
-      
-      setAllCompanyUsers(companyUsers); 
-      setFilteredAllUsers(companyUsers); 
+      const companyUsers = await getAllUsersInCompany();
+
+      setAllCompanyUsers(companyUsers);
+      setFilteredAllUsers(companyUsers);
       setLoading(false);
     } catch (err) {
       console.error('Error fetching users:', err);
@@ -152,12 +175,21 @@ const SettingsUsers = () => {
       } else {
         await updateUser(userId, dataToUpdate);
       }
-      
+
       setUsers(users.map(user => user.id === userId ? { ...user, ...dataToUpdate } : user));
       setEditingUser(null);
+      setSnackbar({
+        open: true,
+        message: 'User updated successfully',
+        severity: 'success',
+      });
     } catch (err) {
       console.error('Error updating user:', err);
-      setError('Failed to update user. Please try again.');
+      setSnackbar({
+        open: true,
+        message: 'Failed to update user. Please try again.',
+        severity: 'error',
+      });
     }
   };
 
@@ -168,18 +200,27 @@ const SettingsUsers = () => {
       } else {
         await deleteUser(userId);
       }
-  
+
       const updatedUsers = users.filter(user => user.id !== userId);
       const updatedAllCompanyUsers = allCompanyUsers.filter(user => user.id !== userId);
-  
-      setUsers(updatedUsers); 
-      setFilteredAllUsers(updatedAllCompanyUsers); 
-      setAllCompanyUsers(updatedAllCompanyUsers); 
-  
+
+      setUsers(updatedUsers);
+      setFilteredAllUsers(updatedAllCompanyUsers);
+      setAllCompanyUsers(updatedAllCompanyUsers);
+
       setDeleteConfirmation(null);
+      setSnackbar({
+        open: true,
+        message: 'User deleted successfully',
+        severity: 'success',
+      });
     } catch (err) {
       console.error('Error deleting user:', err);
-      setError('Failed to delete user. Please try again.');
+      setSnackbar({
+        open: true,
+        message: 'Failed to delete user. Please try again.',
+        severity: 'error',
+      });
     }
   };
 
@@ -188,35 +229,44 @@ const SettingsUsers = () => {
       email: newUser.email.trim() === '',
       firstName: newUser.firstName.trim() === '',
       lastName: newUser.lastName.trim() === '',
-      teams: newUser.teams.length === 0 
+      teams: newUser.teams.length === 0
     };
-  
+
     setFormErrors(errors);
-  
-    if (!Object.values(errors).some((error) => error)) {
-      try {
-        await inviteUser({ ...newUser, company: currentUserCompany });
-        setUsers([...users, { ...newUser, id: Date.now().toString(), company: currentUserCompany, status: 'Pending' }]);
-        setInviteDialogOpen(false);
-        setNewUser({
-          email: '',
-          firstName: '',
-          lastName: '',
-          company: '',
-          userType: 'Normal',
-          teams: [],
-          status: 'Pending'
-        });
-      } catch (err) {
-        console.error('Error inviting user:', err);
-        setError('Failed to invite user. Please try again.');
-      }
+
+
+    try {
+      await inviteUser({ ...newUser, company: currentUserCompany });
+      setUsers([...users, { ...newUser, id: Date.now().toString(), company: currentUserCompany, status: 'Pending' }]);
+      setInviteDialogOpen(false);
+      setNewUser({
+        email: '',
+        firstName: '',
+        lastName: '',
+        company: '',
+        userType: 'Normal',
+        teams: [],
+        status: 'Pending'
+      });
+      setSnackbar({
+        open: true,
+        message: 'User invited successfully',
+        severity: 'success',
+      });
+    } catch (err) {
+      console.error('Error inviting user:', err);
+      setSnackbar({
+        open: true,
+        message: 'Failed to invite user. Please try again.',
+        severity: 'error',
+      });
     }
+
   };
 
   const handleInputChange = (field, value) => {
     setNewUser({ ...newUser, [field]: value });
-  
+
     if (field === 'teams') {
       setFormErrors({ ...formErrors, [field]: value.length === 0 });
     } else {
@@ -224,21 +274,38 @@ const SettingsUsers = () => {
     }
   };
 
-  const indexOfLastUser = currentPage * usersPerPage;
-  const indexOfFirstUser = indexOfLastUser - usersPerPage;
-  const currentAllUsers = filteredAllUsers.slice(indexOfFirstUser, indexOfLastUser);
-
-  const filteredByStatus = filteredStatusUsers.filter((user) => {
-    if (selectedTab === 0) {
-      return user.status === 'Pending';
-    } else if (selectedTab === 1) {
-      return user.status === 'Approved';
-    } else {
-      return user.status === 'Rejected';
+  const handleCloseSnackbar = (event, reason) => {
+    if (reason === 'clickaway') {
+      return;
     }
-  });
+    setSnackbar({ ...snackbar, open: false });
+  };
+  
+  useEffect(() => {
+    setAllUsersTotalPages(Math.ceil(filteredAllUsers.length / RECORDS_PER_PAGE));
+  }, [filteredAllUsers]);
 
-  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+  useEffect(() => {
+    setStatusUsersTotalPages(Math.ceil(filteredByStatus.length / RECORDS_PER_PAGE));
+  }, [filteredByStatus]);
+
+  const handleAllUsersPageChange = (event, value) => {
+    setAllUsersPage(value);
+  };
+
+  const handleStatusUsersPageChange = (event, value) => {
+    setStatusUsersPage(value);
+  };
+
+   // Update the slicing of currentAllUsers
+  const indexOfLastAllUser = allUsersPage * RECORDS_PER_PAGE;
+  const indexOfFirstAllUser = indexOfLastAllUser - RECORDS_PER_PAGE;
+  const currentAllUsers = filteredAllUsers.slice(indexOfFirstAllUser, indexOfLastAllUser);
+
+  // Update the slicing of currentStatusUsers
+  const indexOfLastStatusUser = statusUsersPage * RECORDS_PER_PAGE;
+  const indexOfFirstStatusUser = indexOfLastStatusUser - RECORDS_PER_PAGE;
+  const currentStatusUsers = filteredByStatus.slice(indexOfFirstStatusUser, indexOfLastStatusUser);
 
   if (loading) return <Box display="flex" justifyContent="center" alignItems="center" height="100vh"><CircularProgress /></Box>;
   if (error) return <Typography color="error" align="center">{error}</Typography>;
@@ -280,7 +347,7 @@ const SettingsUsers = () => {
                 <TableCell>{user.userType || 'Normal'}</TableCell>
                 <TableCell>
                   <Button startIcon={<Edit2 />} onClick={() => setEditingUser(user)} size="small" style={{ marginRight: '8px' }}>
-                    View 
+                    View
                   </Button>
                   <Button startIcon={<Trash2 />} onClick={() => setDeleteConfirmation(user)} color="error" size="small">
                     Delete
@@ -292,14 +359,15 @@ const SettingsUsers = () => {
         </Table>
       </TableContainer>
 
-      <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
-        {Array.from({ length: Math.ceil(filteredAllUsers.length / usersPerPage) }, (_, i) => (
-          <Button key={i} onClick={() => paginate(i + 1)} variant={currentPage === i + 1 ? 'contained' : 'outlined'} sx={{ mx: 0.5 }}>
-            {i + 1}
-          </Button>
-        ))}
+      <Box mt={3} display="flex" justifyContent="center">
+        <Pagination
+          count={allUsersTotalPages}
+          page={allUsersPage}
+          onChange={handleAllUsersPageChange}
+          variant="outlined"
+          shape="rounded"
+        />
       </Box>
-
       <Box display="flex" justifyContent="space-between" alignItems="center" mt={4} mb={2}>
         <Typography variant="h4" gutterBottom>Invite Users</Typography>
         <Button variant="contained" onClick={() => setInviteDialogOpen(true)}>
@@ -362,12 +430,14 @@ const SettingsUsers = () => {
         </Table>
       </TableContainer>
 
-      <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
-        {Array.from({ length: Math.ceil(filteredByStatus.length / usersPerPage) }, (_, i) => (
-          <Button key={i} onClick={() => paginate(i + 1)} variant={currentPage === i + 1 ? 'contained' : 'outlined'} sx={{ mx: 0.5 }}>
-            {i + 1}
-          </Button>
-        ))}
+      <Box mt={3} display="flex" justifyContent="center">
+        <Pagination
+          count={statusUsersTotalPages}
+          page={statusUsersPage}
+          onChange={handleStatusUsersPageChange}
+          variant="outlined"
+          shape="rounded"
+        />
       </Box>
 
       {/* Edit User Dialog */}
@@ -381,7 +451,7 @@ const SettingsUsers = () => {
             fullWidth
             variant="outlined"
             value={editingUser?.firstName || ''}
-            disabled 
+            disabled
           />
           <TextField
             margin="dense"
@@ -389,7 +459,7 @@ const SettingsUsers = () => {
             fullWidth
             variant="outlined"
             value={editingUser?.lastName || ''}
-            disabled 
+            disabled
           />
           <TextField
             margin="dense"
@@ -397,7 +467,7 @@ const SettingsUsers = () => {
             fullWidth
             variant="outlined"
             value={editingUser?.email || ''}
-            disabled 
+            disabled
           />
           <FormControl fullWidth margin="dense" disabled>
             {/* Disable the Teams selection */}
@@ -407,7 +477,7 @@ const SettingsUsers = () => {
               value={editingUser?.teams || []}
               renderValue={(selected) => selected.join(', ')}
               label="Teams"
-              disabled 
+              disabled
             >
               {teams.map((team) => (
                 <MenuItem key={team} value={team}>
@@ -423,11 +493,11 @@ const SettingsUsers = () => {
             fullWidth
             variant="outlined"
             value="Normal"
-            disabled 
+            disabled
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setEditingUser(null)}>Close</Button> 
+          <Button onClick={() => setEditingUser(null)}>Close</Button>
         </DialogActions>
       </Dialog>
 
@@ -525,6 +595,22 @@ const SettingsUsers = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
