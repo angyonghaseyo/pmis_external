@@ -252,6 +252,7 @@ const CompanyInfo = () => {
         open={!!error || !!successMessage} 
         autoHideDuration={6000} 
         onClose={() => {setError(''); setSuccessMessage('');}}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
         <Alert 
           onClose={() => {setError(''); setSuccessMessage('');}} 
