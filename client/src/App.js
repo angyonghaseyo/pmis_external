@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebaseConfig';
-import { getCurrentUser, getUserData } from './services/api';
+import { getUserData } from './services/api';
 import Header from './Header';
 import Sidebar from './Sidebar';
 import UserWorkspace from './components/UserWorkspace';
@@ -17,7 +17,7 @@ import InquiryFeedbackDetail from './InquiryFeedbackDetail';
 import TrainingProgram from './TrainingProgram';
 import CompanyInfo from './CompanyInfo';
 import OperatorRequisition from './OperatorRequisition';
-import VesselVisits from './VesselVisits'; 
+import VesselVisits from './VesselVisits';
 import { Box, CssBaseline, CircularProgress } from '@mui/material';
 
 const drawerWidth = 240;
@@ -72,6 +72,7 @@ function App() {
     <Router>
       <Box sx={{ display: 'flex' }}>
         <CssBaseline />
+        <Header user={user} />
         {user && <Sidebar userType={userType} />}
         <Box
           component="main"
@@ -83,19 +84,18 @@ function App() {
             minHeight: '100vh', // Ensure full height
           }}
         >
-          <Header user={user} />
           <Routes>
             {user ? (
               <>
-                <Route path="/" element={<UserWorkspace user={user} />} />
-                <Route path="/manpower/inquiries-and-feedback" element={<InquiryFeedback />} />
-                <Route path="/manpower/training-program" element={<TrainingProgram />} />
-                <Route path="/manpower/operator-requisition" element={<OperatorRequisition />} />
-                <Route path="/inquiries/:id" element={<InquiryFeedbackDetail />} />
-                <Route path="/settings/profile" element={<EditProfile user={user} />} />
-                <Route path="/settings/users" element={<SettingsUsers />} />
-                <Route path="/settings/company" element={<CompanyInfo />} />
-                <Route path="/vessels/vessel-visit-request" element={<VesselVisits />} />
+                <Route path="/" element={<UserWorkspace user={user} userType={userType} />} />
+                <Route path="/manpower/inquiries-and-feedback" element={<InquiryFeedback userType={userType} />} />
+                <Route path="/manpower/training-program" element={<TrainingProgram userType={userType} />} />
+                <Route path="/manpower/operator-requisition" element={<OperatorRequisition userType={userType} />} />
+                <Route path="/inquiries/:id" element={<InquiryFeedbackDetail userType={userType} />} />
+                <Route path="/settings/profile" element={<EditProfile user={user} userType={userType} />} />
+                <Route path="/settings/users" element={<SettingsUsers userType={userType} />} />
+                <Route path="/settings/company" element={<CompanyInfo userType={userType} />} />
+                <Route path="/vessels/vessel-visit-request" element={<VesselVisits userType={userType} />} />
                 <Route path="*" element={<Navigate to="/" />} />
               </>
             ) : (
@@ -106,12 +106,11 @@ function App() {
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="*" element={<Navigate to="/login" />} />
               </>
-            )
-            }
-          </Routes >
-        </Box >
-      </Box >
-    </Router >
+            )}
+          </Routes>
+        </Box>
+      </Box>
+    </Router>
   );
 }
 

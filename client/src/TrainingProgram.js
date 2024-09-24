@@ -1,13 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Button, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, CircularProgress, Snackbar, Alert } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
-import Sidebar from './Sidebar';
-import Header from './Header';
+import { Box, Typography, Button, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, CircularProgress, Snackbar, Alert, Tabs, Tab } from '@mui/material';
 import { getTrainingPrograms, registerForProgram, withdrawFromProgram, getUserData } from './services/api';
 import { auth } from './firebaseConfig';
 
-const TrainingProgram = () => {
-  const navigate = useNavigate();
+const TrainingProgram = ({ userType }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [enrolledPrograms, setEnrolledPrograms] = useState([]);
@@ -15,6 +11,7 @@ const TrainingProgram = () => {
   const [completedPrograms, setCompletedPrograms] = useState([]);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [user, setUser] = useState(null);
+  const [tabValue, setTabValue] = useState(0);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
@@ -112,6 +109,10 @@ const TrainingProgram = () => {
     setSnackbar({ ...snackbar, open: false });
   };
 
+  const handleTabChange = (event, newValue) => {
+    setTabValue(newValue);
+  };
+
   if (loading) {
     return <Box display="flex" justifyContent="center" alignItems="center" height="100vh"><CircularProgress /></Box>;
   }
@@ -121,20 +122,19 @@ const TrainingProgram = () => {
   }
 
   return (
-    <Box sx={{ display: 'flex' }}>
-      <Sidebar />
-      <Box sx={{ flexGrow: 1, p: 3 }}>
-        <Header user={user} />
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h4" gutterBottom>
+        Training Programs
+      </Typography>
 
-        <Typography variant="h4" gutterBottom>
-          Training Programs
-        </Typography>
+      <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 2 }}>
+        <Tab label="Enrolled Programs" />
+        <Tab label="Available Programs" />
+        <Tab label="Completed Programs" />
+      </Tabs>
 
-        {/* Enrolled Training Programs */}
-        <Typography variant="h6" gutterBottom>
-          Enrolled Training Programs
-        </Typography>
-        <TableContainer component={Paper} sx={{ mb: 4 }}>
+      {tabValue === 0 && (
+        <TableContainer component={Paper}>
           <Table>
             <TableHead>
               <TableRow>
@@ -164,7 +164,7 @@ const TrainingProgram = () => {
                     <TableCell>
                       <Button 
                         variant="contained" 
-                        sx={{ backgroundColor: '#d32f2f', '&:hover': { backgroundColor: '#b71c1c' } }} 
+                        color="secondary"
                         onClick={() => handleWithdrawClick(program.id)}
                       >
                         Withdraw
@@ -176,12 +176,10 @@ const TrainingProgram = () => {
             </TableBody>
           </Table>
         </TableContainer>
+      )}
 
-        {/* Available Training Programs */}
-        <Typography variant="h6" gutterBottom>
-          Available Training Programs
-        </Typography>
-        <TableContainer component={Paper} sx={{ mb: 4 }}>
+      {tabValue === 1 && (
+        <TableContainer component={Paper}>
           <Table>
             <TableHead>
               <TableRow>
@@ -223,11 +221,9 @@ const TrainingProgram = () => {
             </TableBody>
           </Table>
         </TableContainer>
+      )}
 
-        {/* Completed Training Programs */}
-        <Typography variant="h6" gutterBottom>
-          Completed Training Programs
-        </Typography>
+      {tabValue === 2 && (
         <TableContainer component={Paper}>
           <Table>
             <TableHead>
@@ -260,13 +256,13 @@ const TrainingProgram = () => {
             </TableBody>
           </Table>
         </TableContainer>
+      )}
 
-        <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={handleCloseSnackbar}>
-          <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
-            {snackbar.message}
-          </Alert>
-        </Snackbar>
-      </Box>
+      <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={handleCloseSnackbar}>
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
