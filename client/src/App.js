@@ -19,6 +19,7 @@ import CompanyInfo from './CompanyInfo';
 import OperatorRequisition from './OperatorRequisition';
 import VesselVisits from './VesselVisits';
 import { Box, CssBaseline, CircularProgress } from '@mui/material';
+import { simulateBerthTestData } from './SimulateBerthTestData'; // Import the function
 
 const drawerWidth = 240;
 
@@ -37,6 +38,7 @@ function App() {
       } finally {
         setLoading(false);
       }
+      simulateBerthTestData();
     };
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
