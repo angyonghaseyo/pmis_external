@@ -1,13 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Box, 
-  TextField, 
-  Typography, 
-  Button, 
-  MenuItem, 
-  Grid, 
-  Avatar, 
-  IconButton,
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Box,
+  TextField,
+  Typography,
+  Button,
+  MenuItem,
+  Grid,
+  Avatar,
   CircularProgress,
   Snackbar,
   Alert,
@@ -44,13 +43,10 @@ const CompanyInfo = () => {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  useEffect(() => {
-    fetchCompanyData();
-  }, []);
-
-  const fetchCompanyData = async () => {
+  const fetchCompanyData = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       const user = auth.currentUser;
       if (!user) throw new Error('No authenticated user');
 
@@ -66,7 +62,11 @@ const CompanyInfo = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchCompanyData();
+  }, [fetchCompanyData]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -101,12 +101,10 @@ const CompanyInfo = () => {
         currencySymbol: companyData.currencySymbol,
       };
 
-      // Only include logoUrl if it's set
       if (companyData.logoUrl) {
         updatedData.logoUrl = companyData.logoUrl;
       }
 
-      // Check if all required fields are filled
       const requiredFields = ['country', 'city', 'address', 'zipCode'];
       const missingFields = requiredFields.filter(field => !updatedData[field]);
       if (missingFields.length > 0) {
@@ -176,6 +174,7 @@ const CompanyInfo = () => {
             value={companyData.name}
             InputProps={{
               readOnly: true,
+              style: { color: 'grey' }
             }}
           />
         </Grid>
@@ -196,6 +195,7 @@ const CompanyInfo = () => {
               onChange={handleInputChange}
               InputProps={{
                 readOnly: !isEditable,
+                style: { color: isEditable ? 'inherit' : 'grey' }
               }}
             />
           </Grid>
@@ -217,6 +217,7 @@ const CompanyInfo = () => {
             margin="normal"
             InputProps={{
               readOnly: !isEditable,
+              style: { color: isEditable ? 'inherit' : 'grey' }
             }}
             SelectProps={{
               disabled: !isEditable,
