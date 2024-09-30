@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from './firebaseConfig';
+import { auth, db } from './firebaseConfig';
+import { doc, getDoc } from 'firebase/firestore';
 import { 
-  TextField, 
-  Button, 
-  Typography, 
-  Alert, 
-  CircularProgress, 
-  Box, 
-  Container, 
-  Paper 
+    TextField, 
+    Button, 
+    Typography, 
+    Alert, 
+    CircularProgress, 
+    Box, 
+    Container, 
+    Paper
 } from '@mui/material';
 
 function LoginForm() {
@@ -26,10 +27,21 @@ function LoginForm() {
         setLoading(true);
 
         try {
-            await signInWithEmailAndPassword(auth, email, password);
-            setLoading(false);
-            navigate('/'); // Redirect to home page or dashboard
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            const user = userCredential.user;
+
+            // Check if user exists in the 'users' collection
+            const userDocRef = doc(db, 'users', user.uid);
+            const userDoc = await getDoc(userDocRef);
+
+            if (!userDoc.exists()) {
+                throw new Error('No user profile found');
+            }
+
+            // If we reach here, the user is authenticated and has a profile in the 'users' collection
+            // The App component will handle the redirection
         } catch (error) {
+            console.error('Login error:', error);
             setLoading(false);
             switch (error.code) {
                 case 'auth/user-not-found':
@@ -53,7 +65,7 @@ function LoginForm() {
     return (
         <Box>
             <Container maxWidth="xs">
-                <Paper elevation={3} sx={{ padding: 4, width: '100%' }}>
+                <Paper elevation={3} sx={{ padding: 4, width: '100%', mt: 8 }}>
                     <Typography component="h1" variant="h4" gutterBottom>
                         🚢  Oceania PMIS
                     </Typography>

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from './firebaseConfig';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { auth, db } from './firebaseConfig';
+import { doc, getDoc } from 'firebase/firestore';
 import { getUserData } from './services/api';
 import Header from './Header';
 import Sidebar from './Sidebar';
@@ -30,10 +31,24 @@ function App() {
   useEffect(() => {
     const fetchUserData = async (currentUser) => {
       try {
-        const userData = await getUserData(currentUser.uid);
-        setUserType(userData.userType);
+        const userDocRef = doc(db, 'users', currentUser.uid);
+        const userDoc = await getDoc(userDocRef);
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          setUserType(userData.userType);
+          setUser(currentUser);
+        } else {
+          console.log("No user profile found in 'users' collection, signing out");
+          await signOut(auth);
+          setUser(null);
+          setUserType(null);
+        }
       } catch (error) {
         console.error("Error fetching user data:", error);
+        await signOut(auth);
+        setUser(null);
+        setUserType(null);
       } finally {
         setLoading(false);
       }
@@ -41,7 +56,6 @@ function App() {
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
-        setUser(currentUser);
         await fetchUserData(currentUser);
       } else {
         setUser(null);
@@ -55,14 +69,7 @@ function App() {
 
   if (loading) {
     return (
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: '100vh',
-        }}
-      >
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
         <CircularProgress />
       </Box>
     );
@@ -72,7 +79,7 @@ function App() {
     <Router>
       <Box sx={{ display: 'flex' }}>
         <CssBaseline />
-        <Header user={user} />
+        {user && <Header user={user} />}
         {user && <Sidebar userType={userType} />}
         <Box
           component="main"
@@ -80,8 +87,8 @@ function App() {
             flexGrow: 1,
             p: 3,
             width: user ? `calc(100% - ${drawerWidth}px)` : '100%',
-            mt: '80px',
-            minHeight: '100vh', // Ensure full height
+            mt: user ? '80px' : 0,
+            minHeight: '100vh',
           }}
         >
           <Routes>
