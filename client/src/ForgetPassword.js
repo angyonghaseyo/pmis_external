@@ -12,7 +12,7 @@ import {
     Container
 } from '@mui/material';
 
-function ForgotPassword() {
+function ForgetPassword() {
     const [email, setEmail] = useState('');
     const [isSubmitted, setIsSubmitted] = useState(false);
     const [error, setError] = useState('');
@@ -111,4 +111,4 @@ function ForgotPassword() {
     );
 }
 
-export default ForgotPassword;
+export default ForgetPassword;
