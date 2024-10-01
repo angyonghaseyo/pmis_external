@@ -10,7 +10,7 @@ import UserWorkspace from './components/UserWorkspace';
 import SettingsUsers from './components/SettingsUsers';
 import LoginForm from './LoginForm';
 import SignUpForm from './SignUpForm';
-import ForgetPassword from './ForgetPassword';
+import ForgotPassword from './ForgotPassword';
 import ResetPassword from './ResetPassword';
 import EditProfile from './EditProfile';
 import InquiryFeedback from './InquiryFeedback';
@@ -109,7 +109,7 @@ function App() {
               <>
                 <Route path="/login" element={<LoginForm />} />
                 <Route path="/signup" element={<SignUpForm />} />
-                <Route path="/forgot-password" element={<ForgetPassword />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="*" element={<Navigate to="/login" />} />
               </>
