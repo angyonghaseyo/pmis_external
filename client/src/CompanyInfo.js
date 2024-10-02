@@ -17,7 +17,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db, auth } from './firebaseConfig';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from './firebaseConfig';
-import { getCompanyInfo, updateCompanyInfo } from './services/api';
+import { getCompanyInfo, updateCompanyInfo, getUserData } from './services/api';
 
 const currencies = [
   { value: 'USD', label: '$ - US Dollar' },
@@ -42,6 +42,7 @@ const CompanyInfo = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [userProfile, setUserProfile] = useState(null);
 
   const fetchCompanyData = useCallback(async () => {
     try {
@@ -64,8 +65,30 @@ const CompanyInfo = () => {
     }
   }, []);
 
+  const fetchUserProfile = async (userId) => {
+    try {
+      const profileData = await getUserData(userId);
+      setUserProfile(profileData);
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      setError('Failed to fetch user profile. Please try again later.');
+    }
+  };
+
+  const hasRole = (requiredRoles) => {
+    if (!userProfile || !Array.isArray(userProfile.accessRights)) return false;
+
+    // Check if the user has any of the required roles
+    const hasRequiredRole = requiredRoles.some(role => userProfile.accessRights.includes(role));
+
+    // Return true if the user has a required role or is an Admin
+    return hasRequiredRole || userProfile.role === 'Admin';
+  };
+
+
   useEffect(() => {
     fetchCompanyData();
+    fetchUserProfile(auth.currentUser.uid);
   }, [fetchCompanyData]);
 
   const handleInputChange = (e) => {
@@ -243,21 +266,23 @@ const CompanyInfo = () => {
         </Box>
       ) : (
         <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-          <Button variant="contained" color="primary" onClick={() => setIsEditable(true)}>
-            Edit Company Information
-          </Button>
+          {hasRole(['Edit Company Information']) && (
+            <Button variant="contained" color="primary" onClick={() => setIsEditable(true)}>
+              Edit Company Information
+            </Button>
+          )}
         </Box>
       )}
 
-      <Snackbar 
-        open={!!error || !!successMessage} 
-        autoHideDuration={6000} 
-        onClose={() => {setError(''); setSuccessMessage('');}}
+      <Snackbar
+        open={!!error || !!successMessage}
+        autoHideDuration={6000}
+        onClose={() => { setError(''); setSuccessMessage(''); }}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
-        <Alert 
-          onClose={() => {setError(''); setSuccessMessage('');}} 
-          severity={error ? "error" : "success"} 
+        <Alert
+          onClose={() => { setError(''); setSuccessMessage(''); }}
+          severity={error ? "error" : "success"}
           sx={{ width: '100%' }}
         >
           {error || successMessage}

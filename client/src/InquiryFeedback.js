@@ -25,9 +25,10 @@ import {
   IconButton
 } from '@mui/material';
 import { Edit, Reply } from '@mui/icons-material';
-import { getUserInquiriesFeedback, createInquiryFeedback, updateInquiryFeedback } from './services/api';
+import { getUserInquiriesFeedback, createInquiryFeedback, updateInquiryFeedback, getUserData } from './services/api';
 import { auth } from './firebaseConfig';
-import { format } from 'date-fns'; 
+import { format } from 'date-fns';
+
 
 const InquiryFeedback = ({ userType }) => {
   const [user, setUser] = useState(null);
@@ -50,10 +51,16 @@ const InquiryFeedback = ({ userType }) => {
   const [replyDialogOpen, setReplyDialogOpen] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+  const [userProfile, setUserProfile] = useState(null);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
       setUser(currentUser);
+      if (currentUser) {
+        fetchUserProfile(currentUser.uid);
+      } else {
+        setUserProfile(null);
+      }
     });
 
     return () => unsubscribe();
@@ -125,29 +132,29 @@ const InquiryFeedback = ({ userType }) => {
       subject: formData.subject.trim() === '',
       description: formData.description.trim() === ''
     };
-  
+
     setFormErrors(errors);
-  
+
     if (!errors.subject && !errors.description) {
       try {
         setLoading(true);
         setSubmitError(null);
-  
+
         const submissionData = {
           type: formData.type,
           subject: formData.subject,
           description: formData.description,
-          status: 'Pending', 
+          status: 'Pending',
           urgency: formData.urgency,
           file: formData.file instanceof File ? formData.file : null
         };
-  
+
         if (editingInquiry) {
           await updateInquiryFeedback(editingInquiry.incrementalId, submissionData);
         } else {
           await createInquiryFeedback(submissionData);
         }
-  
+
         handleDialogClose();
         fetchInquiriesFeedback();
         setSnackbar({ open: true, message: 'Submission successful', severity: 'success' });
@@ -196,6 +203,26 @@ const InquiryFeedback = ({ userType }) => {
     setSnackbar({ ...snackbar, open: false });
   };
 
+  const hasRole = (requiredRoles) => {
+    if (!userProfile || !Array.isArray(userProfile.accessRights)) return false;
+
+    // Check if the user has any of the required roles
+    const hasRequiredRole = requiredRoles.some(role => userProfile.accessRights.includes(role));
+
+    // Return true if the user has a required role or is an Admin
+    return hasRequiredRole || userProfile.role === 'Admin';
+  };
+
+  const fetchUserProfile = async (userId) => {
+    try {
+      const profileData = await getUserData(userId);
+      setUserProfile(profileData);
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      setError('Failed to fetch user profile. Please try again later.');
+    }
+  };
+
   if (loading) return <Box display="flex" justifyContent="center" alignItems="center" height="100vh"><CircularProgress /></Box>;
   if (error) return <Typography color="error" align="center">{error}</Typography>;
 
@@ -203,9 +230,11 @@ const InquiryFeedback = ({ userType }) => {
     <Box sx={{ p: 3 }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4" component="h2">Inquiries & Feedback</Typography>
-        <Button variant="contained" color="primary" onClick={() => handleDialogOpen()}>
-          Create New Inquiry / Feedback
-        </Button>
+        {hasRole(["Create Inquiries and Feedback"]) &&
+          <Button variant="contained" color="primary" onClick={() => handleDialogOpen()}>
+            Create New Inquiry / Feedback
+          </Button>
+        }
       </Box>
 
       <Grid container spacing={3} mb={3}>
@@ -363,8 +392,8 @@ const InquiryFeedback = ({ userType }) => {
             onChange={(e) => setReplyText(e.target.value)}
           />
           <Typography variant="body2" color="textSecondary">
-            Note: This will be your final reply to this {editingInquiry?.status.toLowerCase()} inquiry. 
-            The status will remain as {editingInquiry?.status}. 
+            Note: This will be your final reply to this {editingInquiry?.status.toLowerCase()} inquiry.
+            The status will remain as {editingInquiry?.status}.
             If you need further assistance, please open a new inquiry.
           </Typography>
         </DialogContent>

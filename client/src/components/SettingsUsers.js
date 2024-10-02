@@ -26,23 +26,16 @@ import {
   Tabs,
   Tab,
   Snackbar,
-  Alert
+  Alert,
+  Chip,
+  Grid
 } from '@mui/material';
 import { Edit2, Trash2 } from 'lucide-react';
-import { getUsers, updateUser, deleteUser, inviteUser, getCurrentUser, cancelInvitation, getAllUsersInCompany } from '../services/api';
+import { getUsers, updateUser, deleteUser, inviteUser, getCurrentUser, cancelInvitation, getAllUsersInCompany, getUserData } from '../services/api';
 import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+import { db, auth } from '../firebaseConfig';
 import Pagination from '@mui/material/Pagination';
 
-const teams = [
-  'Assets and Facilities',
-  'Manpower',
-  'Vessel Visits',
-  'Port Operations and Resources',
-  'Cargos',
-  'Financial',
-  'Customs and Trade Documents'
-];
 
 const RECORDS_PER_PAGE = 10;
 
@@ -64,21 +57,20 @@ const SettingsUsers = () => {
   const [deleteConfirmation, setDeleteConfirmation] = useState(null);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [currentUserCompany, setCurrentUserCompany] = useState('');
+  const [userProfile, setUserProfile] = useState(null);
   const [newUser, setNewUser] = useState({
     email: '',
     firstName: '',
     lastName: '',
     company: '',
-    userType: 'Normal',
-    teams: [],
-    status: 'Pending'
+    status: 'Pending',
+    accessRights: []
   });
   const [selectedTab, setSelectedTab] = useState(0);
   const [formErrors, setFormErrors] = useState({
     email: false,
     firstName: false,
     lastName: false,
-    teams: false
   });
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -86,10 +78,30 @@ const SettingsUsers = () => {
     severity: 'success',
   });
 
+  const accessRights = [
+    "View Inquiries and Feedbacks",
+    "Create Inquiries and Feedback",
+    "Enrol Training Program",
+    "View Operator Requisitions",
+    "Create Operator Requisition",
+    "View Vessel Visit Requests",
+    "Create Vessel Visit Request",
+    "Edit Vessel Visit Requests",
+    "Delete Vessel Visit Requests",
+    "View Users List",
+    "Delete User",
+    "Invite User",
+    "Delete User Invitations",
+    "View Invitations List",
+    "View Company Information",
+    "Edit Company Information",
+  ];
+
   useEffect(() => {
     fetchUsers();
     fetchCurrentUserCompany();
     fetchUsersInCompany();
+    fetchUserProfile(auth.currentUser.uid);
   }, []);
 
   useEffect(() => {
@@ -97,9 +109,7 @@ const SettingsUsers = () => {
     const filtered = allCompanyUsers.filter(user =>
       user.firstName.toLowerCase().includes(searchAllUsers.toLowerCase()) ||
       user.lastName.toLowerCase().includes(searchAllUsers.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchAllUsers.toLowerCase()) ||
-      (user.teams && user.teams.some(team => team.toLowerCase().includes(searchAllUsers.toLowerCase()))) ||
-      (user.userType && user.userType.toLowerCase().includes(searchAllUsers.toLowerCase()))
+      user.email.toLowerCase().includes(searchAllUsers.toLowerCase())
     );
     setFilteredAllUsers(filtered);
     setAllUsersPage(1); // Reset to first page when filtering
@@ -110,9 +120,7 @@ const SettingsUsers = () => {
     const filtered = users.filter(user =>
       user.firstName.toLowerCase().includes(searchStatusUsers.toLowerCase()) ||
       user.lastName.toLowerCase().includes(searchStatusUsers.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchStatusUsers.toLowerCase()) ||
-      (user.teams && user.teams.some(team => team.toLowerCase().includes(searchStatusUsers.toLowerCase()))) ||
-      (user.userType && user.userType.toLowerCase().includes(searchStatusUsers.toLowerCase()))
+      user.email.toLowerCase().includes(searchStatusUsers.toLowerCase())
     );
     setFilteredStatusUsers(filtered);
     setStatusUsersPage(1); // Reset to first page when filtering
@@ -169,7 +177,6 @@ const SettingsUsers = () => {
   const handleUpdateUser = async (userId, updatedData) => {
     try {
       const { email, status, ...dataToUpdate } = updatedData;
-      dataToUpdate.userType = 'Normal';
       if (status === 'Pending') {
         await updateUser(userId, dataToUpdate, true);
       } else {
@@ -229,7 +236,6 @@ const SettingsUsers = () => {
       email: newUser.email.trim() === '',
       firstName: newUser.firstName.trim() === '',
       lastName: newUser.lastName.trim() === '',
-      teams: newUser.teams.length === 0
     };
 
     setFormErrors(errors);
@@ -244,9 +250,8 @@ const SettingsUsers = () => {
         firstName: '',
         lastName: '',
         company: '',
-        userType: 'Normal',
-        teams: [],
-        status: 'Pending'
+        status: 'Pending',
+        accessRights: []
       });
       setSnackbar({
         open: true,
@@ -269,6 +274,8 @@ const SettingsUsers = () => {
 
     if (field === 'teams') {
       setFormErrors({ ...formErrors, [field]: value.length === 0 });
+    } else if (field === 'accessRights') {
+      // No validation needed for accessRights, it can be empty
     } else {
       setFormErrors({ ...formErrors, [field]: value.trim() === '' });
     }
@@ -280,7 +287,7 @@ const SettingsUsers = () => {
     }
     setSnackbar({ ...snackbar, open: false });
   };
-  
+
   useEffect(() => {
     setAllUsersTotalPages(Math.ceil(filteredAllUsers.length / RECORDS_PER_PAGE));
   }, [filteredAllUsers]);
@@ -297,7 +304,7 @@ const SettingsUsers = () => {
     setStatusUsersPage(value);
   };
 
-   // Update the slicing of currentAllUsers
+  // Update the slicing of currentAllUsers
   const indexOfLastAllUser = allUsersPage * RECORDS_PER_PAGE;
   const indexOfFirstAllUser = indexOfLastAllUser - RECORDS_PER_PAGE;
   const currentAllUsers = filteredAllUsers.slice(indexOfFirstAllUser, indexOfLastAllUser);
@@ -307,138 +314,173 @@ const SettingsUsers = () => {
   const indexOfFirstStatusUser = indexOfLastStatusUser - RECORDS_PER_PAGE;
   const currentStatusUsers = filteredByStatus.slice(indexOfFirstStatusUser, indexOfLastStatusUser);
 
+  const fetchUserProfile = async (userId) => {
+    try {
+      const profileData = await getUserData(userId);
+      setUserProfile(profileData);
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      setError('Failed to fetch user profile. Please try again later.');
+    }
+  };
+  const hasRole = (requiredRoles) => {
+    if (!userProfile || !Array.isArray(userProfile.accessRights)) return false;
+
+    // Check if the user has any of the required roles
+    const hasRequiredRole = requiredRoles.some(role => userProfile.accessRights.includes(role));
+
+    // Return true if the user has a required role or is an Admin
+    return hasRequiredRole || userProfile.role === 'Admin';
+  };
+
   if (loading) return <Box display="flex" justifyContent="center" alignItems="center" height="100vh"><CircularProgress /></Box>;
   if (error) return <Typography color="error" align="center">{error}</Typography>;
 
   return (
     <Box sx={{ p: 3 }}>
       {/* All Users Table */}
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-        <Typography variant="h4" gutterBottom>All Users</Typography>
-      </Box>
+      {hasRole(['View Users List', 'Delete User']) && (
+        <>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Typography variant="h4" gutterBottom>All Users</Typography>
+          </Box>
 
-      {/* Search bar for All Users */}
-      <TextField
-        label="Search all users"
-        variant="outlined"
-        fullWidth
-        margin="normal"
-        value={searchAllUsers}
-        onChange={(e) => setSearchAllUsers(e.target.value)}
-      />
 
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Email</TableCell>
-              <TableCell>Teams</TableCell>
-              <TableCell>User Type</TableCell>
-              <TableCell>Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {currentAllUsers.map((user) => (
-              <TableRow key={user.id}>
-                <TableCell>{`${user.firstName} ${user.lastName}`}</TableCell>
-                <TableCell>{user.email}</TableCell>
-                <TableCell>{user.teams ? user.teams.join(', ') : 'N/A'}</TableCell>
-                <TableCell>{user.userType || 'Normal'}</TableCell>
-                <TableCell>
-                  <Button startIcon={<Edit2 />} onClick={() => setEditingUser(user)} size="small" style={{ marginRight: '8px' }}>
-                    View
-                  </Button>
-                  <Button startIcon={<Trash2 />} onClick={() => setDeleteConfirmation(user)} color="error" size="small">
-                    Delete
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+          {/* Search bar for All Users */}
 
-      <Box mt={3} display="flex" justifyContent="center">
-        <Pagination
-          count={allUsersTotalPages}
-          page={allUsersPage}
-          onChange={handleAllUsersPageChange}
-          variant="outlined"
-          shape="rounded"
-        />
-      </Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mt={4} mb={2}>
-        <Typography variant="h4" gutterBottom>Invite Users</Typography>
-        <Button variant="contained" onClick={() => setInviteDialogOpen(true)}>
-          Invite User
-        </Button>
-      </Box>
+          <TextField
+            label="Search all users"
+            variant="outlined"
+            fullWidth
+            margin="normal"
+            value={searchAllUsers}
+            onChange={(e) => setSearchAllUsers(e.target.value)}
+          />
 
-      {/* Tabs and Pending, Approved, Rejected tables */}
-      <Tabs value={selectedTab} onChange={(e, newValue) => setSelectedTab(newValue)} aria-label="user status tabs" sx={{ mt: 4 }}>
-        <Tab label="Pending Requests" />
-        <Tab label="Approved Requests" />
-        <Tab label="Rejected Requests" />
-      </Tabs>
 
-      {/* Search bar for Status-based Users */}
-      <TextField
-        label={`Search ${selectedTab === 0 ? 'Pending' : selectedTab === 1 ? 'Approved' : 'Rejected'} users`}
-        variant="outlined"
-        fullWidth
-        margin="normal"
-        value={searchStatusUsers}
-        onChange={(e) => setSearchStatusUsers(e.target.value)}
-      />
 
-      <TableContainer component={Paper} sx={{ mt: 2 }}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Email</TableCell>
-              <TableCell>Teams</TableCell>
-              <TableCell>User Type</TableCell>
-              <TableCell>Status</TableCell>
-              {selectedTab === 2 && <TableCell>Rejection Reason</TableCell>}
-              {selectedTab === 0 && <TableCell>Actions</TableCell>}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filteredByStatus.map((user) => (
-              <TableRow key={user.id}>
-                <TableCell>{`${user.firstName} ${user.lastName}`}</TableCell>
-                <TableCell>{user.email}</TableCell>
-                <TableCell>{user.teams ? user.teams.join(', ') : 'N/A'}</TableCell>
-                <TableCell>{user.userType || 'Normal'}</TableCell>
-                <TableCell>{user.status}</TableCell>
-                {selectedTab === 2 && <TableCell>{user.rejectionReason || 'N/A'}</TableCell>}
-                {selectedTab === 0 && (
-                  <TableCell>
-                    <Button startIcon={<Edit2 />} onClick={() => setEditingUser(user)} size="small" style={{ marginRight: '8px' }}>
-                      Edit
-                    </Button>
-                    <Button startIcon={<Trash2 />} onClick={() => setDeleteConfirmation(user)} color="error" size="small">
-                      {user.status === 'Pending' ? 'Cancel' : 'Delete'}
-                    </Button>
-                  </TableCell>
-                )}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Name</TableCell>
+                  <TableCell>Email</TableCell>
+                  <TableCell>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {currentAllUsers.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell>{`${user.firstName} ${user.lastName}`}</TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell>
+                      <Button startIcon={<Edit2 />} onClick={() => setEditingUser(user)} size="small" style={{ marginRight: '8px' }}>
+                        View
+                      </Button>
+                      {hasRole(['Delete User']) && (
+                        <Button startIcon={<Trash2 />} onClick={() => setDeleteConfirmation(user)} color="error" size="small">
+                          Delete
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
 
-      <Box mt={3} display="flex" justifyContent="center">
-        <Pagination
-          count={statusUsersTotalPages}
-          page={statusUsersPage}
-          onChange={handleStatusUsersPageChange}
-          variant="outlined"
-          shape="rounded"
-        />
-      </Box>
+
+          <Box mt={3} display="flex" justifyContent="center">
+            <Pagination
+              count={allUsersTotalPages}
+              page={allUsersPage}
+              onChange={handleAllUsersPageChange}
+              variant="outlined"
+              shape="rounded"
+            />
+          </Box>
+        </>
+      )}
+
+      {hasRole(['Delete User Invitations', 'View Invitations List', 'Invite User']) && (
+        <>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mt={4} mb={2}>
+            <Typography variant="h4" gutterBottom>Invite Users</Typography>
+            {hasRole(['Invite User']) && (
+              <Button variant="contained" onClick={() => setInviteDialogOpen(true)}>
+                Invite User
+              </Button>
+            )}
+          </Box>
+
+          {/* Tabs and Pending, Approved, Rejected tables */}
+          <Tabs value={selectedTab} onChange={(e, newValue) => setSelectedTab(newValue)} aria-label="user status tabs" sx={{ mt: 4 }}>
+            <Tab label="Pending Requests" />
+            <Tab label="Approved Requests" />
+            <Tab label="Rejected Requests" />
+          </Tabs>
+
+          {/* Search bar for Status-based Users */}
+
+          <TextField
+            label={`Search ${selectedTab === 0 ? 'Pending' : selectedTab === 1 ? 'Approved' : 'Rejected'} users`}
+            variant="outlined"
+            fullWidth
+            margin="normal"
+            value={searchStatusUsers}
+            onChange={(e) => setSearchStatusUsers(e.target.value)}
+          />
+
+
+
+          <TableContainer component={Paper} sx={{ mt: 2 }}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Name</TableCell>
+                  <TableCell>Email</TableCell>
+                  <TableCell>Status</TableCell>
+                  {selectedTab === 2 && <TableCell>Rejection Reason</TableCell>}
+                  {selectedTab === 0 && <TableCell>Actions</TableCell>}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {filteredByStatus.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell>{`${user.firstName} ${user.lastName}`}</TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell>{user.status}</TableCell>
+                    {selectedTab === 2 && <TableCell>{user.rejectionReason || 'N/A'}</TableCell>}
+                    {selectedTab === 0 && (
+                      <TableCell>
+                        <Button startIcon={<Edit2 />} onClick={() => setEditingUser(user)} size="small" style={{ marginRight: '8px' }}>
+                          Edit
+                        </Button>
+                        {hasRole(['Delete User Invitations']) && (
+                          <Button startIcon={<Trash2 />} onClick={() => setDeleteConfirmation(user)} color="error" size="small">
+                            {user.status === 'Pending' ? 'Cancel' : 'Delete'}
+                          </Button>
+                        )}
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+
+          <Box mt={3} display="flex" justifyContent="center">
+            <Pagination
+              count={statusUsersTotalPages}
+              page={statusUsersPage}
+              onChange={handleStatusUsersPageChange}
+              variant="outlined"
+              shape="rounded"
+            />
+          </Box>
+        </>
+      )}
 
       {/* Edit User Dialog */}
       <Dialog open={!!editingUser} onClose={() => setEditingUser(null)}>
@@ -469,32 +511,19 @@ const SettingsUsers = () => {
             value={editingUser?.email || ''}
             disabled
           />
-          <FormControl fullWidth margin="dense" disabled>
-            {/* Disable the Teams selection */}
-            <InputLabel>Teams</InputLabel>
-            <Select
-              multiple
-              value={editingUser?.teams || []}
-              renderValue={(selected) => selected.join(', ')}
-              label="Teams"
-              disabled
-            >
-              {teams.map((team) => (
-                <MenuItem key={team} value={team}>
-                  <Checkbox checked={(editingUser?.teams || []).indexOf(team) > -1} />
-                  <ListItemText primary={team} />
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <TextField
-            margin="dense"
-            label="User Type"
-            fullWidth
-            variant="outlined"
-            value="Normal"
-            disabled
-          />
+          <Grid item xs={12}>
+            <Typography variant="h6" gutterBottom>Access Rights</Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              {editingUser?.accessRights && editingUser.accessRights.length > 0 ? (
+                editingUser.accessRights.map((right, index) => (
+                  <Chip key={index} label={right} color="secondary" />
+                ))
+              ) : (
+                <Typography color="textSecondary">No specific access rights assigned</Typography>
+              )}
+            </Box>
+          </Grid>
+
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setEditingUser(null)}>Close</Button>
@@ -561,32 +590,25 @@ const SettingsUsers = () => {
             value={currentUserCompany}
             disabled
           />
+
           <FormControl fullWidth margin="dense">
-            <InputLabel>Teams</InputLabel>
+            <InputLabel>Access Rights</InputLabel>
             <Select
               multiple
-              value={newUser.teams}
-              onChange={(e) => handleInputChange('teams', e.target.value)}
+              value={newUser.accessRights}
+              onChange={(e) => handleInputChange('accessRights', e.target.value)}
               renderValue={(selected) => selected.join(', ')}
-              label="Teams"
+              label="Access Rights"
             >
-              {teams.map((team) => (
-                <MenuItem key={team} value={team}>
-                  <Checkbox checked={newUser.teams.indexOf(team) > -1} />
-                  <ListItemText primary={team} />
+              {accessRights.map((right) => (
+                <MenuItem key={right} value={right}>
+                  <Checkbox checked={newUser.accessRights.indexOf(right) > -1} />
+                  <ListItemText primary={right} />
                 </MenuItem>
               ))}
             </Select>
-            {formErrors.teams && <Typography color="error" variant="caption">At least one team must be selected</Typography>}
           </FormControl>
-          <TextField
-            margin="dense"
-            label="User Type"
-            fullWidth
-            variant="outlined"
-            value="Normal"
-            disabled
-          />
+
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setInviteDialogOpen(false)}>Cancel</Button>

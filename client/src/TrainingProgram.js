@@ -3,7 +3,7 @@ import { Box, Typography, Button, Paper, Table, TableBody, TableCell, TableConta
 import { getTrainingPrograms, registerForProgram, withdrawFromProgram, getUserData } from './services/api';
 import { auth } from './firebaseConfig';
 
-const TrainingProgram = ({ userType }) => {
+function TrainingProgram() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [enrolledPrograms, setEnrolledPrograms] = useState([]);
@@ -162,8 +162,8 @@ const TrainingProgram = ({ userType }) => {
                     <TableCell>{program.mode}</TableCell>
                     <TableCell>{program.enrollmentDate.toDate().toLocaleDateString()}</TableCell>
                     <TableCell>
-                      <Button 
-                        variant="contained" 
+                      <Button
+                        variant="contained"
                         color="secondary"
                         onClick={() => handleWithdrawClick(program.id)}
                       >
@@ -207,9 +207,9 @@ const TrainingProgram = ({ userType }) => {
                     <TableCell>{program.mode}</TableCell>
                     <TableCell>{program.participantCapacity - program.numberOfCurrentRegistrations}</TableCell>
                     <TableCell>
-                      <Button 
-                        variant="contained" 
-                        color="primary" 
+                      <Button
+                        variant="contained"
+                        color="primary"
                         onClick={() => handleRegisterClick(program.id)}
                       >
                         Register

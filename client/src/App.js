@@ -25,7 +25,6 @@ const drawerWidth = 240;
 
 function App() {
   const [user, setUser] = useState(null);
-  const [userType, setUserType] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,22 +32,24 @@ function App() {
       try {
         const userDocRef = doc(db, 'users', currentUser.uid);
         const userDoc = await getDoc(userDocRef);
-        
+
         if (userDoc.exists()) {
           const userData = userDoc.data();
-          setUserType(userData.userType);
-          setUser(currentUser);
+          console.log('Fetched user data:', userData);
+          setUser({
+            ...currentUser,
+            ...userData,
+            accessRights: userData.accessRights || []
+          });
         } else {
           console.log("No user profile found in 'users' collection, signing out");
           await signOut(auth);
           setUser(null);
-          setUserType(null);
         }
       } catch (error) {
         console.error("Error fetching user data:", error);
         await signOut(auth);
         setUser(null);
-        setUserType(null);
       } finally {
         setLoading(false);
       }
@@ -59,13 +60,21 @@ function App() {
         await fetchUserData(currentUser);
       } else {
         setUser(null);
-        setUserType(null);
         setLoading(false);
       }
     });
 
     return () => unsubscribe();
   }, []);
+
+  const hasAccessRights = (requiredRights) => {
+    console.log('User access rights:', user?.accessRights);
+    console.log('Required rights:', requiredRights);
+    if (!user || !user.accessRights) return false;
+    const hasRights = requiredRights.some(right => user.accessRights.includes(right));
+    console.log('Has required rights:', hasRights);
+    return hasRights;
+  };
 
   if (loading) {
     return (
@@ -80,7 +89,7 @@ function App() {
       <Box sx={{ display: 'flex' }}>
         <CssBaseline />
         {user && <Header user={user} />}
-        {user && <Sidebar userType={userType} />}
+        {user && <Sidebar user={user} />}
         <Box
           component="main"
           sx={{
@@ -93,17 +102,30 @@ function App() {
         >
           <Routes>
             {user ? (
+
               <>
-                <Route path="/" element={<UserWorkspace user={user} userType={userType} />} />
-                <Route path="/manpower/inquiries-and-feedback" element={<InquiryFeedback userType={userType} />} />
-                <Route path="/manpower/training-program" element={<TrainingProgram userType={userType} />} />
-                <Route path="/manpower/operator-requisition" element={<OperatorRequisition userType={userType} />} />
-                <Route path="/inquiries/:id" element={<InquiryFeedbackDetail userType={userType} />} />
-                <Route path="/settings/profile" element={<EditProfile user={user} userType={userType} />} />
-                <Route path="/settings/users" element={<SettingsUsers userType={userType} />} />
-                <Route path="/settings/company" element={<CompanyInfo userType={userType} />} />
-                <Route path="/vessels/vessel-visit-request" element={<VesselVisits userType={userType} />} />
-                <Route path="*" element={<Navigate to="/" />} />
+                <Route path="/" element={<UserWorkspace user={user} />} />
+                {hasAccessRights(['View Inquiries and Feedbacks', 'Create Inquiries and Feedback']) && (
+                  <Route path="/manpower/inquiries-and-feedback" element={<InquiryFeedback user={user} />} />
+                )}
+                {hasAccessRights(['Enrol Training Program']) && (
+                  <Route path="/manpower/training-program" element={<TrainingProgram />} />
+                )}
+                {hasAccessRights(['View Operator Requisitions', 'Create Operator Requisition']) && (
+                  <Route path="/manpower/operator-requisition" element={<OperatorRequisition user={user} />} />
+                )}
+
+                <Route path="/settings/profile" element={<EditProfile user={user} />} />
+                {hasAccessRights(['View Users List', 'Delete User', 'Invite User', 'Delete User Invitations', 'View Invitations List']) && (
+                  <Route path="/settings/users" element={<SettingsUsers user={user} />} />
+                )}
+                {hasAccessRights(['View Company Information', 'Edit Company Information']) && (
+                  <Route path="/settings/company" element={<CompanyInfo user={user} />} />
+                )}
+                {hasAccessRights(['View Vessel Visit Requests', 'Create Vessel Visit Request', 'Edit Vessel Visit Requests', 'Delete Vessel Visit Requests']) && (
+                  <Route path="/vessels/vessel-visit-request" element={<VesselVisits user={user} />} />
+                )}
+                <Route path="*" element={<Navigate to="/" replace />} />
               </>
             ) : (
               <>
@@ -113,6 +135,7 @@ function App() {
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="*" element={<Navigate to="/login" />} />
               </>
+
             )}
           </Routes>
         </Box>
