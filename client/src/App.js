@@ -10,7 +10,7 @@ import UserWorkspace from './components/UserWorkspace';
 import SettingsUsers from './components/SettingsUsers';
 import LoginForm from './LoginForm';
 import SignUpForm from './SignUpForm';
-import ForgotPassword from './ForgetPassword';
+import ForgotPassword from './ForgotPassword';
 import ResetPassword from './ResetPassword';
 import EditProfile from './EditProfile';
 import InquiryFeedback from './InquiryFeedback';
