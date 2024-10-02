@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TextField, Button, Box, Typography, Select, MenuItem, InputLabel, FormControl, Grid, Avatar } from '@mui/material';
+import { TextField, Button, Box, Typography, Select, MenuItem, InputLabel, FormControl, Grid, Avatar, Chip } from '@mui/material';
 import { getCurrentUser, updateUserProfile, sendPasswordResetEmailToUser, deleteUserAccount } from './services/api';
 import { auth, db, storage } from './firebaseConfig';
 import { updateProfile } from 'firebase/auth';
@@ -24,7 +24,8 @@ function EditProfile() {
     lastName: '',
     company: '',
     userType: '',
-    teams: []
+    teams: [],
+    accessRights: [],
   });
   const [selectedImage, setSelectedImage] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -50,7 +51,8 @@ function EditProfile() {
             lastName: userData.lastName || '',
             company: userData.company || 'Oceania Port',
             userType: userData.userType || 'Normal',
-            teams: userData.teams || []
+            teams: userData.teams || [],
+            accessRights: userData.accessRights || [],
           });
           setSelectedImage(user.photoURL);
         }
@@ -83,7 +85,7 @@ function EditProfile() {
     try {
       setLoading(true);
       let photoURL = selectedImage;
-      
+
       if (selectedImage && selectedImage.startsWith('blob:')) {
         const imageRef = ref(storage, `profile_photos/${auth.currentUser.uid}`);
         const response = await fetch(selectedImage);
@@ -91,16 +93,16 @@ function EditProfile() {
         await uploadBytes(imageRef, blob);
         photoURL = await getDownloadURL(imageRef);
       }
-  
+
       const fullName = `${profile.salutation} ${profile.firstName} ${profile.lastName}`.trim();
       const updatedProfile = {
         displayName: fullName,
         photoURL: photoURL,
       };
-  
+
       // Update Firebase Auth user profile
       await updateProfile(auth.currentUser, updatedProfile);
-  
+
       // Update Firestore document
       const userDocRef = doc(db, 'users', auth.currentUser.uid);
       await updateDoc(userDocRef, {
@@ -113,7 +115,7 @@ function EditProfile() {
         userType: profile.userType,
         // Note: We're not updating 'teams' here as it should be managed elsewhere
       });
-  
+
       alert('Profile updated successfully');
     } catch (err) {
       console.error('Error updating profile:', err);
@@ -220,38 +222,23 @@ function EditProfile() {
             onChange={handleChange}
             fullWidth
             margin="normal"
-            disabled 
-          />
-        </Grid>
-        <Grid item xs={12}>
-          <TextField
-            label="User Type"
-            name="userType"
-            value={profile.userType}
-            fullWidth
-            margin="normal"
             disabled
           />
         </Grid>
         <Grid item xs={12}>
-          <Box sx={{ border: '1px solid #ccc', borderRadius: '4px', padding: '1rem', marginTop: '1rem' }}>
-            <Typography variant="subtitle1" gutterBottom>Teams</Typography>
-            <div className="teams-container" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-              {teams.map((team) => (
-                <div key={team} className="team-checkbox" style={{ display: 'flex', alignItems: 'center', minWidth: '200px' }}>
-                  <input
-                    type="checkbox"
-                    id={team}
-                    checked={profile.teams.includes(team)}
-                    disabled
-                    style={{ marginRight: '8px' }}
-                  />
-                  <label htmlFor={team}>{team}</label>
-                </div>
-              ))}
-            </div>
+          <Typography variant="h6" gutterBottom>Access Rights</Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+            {profile.accessRights.length > 0 ? (
+              profile.accessRights.map((right, index) => (
+                <Chip key={index} label={right} color="secondary" />
+              ))
+            ) : (
+              <Typography color="textSecondary">No specific access rights assigned</Typography>
+            )}
           </Box>
         </Grid>
+
+
       </Grid>
 
       <Box sx={{ marginTop: '2rem' }}>
