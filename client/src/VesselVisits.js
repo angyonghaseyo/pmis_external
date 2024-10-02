@@ -315,7 +315,7 @@ const VesselVisits = () => {
       setError((prev) => ({ ...prev, [name]: "" }));
       setFormData((prev) => ({
         ...prev,
-        [name]: newDate.toISOString(), // Convert to ISO string
+        [name]: newDate, // Convert to ISO string
       }));
     }
   };
@@ -349,8 +349,8 @@ const VesselVisits = () => {
       vesselType: formData.vesselType,
       loa: formData.loa,
       draft: formData.draft,
-      eta: formData.eta,
-      etd: formData.etd,
+      eta: formData.eta.toISOString(),
+      etd: formData.etd.toISOString(),
       cargoType: formData.cargoType,
       cargoVolume: formData.cargoVolume,
       pilotage: formData.pilotage,
@@ -571,7 +571,7 @@ const VesselVisits = () => {
               <LocalizationProvider dateAdapter={AdapterDateFns}>
                 <DateTimePicker
                   label="ETA"
-                  value={formData.eta}
+                  value={formData.eta ? new Date(formData.eta) : null} // Convert ISO string to Date object
                   onChange={(date) => handleDateChange("eta", date)}
                   renderInput={(params) => (
                     <TextField {...params} fullWidth required />
@@ -583,7 +583,7 @@ const VesselVisits = () => {
               <LocalizationProvider dateAdapter={AdapterDateFns}>
                 <DateTimePicker
                   label="ETD"
-                  value={formData.etd}
+                  value={formData.etd ? new Date(formData.etd) : null} // Convert ISO string to Date object
                   onChange={(date) => handleDateChange("etd", date)}
                   renderInput={(params) => (
                     <TextField {...params} fullWidth required />
