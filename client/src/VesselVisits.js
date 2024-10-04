@@ -49,8 +49,9 @@ import {
   listAll,
   deleteObject,
 } from "firebase/storage";
-
-// import firebase from './firebase'; // Assume Firebase is properly configured
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
 
 const VesselVisits = () => {
   const [openDialog, setOpenDialog] = useState(false);
@@ -100,6 +101,10 @@ const VesselVisits = () => {
   const [fileError, setFileError] = useState("");
   const fileInputRef = useRef(null); // Create a ref for the file input
   const [downloadURL, setDownloadURL] = useState("");
+
+  dayjs.extend(utc);
+  dayjs.extend(timezone);
+  const singaporeTimeZone = "Asia/Singapore";
 
   useEffect(() => {
     fetchVesselVisits();
@@ -381,25 +386,146 @@ const VesselVisits = () => {
     }
   };
 
-  const checkManpowerAvailability = async () => {
-    try {
-      const manpowerCollectionRef = collection(db, "manpower");
-      const manpowerSnapshot = await getDocs(manpowerCollectionRef);
+  const checkManpowerAvailability = async (vesselVisitRequest) => {
+    const {
+      eta,
+      etd,
+      numberOfCranesNeeded,
+      numberOfTrucksNeeded,
+      numberOfReachStackersNeeded,
+    } = vesselVisitRequest;
 
-      // Assuming that each document has an 'available' field
-      let manpowerAvailable = true;
-      manpowerSnapshot.forEach((doc) => {
-        const manpower = doc.data();
-        if (!manpower.available) {
-          manpowerAvailable = false;
+    // Define the 8-hour time slots
+    const timeSlots = [
+      { start: "00:00", end: "08:00" },
+      { start: "08:00", end: "16:00" },
+      { start: "16:00", end: "00:00" },
+    ];
+
+    // Helper function to calculate overlapping time slots
+    const getOverlappingTimeSlots = (eta, etd) => {
+      const slots = [];
+      let iterator = eta.startOf("day"); // Start from the day of the ETA
+
+      // Loop through each day between ETA and ETD
+      while (iterator.isBefore(etd, "day") || iterator.isSame(etd, "day")) {
+        timeSlots.forEach((slot) => {
+          const slotStart = iterator
+            .hour(Number(slot.start.split(":")[0]))
+            .minute(0);
+          let slotEnd = iterator.hour(Number(slot.end.split(":")[0])).minute(0);
+
+          if (slot.end === "00:00") {
+            slotEnd = slotEnd.add(1, "day");
+          }
+
+          // Check if the slot overlaps with ETA-ETD range
+          if (
+            ((slotStart.isSame(eta) || slotStart.isAfter(eta)) &&
+              slotStart.isBefore(etd)) ||
+            ((slotEnd.isSame(etd) || slotEnd.isBefore(etd)) &&
+              slotEnd.isAfter(eta))
+          ) {
+            slots.push({ start: slotStart.format(), end: slotEnd.format() });
+          }
+        });
+
+        iterator = iterator.add(1, "day"); // Move to the next day
+      }
+      console.log(slots);
+      return slots;
+    };
+
+    // Helper function to filter manpower documents based on time slots
+    const filterManpowerDocuments = async (calculatedSlots) => {
+      try {
+        const workSchedulesRef = collection(db, "denzel_work_schedule");
+        const manpowerDocs = [];
+
+        // Loop through each calculated slot and query Firestore
+        for (const slot of calculatedSlots) {
+          const { start, end } = slot;
+
+          // Create time period string for Firestore query (e.g., "00:00-08:00")
+          const timePeriod = `${start.split("T")[1].slice(0, 5)}-${end
+            .split("T")[1]
+            .slice(0, 5)}`;
+          const startDate = start.split("T")[0];
+          const endDate = end.split("T")[0];
+
+          // Query Firestore for documents matching the time period and date range
+          const q = query(
+            workSchedulesRef,
+            where("startDate", "<=", endDate),
+            where("endDate", ">=", startDate),
+            where("timePeriod", "==", timePeriod)
+          );
+
+          const querySnapshot = await getDocs(q);
+
+          // Add matching documents to array
+          querySnapshot.forEach((doc) => {
+            manpowerDocs.push(doc.data());
+          });
         }
+
+        return manpowerDocs;
+      } catch (error) {
+        console.error("Error fetching manpower documents:", error);
+      }
+    };
+
+    // Helper function to check if manpower is sufficient
+    const checkManpowerSufficiency = (manpowerDocs, requiredRoles) => {
+      const availableManpower = {};
+
+      manpowerDocs.forEach((doc) => {
+        doc.assignedUsers.forEach((user) => {
+          if (!availableManpower[user.role]) {
+            availableManpower[user.role] = 0;
+          }
+          availableManpower[user.role] += 1;
+        });
       });
 
-      return manpowerAvailable; // True if all manpower resources are available, false if any are unavailable
-    } catch (error) {
-      console.error("Error checking manpower availability:", error);
-      return false; // Return false in case of error
-    }
+      const isManpowerSufficient = Object.keys(requiredRoles).every((role) => {
+        return (
+          availableManpower[role] &&
+          availableManpower[role] >= requiredRoles[role]
+        );
+      });
+
+      return isManpowerSufficient;
+    };
+
+    const localETA = dayjs.utc(eta).tz(singaporeTimeZone);
+    console.log("Local ETA:", localETA.toISOString());
+
+    const localETD = dayjs.utc(etd).tz(singaporeTimeZone);
+    console.log("Local ETD:", localETD.toISOString());
+
+    // Calculate relevant 8-hour time slots
+    const overlappingSlots = getOverlappingTimeSlots(localETA, localETD);
+    console.log("Overlapping Time Slots:", overlappingSlots);
+
+    // Fetch manpower documents that fall within those slots
+    const manpowerDocs = await filterManpowerDocuments(overlappingSlots);
+    console.log("Filtered Manpower Documents:", manpowerDocs);
+    
+
+    // Define required roles based on vessel needs
+    const requiredRoles = {
+      "Crane Operator": numberOfCranesNeeded,
+      "Truck Operator": numberOfTrucksNeeded,
+      "Reach Stacker Operator": numberOfReachStackersNeeded,
+    };
+    console.log("Required Roles:", requiredRoles);
+
+    // Check if manpower is sufficient for the vessel visit request
+    const isSufficient = checkManpowerSufficiency(manpowerDocs, requiredRoles);
+    console.log("isSuffucient is " + isSufficient);
+
+    return isSufficient ? true : false;
   };
 
   const checkResources = async () => {
@@ -417,7 +543,13 @@ const VesselVisits = () => {
       containersOffloaded: formData.containersOffloaded,
       containersOnloaded: formData.containersOnloaded,
     });
-    const manpowerDemandCheckBoolean = await checkManpowerAvailability();
+    const manpowerDemandCheckBoolean = await checkManpowerAvailability({
+      eta: formData.eta,
+      etd: FormData.etd,
+      numberOfCranesNeeded: formData.numberOfCranesNeeded,
+      numberOfTrucksNeeded: formData.numberOfTrucksNeeded,
+      numberOfReachStackersNeeded: formData.numberOfReachStackersNeeded,
+    });
 
     return {
       facilitiesDemandCheckBooleanAndBerth,
