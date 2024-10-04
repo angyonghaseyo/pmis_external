@@ -39,7 +39,14 @@ import {
   query,
   where,
 } from "firebase/firestore";
-import { getStorage, ref, uploadBytes, getDownloadURL, listAll, deleteObject } from "firebase/storage";
+import {
+  getStorage,
+  ref,
+  uploadBytes,
+  getDownloadURL,
+  listAll,
+  deleteObject,
+} from "firebase/storage";
 
 // import firebase from './firebase'; // Assume Firebase is properly configured
 
@@ -89,7 +96,7 @@ const VesselVisits = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [fileError, setFileError] = useState("");
   const fileInputRef = useRef(null); // Create a ref for the file input
-
+  const [downloadURL, setDownloadURL] = useState("");
 
   useEffect(() => {
     fetchVesselVisits();
@@ -440,7 +447,6 @@ const VesselVisits = () => {
         vesselBayCount: visit.vesselBayCount,
         vesselTierCount: visit.vesselTierCount,
         stowageplanURL: visit.stowageplanURL,
-
       });
       setEditingId("Edit"); //  setEditingId(visit.id); Denzel
     } else {
@@ -505,45 +511,39 @@ const VesselVisits = () => {
   };
 
   const handleFileChange = (e) => {
-    console.log("abracadbra");
     const file = e.target.files[0]; // Only one file
     try {
       if (file && file.type !== "text/csv") {
         setFileError("Please upload a valid CSV file.");
         setSelectedFile(null);
       } else {
-        console.log("file with" + file.name + "is registered")
+        console.log("file with" + file.name + "is registered");
         setFileError("");
         setSelectedFile(file);
       }
     } catch (error) {
       console.log("there is an error", error);
     }
-
   };
-
 
   // Handle file clear/reset
   const handleClearFile = async () => {
     const storage = getStorage();
+    const fileName = selectedFile.name;
+    try {
+      // Create a reference to the specific file in the 'stowage-plans/' directory
+      const fileRef = ref(storage, `stowage-plans/${fileName}`);
+      // Delete the specific file
+      await deleteObject(fileRef);
+
+      console.log("The right file has been deleted.");
+    } catch (error) {
+      console.error("Error deleting files from 'stowage-plans':", error);
+    }
     setSelectedFile(null);
     setFileError("");
     if (fileInputRef.current) {
       fileInputRef.current.value = null; // This line is important if you want to be able to re-upload the same file
-    }
-    const listRef = ref(storage, 'stowage-plans');
-    //this part of the code is responsible for deleting all files in stowage-plans. In other words, there is only 1 file present in stowage-plans folder
-    try {
-      // List all the items (files) in the directory
-      const res = await listAll(listRef);
-      const deletePromises = res.items.map((itemRef) => deleteObject(itemRef));
-
-      // Wait for all delete operations to complete
-      await Promise.all(deletePromises);
-
-      console.log("All files in 'stowage-plans' have been deleted.");
-    } catch (error) {
-      console.error("Error deleting files from 'stowage-plans':", error);
     }
   };
 
@@ -661,16 +661,23 @@ const VesselVisits = () => {
     //file uploading
     try {
       const storage = getStorage();
-      const storageRef = ref(storage, `stowage-plans/${formData.imoNumber}_stowageplan`);
+      const storageRef = ref(
+        storage,
+        `stowage-plans/${formData.imoNumber}_stowageplan.csv`
+      );
       // Upload the file
       await uploadBytes(storageRef, selectedFile);
       // Get the download URL after upload
       newVisit.stowageplanURL = await getDownloadURL(storageRef);
-
+      setDownloadURL(newVisit.stowageplanURL);
+      console.log(
+        "File uploaded and renamed successfully:",
+        newVisit.stowageplanURL
+      );
     } catch (error) {
       setFileError("Missing stowage plan.");
-      console.error("Error updating stowage plan's URL to newVisit:", error);   
-     }
+      console.error("Error updating stowage plan's URL to newVisit:", error);
+    }
 
     try {
       const docRef = doc(db, "vesselVisitRequests", formData.imoNumber);
@@ -1086,7 +1093,7 @@ const VesselVisits = () => {
               </Typography>
             )}
 
-            <Box mt={2}>
+            <Box mt={2} sx={{ mt: 4, p: 2 }}>
               <Button
                 variant="outlined"
                 color="secondary"
@@ -1096,6 +1103,19 @@ const VesselVisits = () => {
               >
                 Clear File
               </Button>
+              {downloadURL && (
+                <a href={downloadURL} download>
+                  <Button
+                    variant="contained"
+                    color="secondary" // Set to purple or any color you prefer
+                    sx={{ ml: 2, backgroundColor: "green" }} // Apply margin-left for spacing
+                    href={downloadURL}
+                    download
+                  >
+                    Download file
+                  </Button>
+                </a>
+              )}
             </Box>
           </Box>
         </DialogContent>
