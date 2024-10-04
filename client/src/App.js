@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth, db } from './firebaseConfig';
@@ -20,7 +20,10 @@ import CompanyInfo from './CompanyInfo';
 import OperatorRequisition from './OperatorRequisition';
 import VesselVisits from './VesselVisits';
 import { Box, CssBaseline, CircularProgress } from '@mui/material';
-import { simulateBerthTestData } from './SimulateBerthTestData'; // Import the function
+import { simulateBerthTestData } from './SimulateBerthTestData'; 
+import {simulateManpowerTestData} from './SimulateManpowerTestData';
+import {simulateAssetTestData} from './SimulateAssetTestData';
+
 
 const drawerWidth = 240;
 
@@ -53,7 +56,6 @@ function App() {
       } finally {
         setLoading(false);
       }
-      simulateBerthTestData();
     };
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -65,6 +67,14 @@ function App() {
         setLoading(false);
       }
     });
+
+    simulateBerthTestData();
+    console.log("A");
+    simulateManpowerTestData();
+    console.log("B");
+    simulateAssetTestData();
+    console.log("C");
+
 
     return () => unsubscribe();
   }, []);
