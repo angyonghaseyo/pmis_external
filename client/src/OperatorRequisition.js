@@ -26,7 +26,7 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import { Close } from '@mui/icons-material';
-import { getOperatorRequisitions, createOperatorRequisition, updateOperatorRequisition, deleteOperatorRequisition } from './services/api';
+import { getOperatorRequisitions, createOperatorRequisition, updateOperatorRequisition, deleteOperatorRequisition, getUserData } from './services/api';
 import { auth } from './firebaseConfig';
 
 const operatorSkills = ['Crane Operator', 'Forklift Operator', 'Equipment Technician'];
@@ -48,6 +48,7 @@ const OperatorRequisition = () => {
   const [isEditing, setIsEditing] = useState(null);
   const [tabValue, setTabValue] = useState(0);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+  const [userProfile, setUserProfile] = useState(null);
 
   const fetchRequisitions = useCallback(async () => {
     try {
@@ -59,11 +60,11 @@ const OperatorRequisition = () => {
         return;
       }
       const requisitions = await getOperatorRequisitions(user.uid);
-      
+
       // Filter pending, approved, and rejected requests
       const pending = requisitions.filter(req => req.status === 'Pending');
       const resolved = requisitions.filter(req => ['Approved', 'Rejected'].includes(req.status));
-      
+
       setPendingRequests(pending);
       setResolvedRequests(resolved);
     } catch (err) {
@@ -77,14 +78,36 @@ const OperatorRequisition = () => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
         fetchRequisitions();
+        fetchUserProfile(user.uid);
       } else {
         setError('Please log in to view requisitions.');
         setLoading(false);
+        setUserProfile(null);
       }
     });
 
     return () => unsubscribe();
   }, [fetchRequisitions]);
+
+  const fetchUserProfile = async (userId) => {
+    try {
+      const profileData = await getUserData(userId);
+      setUserProfile(profileData);
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      setError('Failed to fetch user profile. Please try again later.');
+    }
+  };
+  const hasRole = (requiredRoles) => {
+    if (!userProfile || !Array.isArray(userProfile.accessRights)) return false;
+
+    // Check if the user has any of the required roles
+    const hasRequiredRole = requiredRoles.some(role => userProfile.accessRights.includes(role));
+
+    // Return true if the user has a required role or is an Admin
+    return hasRequiredRole || userProfile.role === 'Admin';
+  };
+
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -107,12 +130,12 @@ const OperatorRequisition = () => {
     try {
       const user = auth.currentUser;
       if (!user) throw new Error('No authenticated user');
-  
+
       if (!formData.time) {
         setSnackbar({ open: true, message: 'Time is a required field', severity: 'error' });
         return;
       }
-  
+
       // Validate if the selected date and time is in the past
       const selectedDateTime = new Date(`${formData.date}T${formData.time}`);
       const currentDateTime = new Date();
@@ -120,20 +143,20 @@ const OperatorRequisition = () => {
         setSnackbar({ open: true, message: 'Date and time cannot be in the past', severity: 'error' });
         return;
       }
-  
+
       if (isEditing !== null) {
         await updateOperatorRequisition(isEditing, { ...formData, userId: user.uid });
       } else {
         await createOperatorRequisition({ ...formData, userId: user.uid, status: 'Pending' });
       }
       handleCloseDialog();
-      await fetchRequisitions(); 
+      await fetchRequisitions();
       setSnackbar({ open: true, message: 'Requisition saved successfully', severity: 'success' });
     } catch (err) {
       setSnackbar({ open: true, message: 'Failed to save requisition', severity: 'error' });
     }
   };
-  
+
 
   const handleDelete = async (id) => {
     try {
@@ -176,12 +199,13 @@ const OperatorRequisition = () => {
       <Typography variant="h4" gutterBottom>
         Operator Requisition
       </Typography>
-
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
-        <Button variant="contained" color="primary" onClick={handleOpenDialog}>
-          Create New Request
-        </Button>
-      </Box>
+      {hasRole(["Create Operator Requisition"]) && (
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
+          <Button variant="contained" color="primary" onClick={handleOpenDialog}>
+            Create New Request
+          </Button>
+        </Box>
+      )}
 
       <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 2 }}>
         <Tab label="Pending Requests" />

@@ -28,6 +28,8 @@ import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { db } from "./firebaseConfig";
+import { getUserData } from './services/api';
+import { auth } from './firebaseConfig';
 import {
   doc,
   addDoc,
@@ -55,6 +57,7 @@ const VesselVisits = () => {
   const [visitType, setVisitType] = useState("");
   const [tabValue, setTabValue] = useState(0);
   const [editingId, setEditingId] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
   const [formData, setFormData] = useState({
     vesselName: "",
     imoNumber: "",
@@ -172,8 +175,8 @@ const VesselVisits = () => {
       if (isAssetAvailable(crane, eta, etd)) {
         console.log(
           "Crane with id " +
-            crane.name +
-            " is available time-wise and is being demand checked"
+          crane.name +
+          " is available time-wise and is being demand checked"
         );
         craneCapacityPerHour += crane.containersPerHour;
         craneCount += 1;
@@ -207,8 +210,8 @@ const VesselVisits = () => {
     for (const truck of trucks) {
       console.log(
         "Truck with id" +
-          truck.name +
-          "is available and is being demand checked"
+        truck.name +
+        "is available and is being demand checked"
       );
       if (isAssetAvailable(truck, eta, etd)) {
         truckCapacityPerHour += truck.containersPerHour;
@@ -253,7 +256,7 @@ const VesselVisits = () => {
         ) {
           console.log(
             "there is enough reach stackers with a quantity of " +
-              requiredReachStackers
+            requiredReachStackers
           );
           reachStackerPass = true;
           break;
@@ -368,7 +371,7 @@ const VesselVisits = () => {
         let assignedBerth = matchedBerths.pop();
         console.log(
           "The berth that has been assigned to the vessel is" +
-            assignedBerth.name
+          assignedBerth.name
         );
         return { success: true, assignedBerth: assignedBerth };
       }
@@ -642,8 +645,8 @@ const VesselVisits = () => {
       // status for UI purposes
       status:
         resourceCheck.manpowerDemandCheckBoolean &&
-        resourceCheck.assetsDemandCheckBooleanAndQuantity.success &&
-        resourceCheck.facilitiesDemandCheckBooleanAndBerth.success
+          resourceCheck.assetsDemandCheckBooleanAndQuantity.success &&
+          resourceCheck.facilitiesDemandCheckBooleanAndBerth.success
           ? "confirmed"
           : "pending user intervention",
       vesselGridCount:
@@ -737,6 +740,31 @@ const VesselVisits = () => {
     setTabValue(newValue);
   };
 
+  const fetchUserProfile = async (userId) => {
+    try {
+      const profileData = await getUserData(userId);
+      setUserProfile(profileData);
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      setError('Failed to fetch user profile. Please try again later.');
+    }
+  };
+
+  const hasRole = (requiredRoles) => {
+    if (!userProfile || !Array.isArray(userProfile.accessRights)) return false;
+
+    // Check if the user has any of the required roles
+    const hasRequiredRole = requiredRoles.some(role => userProfile.accessRights.includes(role));
+
+    // Return true if the user has a required role or is an Admin
+    return hasRequiredRole || userProfile.role === 'Admin';
+  };
+
+  useEffect(() => {
+    fetchUserProfile(auth.currentUser.uid);
+  }, []);
+
+
   return (
     <Container maxWidth="lg" sx={{ mt: 4 }}>
       <Box
@@ -748,23 +776,25 @@ const VesselVisits = () => {
         <Typography variant="h4" component="h1">
           Vessel Visits
         </Typography>
-        <Box>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => handleOpenDialog("Scheduled")}
-            sx={{ mr: 2 }}
-          >
-            Scheduled Vessel Visit
-          </Button>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => handleOpenDialog("Ad Hoc")}
-          >
-            Ad Hoc Vessel Visit
-          </Button>
-        </Box>
+        {hasRole(['Create Vessel Visit Request']) && (
+          <Box>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => handleOpenDialog('Scheduled')}
+              sx={{ mr: 2 }}
+            >
+              Scheduled Vessel Visit
+            </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => handleOpenDialog('Ad Hoc')}
+            >
+              Ad Hoc Vessel Visit
+            </Button>
+          </Box>
+        )}
       </Box>
 
       <Tabs
@@ -787,7 +817,9 @@ const VesselVisits = () => {
                 <TableCell>ETD</TableCell>
                 <TableCell>Containers Offloaded</TableCell>
                 <TableCell>Containers Onloaded</TableCell>
-                <TableCell>Actions</TableCell>
+                {hasRole(["Edit Vessel Visit Requests", "Delete Vessel Visit Requests"]) && (
+                  <TableCell>Actions</TableCell>
+                )}
               </TableRow>
             </TableHead>
             <TableBody>
@@ -800,18 +832,16 @@ const VesselVisits = () => {
                   <TableCell>{visit.containersOffloaded}</TableCell>
                   <TableCell>{visit.containersOnloaded}</TableCell>
                   <TableCell>
-                    <IconButton
-                      onClick={() => handleOpenDialog(visit.visitType, visit)}
-                      color="primary"
-                    >
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton
-                      onClick={() => handleDelete(visit.documentId)}
-                      color="secondary"
-                    >
-                      <DeleteIcon />
-                    </IconButton>
+                    {hasRole(["Edit Vessel Visit Requests"]) && (
+                      <IconButton onClick={() => handleOpenDialog(visit.visitType, visit)} color="primary">
+                        <EditIcon />
+                      </IconButton>
+                    )}
+                    {hasRole(["Delete Vessel Visit Requests"]) && (
+                      <IconButton onClick={() => handleDelete(visit.id)} color="secondary">
+                        <DeleteIcon />
+                      </IconButton>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -841,12 +871,12 @@ const VesselVisits = () => {
                 onChange={handleChange}
                 fullWidth
                 required
-                // disabled={!!formData.vesselName}
-                // helperText={
-                //   formData.vesselName
-                //     ? "This field cannot be edited after it is set"
-                //     : ""
-                // }
+              // disabled={!!formData.vesselName}
+              // helperText={
+              //   formData.vesselName
+              //     ? "This field cannot be edited after it is set"
+              //     : ""
+              // }
               />
             </Grid>
             <Grid item xs={6}>
@@ -858,12 +888,12 @@ const VesselVisits = () => {
                 onChange={handleChange}
                 fullWidth
                 required
-                // disabled={!!formData.imoNumber}
-                // helperText={
-                //   formData.imoNumber
-                //     ? "This field cannot be edited after it is set"
-                //     : ""
-                // }
+              // disabled={!!formData.imoNumber}
+              // helperText={
+              //   formData.imoNumber
+              //     ? "This field cannot be edited after it is set"
+              //     : ""
+              // }
               />
             </Grid>
             <Grid item xs={6}>
@@ -1133,3 +1163,4 @@ const VesselVisits = () => {
 };
 
 export default VesselVisits;
+
