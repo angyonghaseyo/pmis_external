@@ -450,6 +450,7 @@ const VesselVisits = () => {
         vesselBayCount: visit.vesselBayCount,
         vesselTierCount: visit.vesselTierCount,
         stowageplanURL: visit.stowageplanURL,
+        visitType: type
       });
       setEditingId("Edit"); //  setEditingId(visit.id); Denzel
     } else {
@@ -475,6 +476,7 @@ const VesselVisits = () => {
         vesselBayCount: 0,
         vesselTierCount: 0,
         stowageplanURL: "",
+        visitType: type
       });
     }
     setOpenDialog(true);
@@ -658,6 +660,7 @@ const VesselVisits = () => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       stowageplanURL: formData.stowageplanURL,
+      visitType: formData.visitType
     };
     //denzel: facility demand check - checking booking time slots is wrong - no longer using 1 hour slots done
     //denzel: facilitydemandcheck should always return true except if there is an error caused in the demand heck
@@ -789,7 +792,7 @@ const VesselVisits = () => {
             <Button
               variant="contained"
               color="primary"
-              onClick={() => handleOpenDialog('Ad Hoc')}
+              onClick={() => handleOpenDialog('Ad-Hoc')}
             >
               Ad Hoc Vessel Visit
             </Button>
