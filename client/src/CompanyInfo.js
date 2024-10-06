@@ -10,7 +10,8 @@ import {
   CircularProgress,
   Snackbar,
   Alert,
-  FormHelperText
+  FormHelperText,
+  Container
 } from '@mui/material';
 import PhotoCamera from '@mui/icons-material/PhotoCamera';
 import { doc, getDoc } from 'firebase/firestore';
@@ -43,6 +44,7 @@ const CompanyInfo = () => {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [userProfile, setUserProfile] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const fetchCompanyData = useCallback(async () => {
     try {
@@ -87,8 +89,30 @@ const CompanyInfo = () => {
 
 
   useEffect(() => {
-    fetchCompanyData();
-    fetchUserProfile(auth.currentUser.uid);
+    const fetchData = async () => {
+      if (!auth.currentUser) {
+        setError('Please log in to view this page.');
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        setError(null);
+        await Promise.all([
+          fetchCompanyData(),
+          fetchUserProfile(auth.currentUser.uid)
+        ]);
+
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        setError('An error occurred while fetching data. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
   }, [fetchCompanyData]);
 
   const handleInputChange = (e) => {
@@ -146,6 +170,13 @@ const CompanyInfo = () => {
   };
 
   if (loading) return <Box display="flex" justifyContent="center" alignItems="center" height="100vh"><CircularProgress /></Box>;
+  if (isLoading) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+        <CircularProgress />
+      </Container>
+    );
+  }
 
   return (
     <Box sx={{ maxWidth: '1000px', mx: 'auto', p: 3 }}>
