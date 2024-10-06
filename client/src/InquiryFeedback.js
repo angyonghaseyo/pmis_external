@@ -22,7 +22,8 @@ import {
   CircularProgress,
   Snackbar,
   Alert,
-  IconButton
+  IconButton,
+  Container
 } from '@mui/material';
 import { Edit, Reply } from '@mui/icons-material';
 import { getUserInquiriesFeedback, createInquiryFeedback, updateInquiryFeedback, getUserData } from './services/api';
@@ -52,22 +53,35 @@ const InquiryFeedback = ({ userType }) => {
   const [replyText, setReplyText] = useState('');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [userProfile, setUserProfile] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
-      setUser(currentUser);
+    const fetchData = async (currentUser) => {
       if (currentUser) {
-        fetchUserProfile(currentUser.uid);
+        try {
+          await Promise.all([
+            fetchUserProfile(currentUser.uid),
+            fetchInquiriesFeedback(),
+
+          ]);
+        } catch (error) {
+          console.error('Error fetching data:', error);
+          // Optionally set an error state here
+        }
       } else {
         setUserProfile(null);
+        // Optionally, you might want to clear other data here as well
       }
+      setIsLoading(false);
+    };
+
+    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+      setUser(currentUser);
+      setIsLoading(true); // Set loading to true when auth state changes
+      fetchData(currentUser);
     });
 
     return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    fetchInquiriesFeedback();
   }, []);
 
   const fetchInquiriesFeedback = async () => {
@@ -225,6 +239,14 @@ const InquiryFeedback = ({ userType }) => {
 
   if (loading) return <Box display="flex" justifyContent="center" alignItems="center" height="100vh"><CircularProgress /></Box>;
   if (error) return <Typography color="error" align="center">{error}</Typography>;
+
+  if (isLoading) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+        <CircularProgress />
+      </Container>
+    );
+  }
 
   return (
     <Box sx={{ p: 3 }}>

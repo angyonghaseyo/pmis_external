@@ -22,6 +22,7 @@ import {
   Tab,
   Snackbar,
   Alert,
+  Container
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -49,7 +50,7 @@ const OperatorRequisition = () => {
   const [tabValue, setTabValue] = useState(0);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [userProfile, setUserProfile] = useState(null);
-
+  const [isLoading, setIsLoading] = useState(true);
   const fetchRequisitions = useCallback(async () => {
     try {
       setLoading(true);
@@ -75,15 +76,30 @@ const OperatorRequisition = () => {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
+    const fetchData = async (user) => {
       if (user) {
-        fetchRequisitions();
-        fetchUserProfile(user.uid);
+        try {
+          setIsLoading(true);
+          setError(null);
+          await Promise.all([
+            fetchRequisitions(),
+            fetchUserProfile(user.uid)
+          ]);
+        } catch (error) {
+          console.error('Error fetching data:', error);
+          setError('An error occurred while fetching data. Please try again.');
+        } finally {
+          setIsLoading(false);
+        }
       } else {
         setError('Please log in to view requisitions.');
-        setLoading(false);
         setUserProfile(null);
+        setIsLoading(false);
       }
+    };
+
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      fetchData(user);
     });
 
     return () => unsubscribe();
@@ -191,6 +207,14 @@ const OperatorRequisition = () => {
         <Typography color="error" align="center" gutterBottom>{error}</Typography>
         <Button variant="contained" color="primary" onClick={fetchRequisitions}>Retry</Button>
       </Box>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+        <CircularProgress />
+      </Container>
     );
   }
 

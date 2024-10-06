@@ -28,7 +28,8 @@ import {
   Snackbar,
   Alert,
   Chip,
-  Grid
+  Grid,
+  Container
 } from '@mui/material';
 import { Edit2, Trash2 } from 'lucide-react';
 import { getUsers, updateUser, deleteUser, inviteUser, getCurrentUser, cancelInvitation, getAllUsersInCompany, getUserData } from '../services/api';
@@ -58,6 +59,7 @@ const SettingsUsers = () => {
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [currentUserCompany, setCurrentUserCompany] = useState('');
   const [userProfile, setUserProfile] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [newUser, setNewUser] = useState({
     email: '',
     firstName: '',
@@ -98,10 +100,23 @@ const SettingsUsers = () => {
   ];
 
   useEffect(() => {
-    fetchUsers();
-    fetchCurrentUserCompany();
-    fetchUsersInCompany();
-    fetchUserProfile(auth.currentUser.uid);
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        await Promise.all([
+          fetchUsers(),
+          fetchCurrentUserCompany(),
+          fetchUsersInCompany(),
+          fetchUserProfile(auth.currentUser.uid)
+        ])
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
   }, []);
 
   useEffect(() => {
@@ -335,6 +350,13 @@ const SettingsUsers = () => {
 
   if (loading) return <Box display="flex" justifyContent="center" alignItems="center" height="100vh"><CircularProgress /></Box>;
   if (error) return <Typography color="error" align="center">{error}</Typography>;
+  if (isLoading) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+        <CircularProgress />
+      </Container>
+    );
+  }
 
   return (
     <Box sx={{ p: 3 }}>

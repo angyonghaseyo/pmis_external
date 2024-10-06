@@ -30,6 +30,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import { db } from "./firebaseConfig";
 import { getUserData } from './services/api';
 import { auth } from './firebaseConfig';
+import { CircularProgress } from "@mui/material";
 import {
   doc,
   addDoc,
@@ -58,6 +59,7 @@ const VesselVisits = () => {
   const [tabValue, setTabValue] = useState(0);
   const [editingId, setEditingId] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [formData, setFormData] = useState({
     vesselName: "",
     imoNumber: "",
@@ -102,7 +104,21 @@ const VesselVisits = () => {
   const [downloadURL, setDownloadURL] = useState("");
 
   useEffect(() => {
-    fetchVesselVisits();
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        await Promise.all([
+          fetchVesselVisits(),
+          fetchUserProfile(auth.currentUser.uid)
+        ]);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        // Optionally set an error state here
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
   }, []);
 
   const fetchVesselVisits = async () => {
@@ -763,9 +779,14 @@ const VesselVisits = () => {
     return hasRequiredRole || userProfile.role === 'Admin';
   };
 
-  useEffect(() => {
-    fetchUserProfile(auth.currentUser.uid);
-  }, []);
+
+  if (isLoading) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+        <CircularProgress />
+      </Container>
+    );
+  }
 
 
   return (
