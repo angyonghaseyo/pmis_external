@@ -295,30 +295,46 @@ const VesselVisits = () => {
 
   const checkFacilityAvailability = async (vesselVisitRequest) => {
     const { loa, draft, cargoType, eta, etd } = vesselVisitRequest;
+    const facilityListCollectionRef = collection(db, "facilityList");
+    const facilityListSnapshot = await getDocs(facilityListCollectionRef);
+    const matchedBerths = [];
+    const etaAdjustedDate = new Date();
+    const etdAdjustedDate = new Date();
+
+
 
     // Helper function to check if assets are available during a time range
     function isBerthAvailable(facility, eta, etd) {
-      for (const period of facility.bookedPeriod) {
-        const [bookedEta, bookedEtd] = period;
-        // If the asset's booked period overlaps with the requested period, it's unavailable
-        if (
-          !(
-            new Date(etd) <= new Date(bookedEta) ||
-            new Date(eta) >= new Date(bookedEtd)
-          )
-        ) {
-          return false;
+      console.log("The facility is: " + facility.name);
+      console.log("eta at isBerthAvailable: " + eta);
+      console.log("etd at isBerthAvailable: " + etd);
+
+      try {
+        // Use Object.entries to iterate over the bookedPeriod map (converted to an object)
+        for (const [periodKey, period] of Object.entries(
+          facility.bookedPeriod
+        )) {
+          const [bookedEta, bookedEtd] = period;
+
+          // If the asset's booked period overlaps with the requested period, it's unavailable
+          if (
+            !(
+              new Date(etd) <= new Date(bookedEta) ||
+              new Date(eta) >= new Date(bookedEtd)
+            )
+          ) {
+            console.log(`Berth is unavailable during period ${periodKey}`);
+            return false;
+          }
         }
+        return true; // Available if no conflicts found
+      } catch (error) {
+        console.error("Error checking berth availability: ", error);
       }
-      return true;
     }
 
     try {
       // Step 1: Check the facilityList to find berths that match the vessel's LOA, draft, and cargoType
-      const facilityListCollectionRef = collection(db, "facilityList");
-      const facilityListSnapshot = await getDocs(facilityListCollectionRef);
-      const matchedBerths = [];
-
       facilityListSnapshot.forEach((doc) => {
         const berth = doc.data();
 
@@ -328,7 +344,7 @@ const VesselVisits = () => {
           draft <= berth.depthCapacity &&
           cargoType === berth.cargoType
         ) {
-          matchedBerths.push(berth.name); // Store the matched berth name
+          matchedBerths.push(berth); // Store the matched berth name
         }
       });
 
@@ -339,11 +355,18 @@ const VesselVisits = () => {
 
       const startDate = new Date(eta);
       const endDate = new Date(etd);
-      console.log("The start date is " + startDate);
-      console.log("The end date is " + endDate);
-      console.log("The eta is " + eta);
-      console.log("The etd is " + etd);
+      console.log("!The start date is " + startDate);
+      console.log("!The end date is " + endDate);
+      console.log("!The eta is " + eta);
+      console.log("!The etd is " + etd);
+      console.log("!As of now, matchedBerths contains: " + matchedBerths);
+    } catch (error) {
+      console.log(
+        "Step 1 for facility demand check has failed because of: " + error
+      );
+    }
 
+    try {
       // Step 2: Loop through each matched berth and check whether it is available during the required hours
       for (const berth of matchedBerths) {
         if (isBerthAvailable(berth, eta, etd)) {
@@ -358,19 +381,21 @@ const VesselVisits = () => {
           );
         }
       }
+      console.log("dfdsf: " + matchedBerths);
+      console.log("oohlahlah" + eta);
       // If no berth is fully available for the entire time range, find a berth with an availability that closest matches the eta of the vessel
       if (matchedBerths.length === 0) {
         console.log("No berth is available for the entire time range.");
         // adjust eta by +1 hour and etd by +1 hour and do demand check again. Keep repeating until you find at least one berth that is free within the eta-etd period
         // First Convert the ISO string to Date objects
-        let etaDate = new Date(eta);
-        let etdDate = new Date(etd);
+        etaAdjustedDate = new Date(eta);
+        etaAdjustedDate.setMinutes(eta.getMinutes() + 15);
+        etdAdjustedDate = new Date(etd);
+        etdAdjustedDate.setMinutes(etd.getMinutes() + 15);
         console.log(
-          `Adjusting ETA and ETD by +1 hour: New ETA: ${etaDate.toISOString()}, New ETD: ${etdDate.toISOString()}`
+          `Adjusting ETA and ETD by 15 minutes: New ETA: ${etaAdjustedDate}, New ETD: ${etdAdjustedDate}`
         );
-        // Update eta and etd in vesselVisitRequest
-        vesselVisitRequest.eta = etaDate.toISOString();
-        vesselVisitRequest.etd = etdDate.toISOString();
+        const { loa, draft, cargoType, etaAdjustedDate, etdAdjustedDate } = vesselVisitRequest;
         return checkFacilityAvailability(vesselVisitRequest);
       } else {
         let assignedBerth = matchedBerths.pop();
@@ -378,7 +403,7 @@ const VesselVisits = () => {
           "The berth that has been assigned to the vessel is" +
           assignedBerth.name
         );
-        return { success: true, assignedBerth: assignedBerth };
+        return { success: true, assignedBerth: assignedBerth.name };
       }
     } catch (error) {
       console.error("Error checking facility availability:", error);
@@ -498,20 +523,107 @@ const VesselVisits = () => {
       return isManpowerSufficient;
     };
 
-    const localETA = dayjs.utc(eta).tz(singaporeTimeZone);
-    console.log("Local ETA:", localETA.toISOString());
+    // Function to fetch documents based on filters
+    const fetchFilteredDocuments = async (
+      timePeriod,
+      startDate,
+      endDate,
+      status
+    ) => {
+      try {
+        const workSchedulesRef = collection(db, "denzel_work_schedule");
 
-    const localETD = dayjs.utc(etd).tz(singaporeTimeZone);
-    console.log("Local ETD:", localETD.toISOString());
+        // Create a Firestore query with the provided filters
+        const q = query(
+          workSchedulesRef,
+          where("timePeriod", "==", timePeriod),
+          where("startDate", "==", startDate),
+          where("endDate", "==", endDate),
+          where("status", "==", status)
+        );
 
-    // Calculate relevant 8-hour time slots
-    const overlappingSlots = getOverlappingTimeSlots(localETA, localETD);
-    console.log("Overlapping Time Slots:", overlappingSlots);
+        const querySnapshot = await getDocs(q);
 
-    // Fetch manpower documents that fall within those slots
-    const manpowerDocs = await filterManpowerDocuments(overlappingSlots);
-    console.log("Filtered Manpower Documents:", manpowerDocs);
-    
+        // Check if documents are found
+        if (querySnapshot.empty) {
+          console.log("No matching documents.");
+          return [];
+        }
+
+        // Map through the found documents and log them
+        const results = [];
+        querySnapshot.forEach((doc) => {
+          results.push(doc.data());
+          console.log(doc.id, " => ", doc.data());
+        });
+
+        return results; // Return the filtered results
+      } catch (error) {
+        console.error("Error fetching filtered documents: ", error);
+      }
+    };
+
+    // Helper function to loop through each day in the range
+    const fetchDocumentsForDateRange = async (
+      timePeriod,
+      startDay,
+      endDay,
+      status
+    ) => {
+      let currentDay = dayjs(startDay);
+      const endDate = dayjs(endDay);
+      const allResults = [];
+
+      // Loop through each day in the range
+      while (currentDay.isBefore(endDate) || currentDay.isSame(endDate)) {
+        const startDateString = currentDay.format("YYYY-MM-DD"); // Format the date as a string
+        const endDateString = currentDay.format("YYYY-MM-DD"); // Use the same date for a single-day check
+        console.log("start" + startDateString);
+        console.log("end" + endDateString);
+
+        // Fetch documents for the current day
+        const docs = await fetchFilteredDocuments(
+          timePeriod,
+          startDateString,
+          endDateString,
+          status
+        );
+
+        if (docs.length > 0) {
+          allResults.push(...docs); // Add found documents to the results array
+        }
+
+        currentDay = currentDay.add(1, "day"); // Move to the next day
+      }
+
+      return allResults; // Return all found documents
+    };
+
+    const timePeriod = "00:00-08:00";
+    const startDay = "2024-10-21";
+    const endDay = "2024-10-25";
+    const status = "Ad-Hoc";
+
+    // Fetch documents for the date range
+    fetchDocumentsForDateRange(timePeriod, startDay, endDay, status).then(
+      (allDocs) => {
+        console.log("All Filtered Documents: ", allDocs);
+      }
+    );
+
+    // const localETA = dayjs.utc(eta).tz(singaporeTimeZone);
+    // console.log("Local ETA:", localETA.toISOString());
+
+    // const localETD = dayjs.utc(etd).tz(singaporeTimeZone);
+    // console.log("Local ETD:", localETD.toISOString());
+
+    // // Calculate relevant 8-hour time slots
+    // const overlappingSlots = getOverlappingTimeSlots(localETA, localETD);
+    // console.log("Overlapping Time Slots:", overlappingSlots);
+
+    // // Fetch manpower documents that fall within those slots
+    // const manpowerDocs = await filterManpowerDocuments(overlappingSlots);
+    // console.log("Filtered Manpower Documents:", manpowerDocs);
 
     // Define required roles based on vessel needs
     const requiredRoles = {
@@ -522,10 +634,10 @@ const VesselVisits = () => {
     console.log("Required Roles:", requiredRoles);
 
     // Check if manpower is sufficient for the vessel visit request
-    const isSufficient = checkManpowerSufficiency(manpowerDocs, requiredRoles);
-    console.log("isSuffucient is " + isSufficient);
+    // const isSufficient = checkManpowerSufficiency(manpowerDocs, requiredRoles);
+    // console.log("isSuffucient is " + isSufficient);
 
-    return isSufficient ? true : false;
+    return true ? true : false;
   };
 
   const checkResources = async () => {
@@ -759,9 +871,9 @@ const VesselVisits = () => {
       containersOffloaded: formData.containersOffloaded,
       containersOnloaded: formData.containersOnloaded,
       facilityDemandCheckBoolean:
-        resourceCheck.facilitiesDemandCheckBooleanAndBerth.success,
+        resourceCheck.facilitiesDemandCheckBooleanAndBerth.success !== undefined ? false : false ,
       berthAssigned:
-        resourceCheck.facilitiesDemandCheckBooleanAndBerth.assignedBerth,
+        resourceCheck.facilitiesDemandCheckBooleanAndBerth.assignedBerth !== undefined ? "" : "",
       assetDemandCheckBoolean:
         resourceCheck.assetsDemandCheckBooleanAndQuantity.success,
       numberOfCranesNeeded:
@@ -813,7 +925,7 @@ const VesselVisits = () => {
       setFileError("Missing stowage plan.");
       console.error("Error updating stowage plan's URL to newVisit:", error);
     }
-
+    console.log(newVisit);
     try {
       const docRef = doc(db, "vesselVisitRequests", formData.imoNumber);
       await setDoc(docRef, newVisit);
@@ -943,14 +1055,16 @@ const VesselVisits = () => {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>ID</TableCell>
+                <TableCell>IMO Number</TableCell>
                 <TableCell>Vessel Name</TableCell>
-                <TableCell>ETA</TableCell>
-                <TableCell>ETD</TableCell>
+                <TableCell>ETA (Local Time) </TableCell>
+                <TableCell>ETD (Local Time) </TableCell>
                 <TableCell>Containers Offloaded</TableCell>
                 <TableCell>Containers Onloaded</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Assigned Berth</TableCell>
                 {hasRole(["Edit Vessel Visit Requests", "Delete Vessel Visit Requests"]) && (
-                  <TableCell>Actions</TableCell>
+                <TableCell>Actions</TableCell>
                 )}
               </TableRow>
             </TableHead>
@@ -959,10 +1073,35 @@ const VesselVisits = () => {
                 <TableRow key={visit.documentId}>
                   <TableCell>{visit.documentId}</TableCell>
                   <TableCell>{visit.vesselName}</TableCell>
-                  <TableCell>{visit.eta}</TableCell> {/* ISO string */}
-                  <TableCell>{visit.etd}</TableCell> {/* ISO string */}
+                  <TableCell>
+                    {visit.eta
+                      ? new Date(visit.eta).toLocaleString("en-SG", {
+                          hour12: true,
+                          year: "numeric",
+                          month: "2-digit",
+                          day: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : "No Date"}
+                  </TableCell>
+                  <TableCell>
+                    {visit.etd
+                      ? new Date(visit.etd).toLocaleString("en-SG", {
+                          hour12: true,
+                          year: "numeric",
+                          month: "2-digit",
+                          day: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : "No Date"}
+                  </TableCell>{" "}
+                  {/* ISO string */}
                   <TableCell>{visit.containersOffloaded}</TableCell>
                   <TableCell>{visit.containersOnloaded}</TableCell>
+                  <TableCell>{visit.status}</TableCell>
+                  <TableCell>{visit.berthAssigned}</TableCell>
                   <TableCell>
                     {hasRole(["Edit Vessel Visit Requests"]) && (
                       <IconButton onClick={() => handleOpenDialog(visit.visitType, visit)} color="primary">
