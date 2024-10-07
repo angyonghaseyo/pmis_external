@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TextField, Button, Box, Typography, Select, MenuItem, InputLabel, FormControl, Grid, Avatar, Chip } from '@mui/material';
+import { TextField, Button, Box, Typography, Select, MenuItem, InputLabel, FormControl, Grid, Avatar, Chip, Snackbar, Alert } from '@mui/material';
 import { getCurrentUser, updateUserProfile, sendPasswordResetEmailToUser, deleteUserAccount } from './services/api';
 import { auth, db, storage } from './firebaseConfig';
 import { updateProfile } from 'firebase/auth';
@@ -30,6 +30,7 @@ function EditProfile() {
   const [selectedImage, setSelectedImage] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
 
   useEffect(() => {
     fetchUserProfile();
@@ -58,7 +59,7 @@ function EditProfile() {
         }
       }
     } catch (err) {
-      console.error('Error fetching user profile:', err);
+      console.error("Error fetching user profile:", err);
       setError('Failed to fetch user profile');
     } finally {
       setLoading(false);
@@ -116,10 +117,10 @@ function EditProfile() {
         // Note: We're not updating 'teams' here as it should be managed elsewhere
       });
 
-      alert('Profile updated successfully');
+      setSnackbar({ open: true, message: 'Profile updated successfully', severity: 'success' });
     } catch (err) {
       console.error('Error updating profile:', err);
-      setError('Failed to update profile: ' + err.message);
+      setSnackbar({ open: true, message: 'Failed to update profile: ' + err.message, severity: 'error' });
     } finally {
       setLoading(false);
     }
@@ -128,10 +129,10 @@ function EditProfile() {
   const handlePasswordReset = async () => {
     try {
       await sendPasswordResetEmailToUser(profile.email);
-      alert('Password reset email sent. Please check your inbox.');
+      setSnackbar({ open: true, message: 'Password reset email sent. Please check your inbox.', severity: 'success' });
     } catch (err) {
       console.error('Error sending password reset email:', err);
-      setError('Failed to send password reset email');
+      setSnackbar({ open: true, message: 'Failed to send password reset email', severity: 'error' });
     }
   };
 
@@ -139,13 +140,20 @@ function EditProfile() {
     if (window.confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
       try {
         await deleteUserAccount();
-        alert('Your account has been deleted successfully.');
+        setSnackbar({ open: true, message: 'Your account has been deleted successfully.', severity: 'success' });
         // Redirect to login page or show a goodbye message
       } catch (err) {
         console.error('Error deleting account:', err);
-        setError('Failed to delete account. Please try again.');
+        setSnackbar({ open: true, message: 'Failed to delete account. Please try again.', severity: 'error' });
       }
     }
+  };
+
+  const handleCloseSnackbar = (event, reason) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+    setSnackbar({ ...snackbar, open: false });
   };
 
   if (loading) return <Typography>Loading...</Typography>;
@@ -237,8 +245,6 @@ function EditProfile() {
             )}
           </Box>
         </Grid>
-
-
       </Grid>
 
       <Box sx={{ marginTop: '2rem' }}>
@@ -273,6 +279,17 @@ function EditProfile() {
           Cancel
         </Button>
       </Box>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
