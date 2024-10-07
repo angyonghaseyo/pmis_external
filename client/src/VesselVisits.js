@@ -30,6 +30,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import { db } from "./firebaseConfig";
 import { getUserData } from './services/api';
 import { auth } from './firebaseConfig';
+import Papa from 'papaparse';
 import {
   doc,
   addDoc,
@@ -550,6 +551,21 @@ const VesselVisits = () => {
     }
   };
 
+  const parseCSVFile = (file) => {
+    return new Promise((resolve, reject) => {
+      Papa.parse(file, {
+        header: true, // Assumes the first row contains the column headers
+        skipEmptyLines: true,
+        complete: function (results) {
+          resolve(results.data); // results.data will be an array of objects
+        },
+        error: function (error) {
+          reject(error);
+        }
+      });
+    });
+  };
+
   const handleSubmit = async () => {
     if (!formData.vesselName) {
       alert("Please fill out the vessel name");
@@ -593,21 +609,21 @@ const VesselVisits = () => {
     }
     if (!formData.containersOffloaded) {
       alert(
-        "Please provide the number of containers that will be offloaded from the vesssel"
+        "Please provide the number of containers that will be offloaded from the vessel"
       );
       return;
     }
     if (!formData.containersOnloaded) {
       alert(
-        "Please provide the number of containers that will be onloaded to the vesssel"
+        "Please provide the number of containers that will be onloaded to the vessel"
       );
       return;
     }
-
+  
     // Simulate resource check
     const resourceCheck = await checkResources();
     console.log(resourceCheck);
-
+  
     // The dates are already stored in ISO format in formData
     const newVisit = {
       vesselName: formData.vesselName,
@@ -627,9 +643,9 @@ const VesselVisits = () => {
       containersOffloaded: formData.containersOffloaded,
       containersOnloaded: formData.containersOnloaded,
       facilityDemandCheckBoolean:
-        resourceCheck.facilitiesDemandCheckBooleanAndBerth.success,
+        resourceCheck.facilitiesDemandCheckBooleanAndBerth.success !== undefined ? false : false, 
       berthAssigned:
-        resourceCheck.facilitiesDemandCheckBooleanAndBerth.assignedBerth,
+        resourceCheck.facilitiesDemandCheckBooleanAndBerth.assignedBerth !== undefined ? "" : "",
       assetDemandCheckBoolean:
         resourceCheck.assetsDemandCheckBooleanAndQuantity.success,
       numberOfCranesNeeded:
@@ -645,8 +661,8 @@ const VesselVisits = () => {
       // status for UI purposes
       status:
         resourceCheck.manpowerDemandCheckBoolean &&
-          resourceCheck.assetsDemandCheckBooleanAndQuantity.success &&
-          resourceCheck.facilitiesDemandCheckBooleanAndBerth.success
+        resourceCheck.assetsDemandCheckBooleanAndQuantity.success &&
+        resourceCheck.facilitiesDemandCheckBooleanAndBerth.success
           ? "confirmed"
           : "pending user intervention",
       vesselGridCount:
@@ -657,35 +673,24 @@ const VesselVisits = () => {
         formData.vesselTierCount !== undefined ? formData.vesselTierCount : 0, // Provide default value for undefined
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      stowageplanURL: formData.stowageplanURL,
+      stowageplan: formData.stowageplan, // Store the parsed stowage plan array
     };
-    //denzel: facility demand check - checking booking time slots is wrong - no longer using 1 hour slots done
-    //denzel: facilitydemandcheck should always return true except if there is an error caused in the demand heck
-    //file uploading
+  
     try {
-      const storage = getStorage();
-      const storageRef = ref(
-        storage,
-        `stowage-plans/${formData.imoNumber}_stowageplan.csv`
-      );
-      // Upload the file
-      await uploadBytes(storageRef, selectedFile);
-      // Get the download URL after upload
-      newVisit.stowageplanURL = await getDownloadURL(storageRef);
-      setDownloadURL(newVisit.stowageplanURL);
-      console.log(
-        "File uploaded and renamed successfully:",
-        newVisit.stowageplanURL
-      );
+      // Parsing the CSV file and storing as an array of objects (instead of URL)
+      const parsedCSVData = await parseCSVFile(selectedFile);
+      newVisit.stowageplan = parsedCSVData;
+      console.log("Stowage plan data stored as an array:", parsedCSVData);
     } catch (error) {
-      setFileError("Missing stowage plan.");
-      console.error("Error updating stowage plan's URL to newVisit:", error);
+      setFileError("Error parsing the CSV file.");
+      console.error("Error parsing the CSV file:", error);
+      return; // Exit the function if CSV parsing fails
     }
-
+  
     try {
       const docRef = doc(db, "vesselVisitRequests", formData.imoNumber);
       await setDoc(docRef, newVisit);
-
+  
       if (editingId) {
         // Editing an existing record: update the corresponding entry in vesselVisitsData
         setVesselVisitsData((prev) =>
@@ -702,7 +707,7 @@ const VesselVisits = () => {
         ]);
       }
       handleCloseDialog();
-
+  
       console.log(
         "Vessel visit request saved successfully with ID:",
         formData.imoNumber
