@@ -903,9 +903,6 @@ const VesselVisits = () => {
         resourceCheck.manpowerDemandCheckBoolean.success &&
         resourceCheck.assetsDemandCheckBooleanAndQuantity.success &&
         resourceCheck.facilitiesDemandCheckBooleanAndBerth.success
-        resourceCheck.manpowerDemandCheckBoolean &&
-        resourceCheck.assetsDemandCheckBooleanAndQuantity.success &&
-        resourceCheck.facilitiesDemandCheckBooleanAndBerth.success
           ? "confirmed"
           : "pending user intervention",
       vesselGridCount:
