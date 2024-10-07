@@ -428,11 +428,18 @@ const VesselVisits = () => {
 
   const checkManpowerAvailability = async (vesselVisitRequest) => {
     try {
-      const { eta, etd, numberOfCranesNeeded, numberOfTrucksNeeded, numberOfReachStackersNeeded } =
-        vesselVisitRequest;
+      const {
+        eta,
+        etd,
+        numberOfCranesNeeded,
+        numberOfTrucksNeeded,
+        numberOfReachStackersNeeded,
+      } = vesselVisitRequest;
 
       console.log("Received vesselVisitRequest:", vesselVisitRequest);
-
+      let totalCranesAvailable = 0;
+      let totalTrucksAvailable = 0;
+      let totalReachStackersAvailable = 0;
       // The ETA and ETD are in UTC (from Date.toISOString())
       const etaDateUTC = new Date(eta.getTime() + 8 * 60 * 60 * 1000); // ETA in UTC
       const etdDateUTC = new Date(etd.getTime() + 8 * 60 * 60 * 1000); // ETD in UTC new Date(etaDateUTC.getTime() + 8 * 60 * 60 * 1000);
@@ -453,7 +460,6 @@ const VesselVisits = () => {
         { start: "00:00", end: "08:00", label: "08:00-16:00" },
         { start: "08:00", end: "16:00", label: "16:00-24:00" },
       ];
-
 
       console.log("Defined shifts in UTC:", shifts);
 
@@ -505,6 +511,22 @@ const VesselVisits = () => {
           (qs) => qs.shift === schedule.timePeriod
         ); // Manually check timePeriod
 
+        // Step 4: Loop through the assignedUsers map
+        if (schedule.assignedUsers) {
+          // Convert the map into an array and iterate through it
+          Object.values(schedule.assignedUsers).forEach((user) => {
+            if (user.role === "Crane Operator") {
+              totalCranesAvailable += 1;
+            }
+            if (user.role === "Truck Operator") {
+              totalTrucksAvailable += 1;
+            }
+            if (user.role === "Reach Stacker Operator") {
+              totalReachStackersAvailable += 1;
+            }
+          });
+        }
+
         return endDateCheck && timePeriodCheck; // Return true if both conditions are satisfied
       });
 
@@ -523,36 +545,41 @@ const VesselVisits = () => {
       }
       //End
       // Initialize counters for required roles (crane operators, truck operators)
-      let totalCranesAvailable = 10;
-      let totalTrucksAvailable = 10;
-      let totalReachStackersAvailable = 10;
 
+      // scheduleSnapshot.forEach((doc) => {
+      //   const scheduleData = doc.data();
+      //   console.log("Processing schedule data:", scheduleData);
+      // });
 
       console.log("Total Cranes Available:", totalCranesAvailable);
       console.log("Total Trucks Available:", totalTrucksAvailable);
-      console.log("Total Reach stackers Available:", totalReachStackersAvailable);
-
+      console.log(
+        "Total Reach stackers Available:",
+        totalReachStackersAvailable
+      );
 
       // Calculate missing workers for each role
       const missingCranes = numberOfCranesNeeded - totalCranesAvailable;
       const missingTrucks = numberOfTrucksNeeded - totalTrucksAvailable;
-      const missingReachStackers = numberOfReachStackersNeeded - totalReachStackersAvailable;
+      const missingReachStackers =
+        numberOfReachStackersNeeded - totalReachStackersAvailable;
 
       console.log("Missing Cranes:", missingCranes > 0 ? missingCranes : 0);
       console.log("Missing Trucks:", missingTrucks > 0 ? missingTrucks : 0);
-      console.log("Missing Trucks:", missingReachStackers > 0 ? missingReachStackers : 0);
-
+      console.log(
+        "Missing Trucks:",
+        missingReachStackers > 0 ? missingReachStackers : 0
+      );
 
       // Compare total available manpower with required manpower
       const cranesSufficient = totalCranesAvailable >= numberOfCranesNeeded;
       const trucksSufficient = totalTrucksAvailable >= numberOfTrucksNeeded;
-      const reachStackersSufficient = totalReachStackersAvailable >= numberOfReachStackersNeeded;
-
+      const reachStackersSufficient =
+        totalReachStackersAvailable >= numberOfReachStackersNeeded;
 
       console.log("Cranes Sufficient:", cranesSufficient);
       console.log("Trucks Sufficient:", trucksSufficient);
       console.log("Trucks Sufficient:", reachStackersSufficient);
-
 
       // Return true if sufficient manpower is found, false otherwise with missing details
       if (cranesSufficient && trucksSufficient && reachStackersSufficient) {
@@ -570,7 +597,10 @@ const VesselVisits = () => {
           missingRoles.push({ role: "Truck Operator", missing: missingTrucks });
         }
         if (missingTrucks > 0) {
-          missingRoles.push({ role: "Reach Stacker Operator", missing: missingReachStackers });
+          missingRoles.push({
+            role: "Reach Stacker Operator",
+            missing: missingReachStackers,
+          });
         }
 
         console.log(
