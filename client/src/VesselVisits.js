@@ -914,6 +914,7 @@ const VesselVisits = () => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       stowageplan: formData.stowageplan, // Store the parsed stowage plan array
+      visitType: formData.visitType,
     };
   
     try {
