@@ -79,14 +79,9 @@ const CompanyInfo = () => {
 
   const hasRole = (requiredRoles) => {
     if (!userProfile || !Array.isArray(userProfile.accessRights)) return false;
-
-    // Check if the user has any of the required roles
     const hasRequiredRole = requiredRoles.some(role => userProfile.accessRights.includes(role));
-
-    // Return true if the user has a required role or is an Admin
     return hasRequiredRole || userProfile.role === 'Admin';
   };
-
 
   useEffect(() => {
     const fetchData = async () => {
@@ -103,7 +98,6 @@ const CompanyInfo = () => {
           fetchCompanyData(),
           fetchUserProfile(auth.currentUser.uid)
         ]);
-
       } catch (error) {
         console.error('Error fetching data:', error);
         setError('An error occurred while fetching data. Please try again.');
@@ -152,7 +146,7 @@ const CompanyInfo = () => {
         updatedData.logoUrl = companyData.logoUrl;
       }
 
-      const requiredFields = ['country', 'city', 'address', 'zipCode'];
+      const requiredFields = ['country', 'state', 'city', 'area', 'address', 'zipCode'];
       const missingFields = requiredFields.filter(field => !updatedData[field]);
       if (missingFields.length > 0) {
         throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
@@ -251,6 +245,9 @@ const CompanyInfo = () => {
                 readOnly: !isEditable,
                 style: { color: isEditable ? 'inherit' : 'grey' }
               }}
+              required={['country', 'state', 'city', 'area', 'address', 'zipCode'].includes(field)}
+              error={isEditable && !companyData[field]}
+              helperText={isEditable && !companyData[field] ? 'This field is required' : ''}
             />
           </Grid>
         ))}
