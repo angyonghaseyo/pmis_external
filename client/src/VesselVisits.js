@@ -28,8 +28,8 @@ import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { db } from "./firebaseConfig";
-import { getUserData } from './services/api';
-import { auth } from './firebaseConfig';
+import { getUserData } from "./services/api";
+import { auth } from "./firebaseConfig";
 import { CircularProgress } from "@mui/material";
 import {
   doc,
@@ -109,10 +109,10 @@ const VesselVisits = () => {
       try {
         await Promise.all([
           fetchVesselVisits(),
-          fetchUserProfile(auth.currentUser.uid)
+          fetchUserProfile(auth.currentUser.uid),
         ]);
       } catch (error) {
-        console.error('Error fetching data:', error);
+        console.error("Error fetching data:", error);
         // Optionally set an error state here
       } finally {
         setIsLoading(false);
@@ -191,8 +191,8 @@ const VesselVisits = () => {
       if (isAssetAvailable(crane, eta, etd)) {
         console.log(
           "Crane with id " +
-          crane.name +
-          " is available time-wise and is being demand checked"
+            crane.name +
+            " is available time-wise and is being demand checked"
         );
         craneCapacityPerHour += crane.containersPerHour;
         craneCount += 1;
@@ -226,8 +226,8 @@ const VesselVisits = () => {
     for (const truck of trucks) {
       console.log(
         "Truck with id" +
-        truck.name +
-        "is available and is being demand checked"
+          truck.name +
+          "is available and is being demand checked"
       );
       if (isAssetAvailable(truck, eta, etd)) {
         truckCapacityPerHour += truck.containersPerHour;
@@ -272,7 +272,7 @@ const VesselVisits = () => {
         ) {
           console.log(
             "there is enough reach stackers with a quantity of " +
-            requiredReachStackers
+              requiredReachStackers
           );
           reachStackerPass = true;
           break;
@@ -309,7 +309,8 @@ const VesselVisits = () => {
 
     // Helper function to check if assets are available during a time range
     function isBerthAvailable(facility, eta, etd) {
-      for (const period of facility.bookedPeriod) {
+      // Iterate over the bookedPeriod map
+      for (const [key, period] of Object.entries(facility.bookedPeriod)) {
         const [bookedEta, bookedEtd] = period;
         // If the asset's booked period overlaps with the requested period, it's unavailable
         if (
@@ -318,9 +319,17 @@ const VesselVisits = () => {
             new Date(eta) >= new Date(bookedEtd)
           )
         ) {
+          console.log(
+            "Berth " +
+              facility.name +
+              "is not available because it has been reserved"
+          );
           return false;
         }
       }
+      console.log(
+        "Berth " + facility.name + "is Available, isBerthAvailable has passed"
+      );
       return true;
     }
 
@@ -339,7 +348,13 @@ const VesselVisits = () => {
           draft <= berth.depthCapacity &&
           cargoType === berth.cargoType
         ) {
-          matchedBerths.push(berth.name); // Store the matched berth name
+          matchedBerths.push(berth); // Store the matched berth name
+          console.log(
+            "based on requirements, berth" +
+              berth.name +
+              "is added to matchedBerths"
+          );
+          console.log("This is matchedBerths" + matchedBerths);
         }
       });
 
@@ -354,6 +369,7 @@ const VesselVisits = () => {
       console.log("The end date is " + endDate);
       console.log("The eta is " + eta);
       console.log("The etd is " + etd);
+      console.log("denzel");
 
       // Step 2: Loop through each matched berth and check whether it is available during the required hours
       for (const berth of matchedBerths) {
@@ -387,7 +403,7 @@ const VesselVisits = () => {
         let assignedBerth = matchedBerths.pop();
         console.log(
           "The berth that has been assigned to the vessel is" +
-          assignedBerth.name
+            assignedBerth.name
         );
         return { success: true, assignedBerth: assignedBerth };
       }
@@ -466,7 +482,7 @@ const VesselVisits = () => {
         vesselBayCount: visit.vesselBayCount,
         vesselTierCount: visit.vesselTierCount,
         stowageplanURL: visit.stowageplanURL,
-        visitType: type
+        visitType: type,
       });
       setEditingId("Edit"); //  setEditingId(visit.id); Denzel
     } else {
@@ -492,7 +508,7 @@ const VesselVisits = () => {
         vesselBayCount: 0,
         vesselTierCount: 0,
         stowageplanURL: "",
-        visitType: type
+        visitType: type,
       });
     }
     setOpenDialog(true);
@@ -663,8 +679,8 @@ const VesselVisits = () => {
       // status for UI purposes
       status:
         resourceCheck.manpowerDemandCheckBoolean &&
-          resourceCheck.assetsDemandCheckBooleanAndQuantity.success &&
-          resourceCheck.facilitiesDemandCheckBooleanAndBerth.success
+        resourceCheck.assetsDemandCheckBooleanAndQuantity.success &&
+        resourceCheck.facilitiesDemandCheckBooleanAndBerth.success
           ? "confirmed"
           : "pending user intervention",
       vesselGridCount:
@@ -676,7 +692,7 @@ const VesselVisits = () => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       stowageplanURL: formData.stowageplanURL,
-      visitType: formData.visitType
+      visitType: formData.visitType,
     };
     //denzel: facility demand check - checking booking time slots is wrong - no longer using 1 hour slots done
     //denzel: facilitydemandcheck should always return true except if there is an error caused in the demand heck
@@ -764,8 +780,8 @@ const VesselVisits = () => {
       const profileData = await getUserData(userId);
       setUserProfile(profileData);
     } catch (error) {
-      console.error('Error fetching user profile:', error);
-      setError('Failed to fetch user profile. Please try again later.');
+      console.error("Error fetching user profile:", error);
+      setError("Failed to fetch user profile. Please try again later.");
     }
   };
 
@@ -773,21 +789,30 @@ const VesselVisits = () => {
     if (!userProfile || !Array.isArray(userProfile.accessRights)) return false;
 
     // Check if the user has any of the required roles
-    const hasRequiredRole = requiredRoles.some(role => userProfile.accessRights.includes(role));
+    const hasRequiredRole = requiredRoles.some((role) =>
+      userProfile.accessRights.includes(role)
+    );
 
     // Return true if the user has a required role or is an Admin
-    return hasRequiredRole || userProfile.role === 'Admin';
+    return hasRequiredRole || userProfile.role === "Admin";
   };
-
 
   if (isLoading) {
     return (
-      <Container maxWidth="lg" sx={{ mt: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+      <Container
+        maxWidth="lg"
+        sx={{
+          mt: 4,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "80vh",
+        }}
+      >
         <CircularProgress />
       </Container>
     );
   }
-
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4 }}>
@@ -800,12 +825,12 @@ const VesselVisits = () => {
         <Typography variant="h4" component="h1">
           Vessel Visits
         </Typography>
-        {hasRole(['Create Vessel Visit Request']) && (
+        {hasRole(["Create Vessel Visit Request"]) && (
           <Box>
             <Button
               variant="contained"
               color="primary"
-              onClick={() => handleOpenDialog('Scheduled')}
+              onClick={() => handleOpenDialog("Scheduled")}
               sx={{ mr: 2 }}
             >
               Scheduled Vessel Visit
@@ -813,7 +838,7 @@ const VesselVisits = () => {
             <Button
               variant="contained"
               color="primary"
-              onClick={() => handleOpenDialog('Ad-Hoc')}
+              onClick={() => handleOpenDialog("Ad-Hoc")}
             >
               Ad Hoc Vessel Visit
             </Button>
@@ -841,9 +866,10 @@ const VesselVisits = () => {
                 <TableCell>ETD</TableCell>
                 <TableCell>Containers Offloaded</TableCell>
                 <TableCell>Containers Onloaded</TableCell>
-                {hasRole(["Edit Vessel Visit Requests", "Delete Vessel Visit Requests"]) && (
-                  <TableCell>Actions</TableCell>
-                )}
+                {hasRole([
+                  "Edit Vessel Visit Requests",
+                  "Delete Vessel Visit Requests",
+                ]) && <TableCell>Actions</TableCell>}
               </TableRow>
             </TableHead>
             <TableBody>
@@ -857,12 +883,18 @@ const VesselVisits = () => {
                   <TableCell>{visit.containersOnloaded}</TableCell>
                   <TableCell>
                     {hasRole(["Edit Vessel Visit Requests"]) && (
-                      <IconButton onClick={() => handleOpenDialog(visit.visitType, visit)} color="primary">
+                      <IconButton
+                        onClick={() => handleOpenDialog(visit.visitType, visit)}
+                        color="primary"
+                      >
                         <EditIcon />
                       </IconButton>
                     )}
                     {hasRole(["Delete Vessel Visit Requests"]) && (
-                      <IconButton onClick={() => handleDelete(visit.id)} color="secondary">
+                      <IconButton
+                        onClick={() => handleDelete(visit.id)}
+                        color="secondary"
+                      >
                         <DeleteIcon />
                       </IconButton>
                     )}
@@ -895,12 +927,12 @@ const VesselVisits = () => {
                 onChange={handleChange}
                 fullWidth
                 required
-              // disabled={!!formData.vesselName}
-              // helperText={
-              //   formData.vesselName
-              //     ? "This field cannot be edited after it is set"
-              //     : ""
-              // }
+                // disabled={!!formData.vesselName}
+                // helperText={
+                //   formData.vesselName
+                //     ? "This field cannot be edited after it is set"
+                //     : ""
+                // }
               />
             </Grid>
             <Grid item xs={6}>
@@ -912,12 +944,12 @@ const VesselVisits = () => {
                 onChange={handleChange}
                 fullWidth
                 required
-              // disabled={!!formData.imoNumber}
-              // helperText={
-              //   formData.imoNumber
-              //     ? "This field cannot be edited after it is set"
-              //     : ""
-              // }
+                // disabled={!!formData.imoNumber}
+                // helperText={
+                //   formData.imoNumber
+                //     ? "This field cannot be edited after it is set"
+                //     : ""
+                // }
               />
             </Grid>
             <Grid item xs={6}>
@@ -1187,4 +1219,3 @@ const VesselVisits = () => {
 };
 
 export default VesselVisits;
-
