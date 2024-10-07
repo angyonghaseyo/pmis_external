@@ -897,10 +897,10 @@ const VesselVisits = () => {
       loa: formData.loa,
       draft: formData.draft,
       eta: resourceCheck.facilitiesDemandCheckBooleanAndBerth.success
-        ? resourceCheck.facilitiesDemandCheckBooleanAndBerth.adjustedEta.toISOString()
+        ? resourceCheck.facilitiesDemandCheckBooleanAndBerth.adjustedEta
         : formData.eta.toISOString(),
       etd: resourceCheck.facilitiesDemandCheckBooleanAndBerth.success
-        ? resourceCheck.facilitiesDemandCheckBooleanAndBerth.adjustedEtd.toISOString()
+        ? resourceCheck.facilitiesDemandCheckBooleanAndBerth.adjustedEtd
         : formData.etd.toISOString(),
       cargoType: formData.cargoType,
       cargoVolume: formData.cargoVolume,
