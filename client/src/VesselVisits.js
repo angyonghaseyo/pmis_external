@@ -324,6 +324,12 @@ const VesselVisits = () => {
               facility.name +
               "is not available because it has been reserved"
           );
+          console.log(`Berth ${facility.name} has the following booked periods:`);
+  
+          // Iterate over the bookedPeriod map
+          for (const [key, period] of Object.entries(facility.bookedPeriod)) {
+            console.log(`Period key: ${key}, ETA: ${period[0]}, ETD: ${period[1]}`);
+          }
           return false;
         }
       }
@@ -383,6 +389,9 @@ const VesselVisits = () => {
           console.log(
             `Berth ${berth} is NOT available for the entire time range and is removed from matchedBerths array.`
           );
+          console.log(
+            `Berth ${berth} is NOT available for the entire time range and is removed from matchedBerths array.`
+          );
         }
       }
       // If no berth is fully available for the entire time range, find a berth with an availability that closest matches the eta of the vessel
@@ -398,14 +407,14 @@ const VesselVisits = () => {
         // Update eta and etd in vesselVisitRequest
         vesselVisitRequest.eta = etaDate.toISOString();
         vesselVisitRequest.etd = etdDate.toISOString();
-        return checkFacilityAvailability(vesselVisitRequest);
+        return { success: false, assignedBerth: "" }; // DENZEL NO WRONG
       } else {
         let assignedBerth = matchedBerths.pop();
         console.log(
           "The berth that has been assigned to the vessel is" +
             assignedBerth.name
         );
-        return { success: true, assignedBerth: assignedBerth };
+        return { success: true, assignedBerth: assignedBerth.name };
       }
     } catch (error) {
       console.error("Error checking facility availability:", error);
@@ -860,12 +869,14 @@ const VesselVisits = () => {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>ID</TableCell>
+                <TableCell>IMO Number</TableCell>
                 <TableCell>Vessel Name</TableCell>
-                <TableCell>ETA</TableCell>
-                <TableCell>ETD</TableCell>
+                <TableCell>ETA (Local Time) </TableCell>
+                <TableCell>ETD (Local Time) </TableCell>
                 <TableCell>Containers Offloaded</TableCell>
                 <TableCell>Containers Onloaded</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Assigned Berth</TableCell>
                 {hasRole([
                   "Edit Vessel Visit Requests",
                   "Delete Vessel Visit Requests",
@@ -877,10 +888,35 @@ const VesselVisits = () => {
                 <TableRow key={visit.documentId}>
                   <TableCell>{visit.documentId}</TableCell>
                   <TableCell>{visit.vesselName}</TableCell>
-                  <TableCell>{visit.eta}</TableCell> {/* ISO string */}
-                  <TableCell>{visit.etd}</TableCell> {/* ISO string */}
+                  <TableCell>
+                    {visit.eta
+                      ? new Date(visit.eta).toLocaleString("en-SG", {
+                          hour12: true,
+                          year: "numeric",
+                          month: "2-digit",
+                          day: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : "No Date"}
+                  </TableCell>
+                  <TableCell>
+                    {visit.etd
+                      ? new Date(visit.etd).toLocaleString("en-SG", {
+                          hour12: true,
+                          year: "numeric",
+                          month: "2-digit",
+                          day: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : "No Date"}
+                  </TableCell>{" "}
+                  {/* ISO string */}
                   <TableCell>{visit.containersOffloaded}</TableCell>
                   <TableCell>{visit.containersOnloaded}</TableCell>
+                  <TableCell>{visit.status}</TableCell>
+                  <TableCell>{visit.berthAssigned}</TableCell>
                   <TableCell>
                     {hasRole(["Edit Vessel Visit Requests"]) && (
                       <IconButton
