@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth, db } from './firebaseConfig';
@@ -21,15 +21,28 @@ import OperatorRequisition from './OperatorRequisition';
 import VesselVisits from './VesselVisits';
 import { Box, CssBaseline, CircularProgress } from '@mui/material';
 import { simulateBerthTestData } from './SimulateBerthTestData'; 
-import {simulateManpowerTestData} from './SimulateManpowerTestData';
-import {simulateAssetTestData} from './SimulateAssetTestData';
-
+import { simulateManpowerTestData } from './SimulateManpowerTestData';
+import { simulateAssetTestData } from './SimulateAssetTestData';
 
 const drawerWidth = 240;
 
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const runSimulations = useCallback(async () => {
+    try {
+      console.log("Starting simulations...");
+      await simulateBerthTestData();
+      console.log("Berth simulation completed");
+      await simulateManpowerTestData();
+      console.log("Manpower simulation completed");
+      await simulateAssetTestData();
+      console.log("Asset simulation completed");
+    } catch (error) {
+      console.error("Error running simulations:", error);
+    }
+  }, []);
 
   useEffect(() => {
     const fetchUserData = async (currentUser) => {
@@ -45,6 +58,9 @@ function App() {
             ...userData,
             accessRights: userData.accessRights || []
           });
+          
+          // Run simulations after user data is fetched
+          await runSimulations();
         } else {
           console.log("No user profile found in 'users' collection, signing out");
           await signOut(auth);
@@ -68,16 +84,8 @@ function App() {
       }
     });
 
-    simulateBerthTestData();
-    console.log("A");
-    simulateManpowerTestData();
-    console.log("B");
-    simulateAssetTestData();
-    console.log("C");
-
-
     return () => unsubscribe();
-  }, []);
+  }, [runSimulations]);
 
   const hasAccessRights = (requiredRights) => {
     console.log('User access rights:', user?.accessRights);
@@ -114,7 +122,6 @@ function App() {
         >
           <Routes>
             {user ? (
-
               <>
                 <Route path="/" element={<UserWorkspace user={user} />} />
                 {hasAccessRights(['View Inquiries and Feedbacks', 'Create Inquiries and Feedback']) && (
@@ -147,7 +154,6 @@ function App() {
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="*" element={<Navigate to="/login" />} />
               </>
-
             )}
           </Routes>
         </Box>
