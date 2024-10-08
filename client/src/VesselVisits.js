@@ -692,6 +692,11 @@ const VesselVisits = () => {
 
   const handleOpenDialog = (type, visit = null) => {
     setVisitType(type);
+    setSelectedFile(null); 
+    setFileError(""); 
+    if (fileInputRef.current) {
+      fileInputRef.current.value = null; // Reset file input
+    }
     if (visit) {
       setFormData({
         vesselName: visit.vesselName,
