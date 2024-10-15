@@ -21,13 +21,16 @@ import {
   Grid,
   IconButton,
   FormControlLabel,
-  Switch
+  Switch,
+  MenuItem
 } from '@mui/material';
 import { Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { getCargoManifests, submitCargoManifest, updateCargoManifest, deleteCargoManifest } from './services/api';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from './firebaseConfig';
 
 const CargoManifest = () => {
   const [manifests, setManifests] = useState([]);
@@ -36,6 +39,7 @@ const CargoManifest = () => {
   const [openDialog, setOpenDialog] = useState(false);
   const [currentManifest, setCurrentManifest] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+  const [vesselVisits, setVesselVisits] = useState([]);
   const [formData, setFormData] = useState({
     vesselName: '',
     imoNumber: '',
@@ -54,6 +58,7 @@ const CargoManifest = () => {
 
   useEffect(() => {
     fetchManifests();
+    fetchVesselVisits();
   }, []);
 
   const fetchManifests = async () => {
@@ -68,6 +73,21 @@ const CargoManifest = () => {
     }
   };
 
+  const fetchVesselVisits = async () => {
+    try {
+      const vesselVisitsRef = collection(db, 'vesselVisitRequests');
+      const vesselVisitsSnapshot = await getDocs(vesselVisitsRef);
+      const vesselVisitsData = vesselVisitsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setVesselVisits(vesselVisitsData);
+    } catch (err) {
+      console.error('Error fetching vessel visits:', err);
+      setError('Failed to fetch vessel visits');
+    }
+  };
+
   const handleInputChange = (event) => {
     const { name, value, checked, type } = event.target;
     setFormData({ 
@@ -78,6 +98,24 @@ const CargoManifest = () => {
 
   const handleDateChange = (name) => (date) => {
     setFormData({ ...formData, [name]: date });
+  };
+
+  const handleImoNumberChange = (event) => {
+    const selectedImoNumber = event.target.value;
+    const selectedVessel = vesselVisits.find(visit => visit.imoNumber === selectedImoNumber);
+    
+    if (selectedVessel) {
+      setFormData({
+        ...formData,
+        imoNumber: selectedImoNumber,
+        vesselName: selectedVessel.vesselName,
+        departureDate: new Date(selectedVessel.etd),
+        arrivalDate: new Date(selectedVessel.eta),
+        containersOffloaded: selectedVessel.containersOffloaded,
+        containersOnloaded: selectedVessel.containersOnloaded,
+        cargoVolume: selectedVessel.cargoVolume || ''
+      });
+    }
   };
 
   const handleSubmit = async () => {
@@ -213,6 +251,23 @@ const CargoManifest = () => {
           <DialogTitle>{currentManifest ? 'Edit Cargo Manifest' : 'Submit Cargo Manifest'}</DialogTitle>
           <DialogContent>
             <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <TextField
+                  select
+                  name="imoNumber"
+                  label="IMO Number"
+                  fullWidth
+                  value={formData.imoNumber}
+                  onChange={handleImoNumberChange}
+                  margin="normal"
+                >
+                  {vesselVisits.map((visit) => (
+                    <MenuItem key={visit.imoNumber} value={visit.imoNumber}>
+                      {visit.imoNumber}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
                   name="vesselName"
@@ -221,16 +276,9 @@ const CargoManifest = () => {
                   value={formData.vesselName}
                   onChange={handleInputChange}
                   margin="normal"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  name="imoNumber"
-                  label="IMO Number"
-                  fullWidth
-                  value={formData.imoNumber}
-                  onChange={handleInputChange}
-                  margin="normal"
+                  InputProps={{
+                    readOnly: true,
+                  }}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -239,6 +287,7 @@ const CargoManifest = () => {
                   value={formData.departureDate}
                   onChange={handleDateChange('departureDate')}
                   renderInput={(params) => <TextField {...params} fullWidth margin="normal" />}
+                  readOnly
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -247,6 +296,7 @@ const CargoManifest = () => {
                   value={formData.arrivalDate}
                   onChange={handleDateChange('arrivalDate')}
                   renderInput={(params) => <TextField {...params} fullWidth margin="normal" />}
+                  readOnly
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -278,6 +328,9 @@ const CargoManifest = () => {
                   value={formData.containersOffloaded}
                   onChange={handleInputChange}
                   margin="normal"
+                  InputProps={{
+                    readOnly: true,
+                  }}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -289,6 +342,9 @@ const CargoManifest = () => {
                   value={formData.containersOnloaded}
                   onChange={handleInputChange}
                   margin="normal"
+                  InputProps={{
+                    readOnly: true,
+                  }}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -300,6 +356,9 @@ const CargoManifest = () => {
                   value={formData.cargoVolume}
                   onChange={handleInputChange}
                   margin="normal"
+                  InputProps={{
+                    readOnly: true,
+                  }}
                 />
               </Grid>
               <Grid item xs={12}>
