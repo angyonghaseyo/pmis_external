@@ -81,11 +81,17 @@ const CargoManifest = () => {
 
   const handleSubmit = async () => {
     try {
+      const submissionData = {
+        ...formData,
+        departureDate: formData.departureDate ? formData.departureDate.toISOString() : null,
+        arrivalDate: formData.arrivalDate ? formData.arrivalDate.toISOString() : null,
+      };
+
       if (currentManifest) {
-        await updateCargoManifest(currentManifest.id, formData);
+        await updateCargoManifest(currentManifest.id, submissionData);
         setSnackbar({ open: true, message: 'Cargo manifest updated successfully', severity: 'success' });
       } else {
-        await submitCargoManifest(formData);
+        await submitCargoManifest(submissionData);
         setSnackbar({ open: true, message: 'Cargo manifest submitted successfully', severity: 'success' });
       }
       setOpenDialog(false);
@@ -108,7 +114,11 @@ const CargoManifest = () => {
   const handleOpenDialog = (manifest = null) => {
     if (manifest) {
       setCurrentManifest(manifest);
-      setFormData(manifest);
+      setFormData({
+        ...manifest,
+        departureDate: manifest.departureDate ? new Date(manifest.departureDate) : null,
+        arrivalDate: manifest.arrivalDate ? new Date(manifest.arrivalDate) : null,
+      });
     } else {
       setCurrentManifest(null);
       setFormData({
@@ -130,7 +140,17 @@ const CargoManifest = () => {
   };
 
   const generateVoyageNumber = (manifest) => {
-    const datePart = manifest.departureDate ? new Date(manifest.departureDate).toISOString().split('T')[0].replace(/-/g, '') : 'YYYYMMDD';
+    let datePart = 'YYYYMMDD';
+    if (manifest.departureDate) {
+      try {
+        const date = new Date(manifest.departureDate);
+        if (!isNaN(date.getTime())) {
+          datePart = date.toISOString().split('T')[0].replace(/-/g, '');
+        }
+      } catch (error) {
+        console.error('Invalid date:', manifest.departureDate);
+      }
+    }
     return `${manifest.imoNumber}-${datePart}-${manifest.originPort.slice(0, 3).toUpperCase()}`;
   };
 
