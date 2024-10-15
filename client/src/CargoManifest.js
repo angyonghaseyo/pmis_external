@@ -282,6 +282,20 @@ const CargoManifest = () => {
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
+                <TextField
+                  name="cargoVolume"
+                  label="Cargo Volume (tons)"
+                  type="number"
+                  fullWidth
+                  value={formData.cargoVolume}
+                  onChange={handleInputChange}
+                  margin="normal"
+                  InputProps={{
+                    readOnly: true,
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
                 <DateTimePicker
                   label="Departure Date"
                   value={formData.departureDate}
@@ -297,26 +311,6 @@ const CargoManifest = () => {
                   onChange={handleDateChange('arrivalDate')}
                   renderInput={(params) => <TextField {...params} fullWidth margin="normal" />}
                   readOnly
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  name="originPort"
-                  label="Origin Port"
-                  fullWidth
-                  value={formData.originPort}
-                  onChange={handleInputChange}
-                  margin="normal"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  name="destinationPort"
-                  label="Destination Port"
-                  fullWidth
-                  value={formData.destinationPort}
-                  onChange={handleInputChange}
-                  margin="normal"
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -349,19 +343,25 @@ const CargoManifest = () => {
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
-                  name="cargoVolume"
-                  label="Cargo Volume (tons)"
-                  type="number"
+                  name="originPort"
+                  label="Origin Port"
                   fullWidth
-                  value={formData.cargoVolume}
+                  value={formData.originPort}
                   onChange={handleInputChange}
                   margin="normal"
-                  InputProps={{
-                    readOnly: true,
-                  }}
                 />
               </Grid>
-              <Grid item xs={12}>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  name="destinationPort"
+                  label="Destination Port"
+                  fullWidth
+                  value={formData.destinationPort}
+                  onChange={handleInputChange}
+                  margin="normal"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
                 <FormControlLabel
                   control={
                     <Switch
@@ -418,7 +418,7 @@ const CargoManifest = () => {
             <Button onClick={handleSubmit} variant="contained" color="primary">
               {currentManifest ? 'Update' : 'Submit'}
             </Button>
-          </DialogActions>
+            </DialogActions>
         </Dialog>
 
         <Snackbar
