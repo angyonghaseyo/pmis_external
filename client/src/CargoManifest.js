@@ -43,7 +43,8 @@ const CargoManifest = () => {
     arrivalDate: null,
     originPort: '',
     destinationPort: '',
-    totalContainers: '',
+    containersOffloaded: '',
+    containersOnloaded: '',
     cargoVolume: '',
     containsConsolidatedCargo: false,
     cargoSummary: '',
@@ -85,6 +86,9 @@ const CargoManifest = () => {
         ...formData,
         departureDate: formData.departureDate ? formData.departureDate.toISOString() : null,
         arrivalDate: formData.arrivalDate ? formData.arrivalDate.toISOString() : null,
+        containersOffloaded: Number(formData.containersOffloaded),
+        containersOnloaded: Number(formData.containersOnloaded),
+        cargoVolume: Number(formData.cargoVolume),
       };
 
       if (currentManifest) {
@@ -128,7 +132,8 @@ const CargoManifest = () => {
         arrivalDate: null,
         originPort: '',
         destinationPort: '',
-        totalContainers: '',
+        containersOffloaded: '',
+        containersOnloaded: '',
         cargoVolume: '',
         containsConsolidatedCargo: false,
         cargoSummary: '',
@@ -168,12 +173,12 @@ const CargoManifest = () => {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>Vessel Name</TableCell>
                 <TableCell>Voyage Number</TableCell>
                 <TableCell>Origin Port</TableCell>
                 <TableCell>Destination Port</TableCell>
                 <TableCell>Arrival Date</TableCell>
-                <TableCell>Total Containers</TableCell>
+                <TableCell>Containers Offloaded</TableCell>
+                <TableCell>Containers Onloaded</TableCell>
                 <TableCell>Cargo Volume (tons)</TableCell>
                 <TableCell>Consolidated Cargo</TableCell>
                 <TableCell>Actions</TableCell>
@@ -182,12 +187,12 @@ const CargoManifest = () => {
             <TableBody>
               {manifests.map((manifest) => (
                 <TableRow key={manifest.id}>
-                  <TableCell>{manifest.vesselName}</TableCell>
                   <TableCell>{generateVoyageNumber(manifest)}</TableCell>
                   <TableCell>{manifest.originPort}</TableCell>
                   <TableCell>{manifest.destinationPort}</TableCell>
                   <TableCell>{manifest.arrivalDate ? new Date(manifest.arrivalDate).toLocaleString() : 'N/A'}</TableCell>
-                  <TableCell>{manifest.totalContainers}</TableCell>
+                  <TableCell>{manifest.containersOffloaded}</TableCell>
+                  <TableCell>{manifest.containersOnloaded}</TableCell>
                   <TableCell>{manifest.cargoVolume}</TableCell>
                   <TableCell>{manifest.containsConsolidatedCargo ? 'Yes' : 'No'}</TableCell>
                   <TableCell>
@@ -266,11 +271,22 @@ const CargoManifest = () => {
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
-                  name="totalContainers"
-                  label="Total Containers"
+                  name="containersOffloaded"
+                  label="Containers Offloaded"
                   type="number"
                   fullWidth
-                  value={formData.totalContainers}
+                  value={formData.containersOffloaded}
+                  onChange={handleInputChange}
+                  margin="normal"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  name="containersOnloaded"
+                  label="Containers Onloaded"
+                  type="number"
+                  fullWidth
+                  value={formData.containersOnloaded}
                   onChange={handleInputChange}
                   margin="normal"
                 />
