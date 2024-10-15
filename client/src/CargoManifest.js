@@ -53,7 +53,8 @@ const CargoManifest = () => {
     containsConsolidatedCargo: false,
     cargoSummary: '',
     dangerousGoods: false,
-    specialInstructions: ''
+    specialInstructions: '',
+    status: 'Pending' // Initialize status as 'Pending'
   });
 
   useEffect(() => {
@@ -127,6 +128,7 @@ const CargoManifest = () => {
         containersOffloaded: Number(formData.containersOffloaded),
         containersOnloaded: Number(formData.containersOnloaded),
         cargoVolume: Number(formData.cargoVolume),
+        status: 'Pending' // Ensure status is set to 'Pending' for new submissions
       };
 
       if (currentManifest) {
@@ -176,7 +178,8 @@ const CargoManifest = () => {
         containsConsolidatedCargo: false,
         cargoSummary: '',
         dangerousGoods: false,
-        specialInstructions: ''
+        specialInstructions: '',
+        status: 'Pending' // Set status to 'Pending' for new manifests
       });
     }
     setOpenDialog(true);
@@ -218,7 +221,7 @@ const CargoManifest = () => {
                 <TableCell>Containers Offloaded</TableCell>
                 <TableCell>Containers Onloaded</TableCell>
                 <TableCell>Cargo Volume (tons)</TableCell>
-                <TableCell>Consolidated Cargo</TableCell>
+                <TableCell>Status</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -232,7 +235,7 @@ const CargoManifest = () => {
                   <TableCell>{manifest.containersOffloaded}</TableCell>
                   <TableCell>{manifest.containersOnloaded}</TableCell>
                   <TableCell>{manifest.cargoVolume}</TableCell>
-                  <TableCell>{manifest.containsConsolidatedCargo ? 'Yes' : 'No'}</TableCell>
+                  <TableCell>{manifest.status}</TableCell>
                   <TableCell>
                     <IconButton onClick={() => handleOpenDialog(manifest)} color="primary">
                       <EditIcon />
@@ -394,61 +397,73 @@ const CargoManifest = () => {
                   onChange={handleInputChange}
                   margin="normal"
                   InputLabelProps={{
-                    style: { color: 'black' },
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={formData.dangerousGoods}
-                      onChange={handleInputChange}
-                      name="dangerousGoods"
-                      color="primary"
-                    />
-                  }
-                  label="Contains Dangerous Goods"
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  name="specialInstructions"
-                  label="Special Instructions"
-                  fullWidth
-                  multiline
-                  rows={4}
-                  value={formData.specialInstructions}
-                  onChange={handleInputChange}
-                  margin="normal"
-                  InputLabelProps={{
-                    style: { color: 'black' },
-                  }}
-                />
-              </Grid>
+                    style: {color: 'black' },
+                }}
+              />
             </Grid>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
-            <Button onClick={handleSubmit} variant="contained" color="primary">
-              {currentManifest ? 'Update' : 'Submit'}
-            </Button>
-          </DialogActions>
-        </Dialog>
+            <Grid item xs={12}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={formData.dangerousGoods}
+                    onChange={handleInputChange}
+                    name="dangerousGoods"
+                    color="primary"
+                  />
+                }
+                label="Contains Dangerous Goods"
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                name="specialInstructions"
+                label="Special Instructions"
+                fullWidth
+                multiline
+                rows={4}
+                value={formData.specialInstructions}
+                onChange={handleInputChange}
+                margin="normal"
+                InputLabelProps={{
+                  style: { color: 'black' },
+                }}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                name="status"
+                label="Status"
+                fullWidth
+                value={formData.status}
+                margin="normal"
+                InputProps={{
+                  readOnly: true,
+                }}
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
+          <Button onClick={handleSubmit} variant="contained" color="primary">
+            {currentManifest ? 'Update' : 'Submit'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
-        <Snackbar
-          open={snackbar.open}
-          autoHideDuration={6000}
-          onClose={() => setSnackbar({ ...snackbar, open: false })}
-          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-        >
-          <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
-            {snackbar.message}
-          </Alert>
-        </Snackbar>
-      </Box>
-    </LocalizationProvider>
-  );
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </Box>
+  </LocalizationProvider>
+);
 };
 
 export default CargoManifest;
