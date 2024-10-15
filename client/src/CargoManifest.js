@@ -19,11 +19,9 @@ import {
   Snackbar,
   Alert,
   Grid,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  IconButton
+  IconButton,
+  FormControlLabel,
+  Switch
 } from '@mui/material';
 import { Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
@@ -41,29 +39,15 @@ const CargoManifest = () => {
   const [formData, setFormData] = useState({
     vesselName: '',
     imoNumber: '',
-    voyageNumber: '',
     departureDate: null,
+    arrivalDate: null,
     originPort: '',
     destinationPort: '',
-    eta: null,
-    etd: null,
-    containerNumber: '',
-    containerSize: '',
-    containerType: '',
-    sealNumber: '',
-    grossWeight: '',
-    netWeight: '',
-    cargoDescription: '',
-    packageCount: '',
-    packageType: '',
-    hsCode: '',
-    shipperName: '',
-    shipperAddress: '',
-    consigneeName: '',
-    consigneeAddress: '',
-    bookingNumber: '',
-    billOfLadingNumber: '',
-    customsStatus: '',
+    totalContainers: '',
+    cargoVolume: '',
+    containsConsolidatedCargo: false,
+    cargoSummary: '',
+    dangerousGoods: false,
     specialInstructions: ''
   });
 
@@ -84,8 +68,11 @@ const CargoManifest = () => {
   };
 
   const handleInputChange = (event) => {
-    const { name, value } = event.target;
-    setFormData({ ...formData, [name]: value });
+    const { name, value, checked, type } = event.target;
+    setFormData({ 
+      ...formData, 
+      [name]: type === 'checkbox' ? checked : value 
+    });
   };
 
   const handleDateChange = (name) => (date) => {
@@ -127,33 +114,24 @@ const CargoManifest = () => {
       setFormData({
         vesselName: '',
         imoNumber: '',
-        voyageNumber: '',
         departureDate: null,
+        arrivalDate: null,
         originPort: '',
         destinationPort: '',
-        eta: null,
-        etd: null,
-        containerNumber: '',
-        containerSize: '',
-        containerType: '',
-        sealNumber: '',
-        grossWeight: '',
-        netWeight: '',
-        cargoDescription: '',
-        packageCount: '',
-        packageType: '',
-        hsCode: '',
-        shipperName: '',
-        shipperAddress: '',
-        consigneeName: '',
-        consigneeAddress: '',
-        bookingNumber: '',
-        billOfLadingNumber: '',
-        customsStatus: '',
+        totalContainers: '',
+        cargoVolume: '',
+        containsConsolidatedCargo: false,
+        cargoSummary: '',
+        dangerousGoods: false,
         specialInstructions: ''
       });
     }
     setOpenDialog(true);
+  };
+
+  const generateVoyageNumber = (manifest) => {
+    const datePart = manifest.departureDate ? new Date(manifest.departureDate).toISOString().split('T')[0].replace(/-/g, '') : 'YYYYMMDD';
+    return `${manifest.imoNumber}-${datePart}-${manifest.originPort.slice(0, 3).toUpperCase()}`;
   };
 
   if (loading) return <CircularProgress />;
@@ -174,8 +152,10 @@ const CargoManifest = () => {
                 <TableCell>Voyage Number</TableCell>
                 <TableCell>Origin Port</TableCell>
                 <TableCell>Destination Port</TableCell>
-                <TableCell>ETA</TableCell>
-                <TableCell>Status</TableCell>
+                <TableCell>Arrival Date</TableCell>
+                <TableCell>Total Containers</TableCell>
+                <TableCell>Cargo Volume (tons)</TableCell>
+                <TableCell>Consolidated Cargo</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -183,11 +163,13 @@ const CargoManifest = () => {
               {manifests.map((manifest) => (
                 <TableRow key={manifest.id}>
                   <TableCell>{manifest.vesselName}</TableCell>
-                  <TableCell>{manifest.voyageNumber}</TableCell>
+                  <TableCell>{generateVoyageNumber(manifest)}</TableCell>
                   <TableCell>{manifest.originPort}</TableCell>
                   <TableCell>{manifest.destinationPort}</TableCell>
-                  <TableCell>{manifest.eta ? new Date(manifest.eta).toLocaleString() : 'N/A'}</TableCell>
-                  <TableCell>{manifest.customsStatus}</TableCell>
+                  <TableCell>{manifest.arrivalDate ? new Date(manifest.arrivalDate).toLocaleString() : 'N/A'}</TableCell>
+                  <TableCell>{manifest.totalContainers}</TableCell>
+                  <TableCell>{manifest.cargoVolume}</TableCell>
+                  <TableCell>{manifest.containsConsolidatedCargo ? 'Yes' : 'No'}</TableCell>
                   <TableCell>
                     <IconButton onClick={() => handleOpenDialog(manifest)} color="primary">
                       <EditIcon />
@@ -227,20 +209,18 @@ const CargoManifest = () => {
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
-                <TextField
-                  name="voyageNumber"
-                  label="Voyage Number"
-                  fullWidth
-                  value={formData.voyageNumber}
-                  onChange={handleInputChange}
-                  margin="normal"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
                 <DateTimePicker
                   label="Departure Date"
                   value={formData.departureDate}
                   onChange={handleDateChange('departureDate')}
+                  renderInput={(params) => <TextField {...params} fullWidth margin="normal" />}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <DateTimePicker
+                  label="Arrival Date"
+                  value={formData.arrivalDate}
+                  onChange={handleDateChange('arrivalDate')}
                   renderInput={(params) => <TextField {...params} fullWidth margin="normal" />}
                 />
               </Grid>
@@ -265,197 +245,64 @@ const CargoManifest = () => {
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
-                <DateTimePicker
-                  label="ETA"
-                  value={formData.eta}
-                  onChange={handleDateChange('eta')}
-                  renderInput={(params) => <TextField {...params} fullWidth margin="normal" />}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <DateTimePicker
-                  label="ETD"
-                  value={formData.etd}
-                  onChange={handleDateChange('etd')}
-                  renderInput={(params) => <TextField {...params} fullWidth margin="normal" />}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
                 <TextField
-                  name="containerNumber"
-                  label="Container Number"
+                  name="totalContainers"
+                  label="Total Containers"
+                  type="number"
                   fullWidth
-                  value={formData.containerNumber}
+                  value={formData.totalContainers}
                   onChange={handleInputChange}
                   margin="normal"
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
-                  name="containerSize"
-                  label="Container Size"
+                  name="cargoVolume"
+                  label="Cargo Volume (tons)"
+                  type="number"
                   fullWidth
-                  value={formData.containerSize}
-                  onChange={handleInputChange}
-                  margin="normal"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  name="containerType"
-                  label="Container Type"
-                  fullWidth
-                  value={formData.containerType}
-                  onChange={handleInputChange}
-                  margin="normal"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  name="sealNumber"
-                  label="Seal Number"
-                  fullWidth
-                  value={formData.sealNumber}
-                  onChange={handleInputChange}
-                  margin="normal"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  name="grossWeight"
-                  label="Gross Weight"
-                  fullWidth
-                  value={formData.grossWeight}
-                  onChange={handleInputChange}
-                  margin="normal"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  name="netWeight"
-                  label="Net Weight"
-                  fullWidth
-                  value={formData.netWeight}
+                  value={formData.cargoVolume}
                   onChange={handleInputChange}
                   margin="normal"
                 />
               </Grid>
               <Grid item xs={12}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={formData.containsConsolidatedCargo}
+                      onChange={handleInputChange}
+                      name="containsConsolidatedCargo"
+                      color="primary"
+                    />
+                  }
+                  label="Contains Consolidated Cargo"
+                />
+              </Grid>
+              <Grid item xs={12}>
                 <TextField
-                  name="cargoDescription"
-                  label="Cargo Description"
+                  name="cargoSummary"
+                  label="Cargo Summary"
                   fullWidth
                   multiline
                   rows={4}
-                  value={formData.cargoDescription}
+                  value={formData.cargoSummary}
                   onChange={handleInputChange}
                   margin="normal"
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  name="packageCount"
-                  label="Package Count"
-                  fullWidth
-                  value={formData.packageCount}
-                  onChange={handleInputChange}
-                  margin="normal"
+              <Grid item xs={12}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={formData.dangerousGoods}
+                      onChange={handleInputChange}
+                      name="dangerousGoods"
+                      color="primary"
+                    />
+                  }
+                  label="Contains Dangerous Goods"
                 />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  name="packageType"
-                  label="Package Type"
-                  fullWidth
-                  value={formData.packageType}
-                  onChange={handleInputChange}
-                  margin="normal"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  name="hsCode"
-                  label="HS Code"
-                  fullWidth
-                  value={formData.hsCode}
-                  onChange={handleInputChange}
-                  margin="normal"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  name="shipperName"
-                  label="Shipper Name"
-                  fullWidth
-                  value={formData.shipperName}
-                  onChange={handleInputChange}
-                  margin="normal"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  name="shipperAddress"
-                  label="Shipper Address"
-                  fullWidth
-                  value={formData.shipperAddress}
-                  onChange={handleInputChange}
-                  margin="normal"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  name="consigneeName"
-                  label="Consignee Name"
-                  fullWidth
-                  value={formData.consigneeName}
-                  onChange={handleInputChange}
-                  margin="normal"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  name="consigneeAddress"
-                  label="Consignee Address"
-                  fullWidth
-                  value={formData.consigneeAddress}
-                  onChange={handleInputChange}
-                  margin="normal"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  name="bookingNumber"
-                  label="Booking Number"
-                  fullWidth
-                  value={formData.bookingNumber}
-                  onChange={handleInputChange}
-                  margin="normal"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  name="billOfLadingNumber"
-                  label="Bill of Lading Number"
-                  fullWidth
-                  value={formData.billOfLadingNumber}
-                  onChange={handleInputChange}
-                  margin="normal"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth margin="normal">
-                  <InputLabel>Customs Status</InputLabel>
-                  <Select
-                    name="customsStatus"
-                    value={formData.customsStatus}
-                    onChange={handleInputChange}
-                    label="Customs Status"
-                  >
-                    <MenuItem value="Pending">Pending</MenuItem>
-                    <MenuItem value="Cleared">Cleared</MenuItem>
-                    <MenuItem value="Held">Held</MenuItem>
-                  </Select>
-                </FormControl>
               </Grid>
               <Grid item xs={12}>
                 <TextField
