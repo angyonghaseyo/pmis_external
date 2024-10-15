@@ -9,25 +9,25 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Paper,
+  IconButton,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   TextField,
+  MenuItem,
+  Paper,
   CircularProgress,
   Snackbar,
   Alert,
   Grid,
-  IconButton,
   FormControlLabel,
-  Switch,
-  MenuItem
+  Switch
 } from '@mui/material';
-import { Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
 import { getCargoManifests, submitCargoManifest, updateCargoManifest, deleteCargoManifest } from './services/api';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from './firebaseConfig';
@@ -260,6 +260,9 @@ const CargoManifest = () => {
                   value={formData.imoNumber}
                   onChange={handleImoNumberChange}
                   margin="normal"
+                  InputLabelProps={{
+                    style: { color: 'black' },
+                  }}
                 >
                   {vesselVisits.map((visit) => (
                     <MenuItem key={visit.imoNumber} value={visit.imoNumber}>
@@ -349,6 +352,9 @@ const CargoManifest = () => {
                   value={formData.originPort}
                   onChange={handleInputChange}
                   margin="normal"
+                  InputLabelProps={{
+                    style: { color: 'black' },
+                  }}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -359,6 +365,9 @@ const CargoManifest = () => {
                   value={formData.destinationPort}
                   onChange={handleInputChange}
                   margin="normal"
+                  InputLabelProps={{
+                    style: { color: 'black' },
+                  }}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -384,6 +393,9 @@ const CargoManifest = () => {
                   value={formData.cargoSummary}
                   onChange={handleInputChange}
                   margin="normal"
+                  InputLabelProps={{
+                    style: { color: 'black' },
+                  }}
                 />
               </Grid>
               <Grid item xs={12}>
@@ -409,6 +421,9 @@ const CargoManifest = () => {
                   value={formData.specialInstructions}
                   onChange={handleInputChange}
                   margin="normal"
+                  InputLabelProps={{
+                    style: { color: 'black' },
+                  }}
                 />
               </Grid>
             </Grid>
@@ -418,7 +433,7 @@ const CargoManifest = () => {
             <Button onClick={handleSubmit} variant="contained" color="primary">
               {currentManifest ? 'Update' : 'Submit'}
             </Button>
-            </DialogActions>
+          </DialogActions>
         </Dialog>
 
         <Snackbar
