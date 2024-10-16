@@ -19,6 +19,7 @@ import TrainingProgram from './TrainingProgram';
 import CompanyInfo from './CompanyInfo';
 import OperatorRequisition from './OperatorRequisition';
 import VesselVisits from './VesselVisits';
+import CargoManifest from './CargoManifest'; // Add this import
 import { Box, CssBaseline, CircularProgress } from '@mui/material';
 import { simulateBerthTestData } from './SimulateBerthTestData'; 
 import { simulateManpowerTestData } from './SimulateManpowerTestData';
@@ -143,6 +144,9 @@ function App() {
                 )}
                 {hasAccessRights(['View Vessel Visit Requests', 'Create Vessel Visit Request', 'Edit Vessel Visit Requests', 'Delete Vessel Visit Requests']) && (
                   <Route path="/vessels/vessel-visit-request" element={<VesselVisits user={user} />} />
+                )}
+                {hasAccessRights(['View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest']) && (
+                  <Route path="/cargos/cargo-manifest" element={<CargoManifest user={user} />} />
                 )}
                 <Route path="*" element={<Navigate to="/" replace />} />
               </>
