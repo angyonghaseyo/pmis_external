@@ -54,7 +54,13 @@ const CargoManifest = () => {
     cargoSummary: '',
     dangerousGoods: false,
     specialInstructions: '',
-    status: 'Pending' // Initialize status as 'Pending'
+    status: 'Pending'
+  });
+  const [formErrors, setFormErrors] = useState({
+    originPort: false,
+    destinationPort: false,
+    cargoSummary: false,
+    specialInstructions: false
   });
 
   useEffect(() => {
@@ -95,6 +101,10 @@ const CargoManifest = () => {
       ...formData, 
       [name]: type === 'checkbox' ? checked : value 
     });
+    setFormErrors({
+      ...formErrors,
+      [name]: false
+    });
   };
 
   const handleDateChange = (name) => (date) => {
@@ -119,7 +129,23 @@ const CargoManifest = () => {
     }
   };
 
+  const validateForm = () => {
+    const errors = {
+      originPort: !formData.originPort.trim(),
+      destinationPort: !formData.destinationPort.trim(),
+      cargoSummary: !formData.cargoSummary.trim(),
+      specialInstructions: !formData.specialInstructions.trim()
+    };
+    setFormErrors(errors);
+    return !Object.values(errors).some(error => error);
+  };
+
   const handleSubmit = async () => {
+    if (!validateForm()) {
+      setSnackbar({ open: true, message: 'Please fill in all required fields', severity: 'error' });
+      return;
+    }
+
     try {
       const submissionData = {
         ...formData,
@@ -128,7 +154,7 @@ const CargoManifest = () => {
         containersOffloaded: Number(formData.containersOffloaded),
         containersOnloaded: Number(formData.containersOnloaded),
         cargoVolume: Number(formData.cargoVolume),
-        status: 'Pending' // Ensure status is set to 'Pending' for new submissions
+        status: 'Pending'
       };
 
       if (currentManifest) {
@@ -179,7 +205,7 @@ const CargoManifest = () => {
         cargoSummary: '',
         dangerousGoods: false,
         specialInstructions: '',
-        status: 'Pending' // Set status to 'Pending' for new manifests
+        status: 'Pending'
       });
     }
     setOpenDialog(true);
@@ -352,9 +378,12 @@ const CargoManifest = () => {
                   name="originPort"
                   label="Origin Port"
                   fullWidth
+                  required
                   value={formData.originPort}
                   onChange={handleInputChange}
                   margin="normal"
+                  error={formErrors.originPort}
+                  helperText={formErrors.originPort ? 'Origin Port is required' : ''}
                   InputLabelProps={{
                     style: { color: 'black' },
                   }}
@@ -365,9 +394,12 @@ const CargoManifest = () => {
                   name="destinationPort"
                   label="Destination Port"
                   fullWidth
+                  required
                   value={formData.destinationPort}
                   onChange={handleInputChange}
                   margin="normal"
+                  error={formErrors.destinationPort}
+                  helperText={formErrors.destinationPort ? 'Destination Port is required' : ''}
                   InputLabelProps={{
                     style: { color: 'black' },
                   }}
@@ -393,77 +425,83 @@ const CargoManifest = () => {
                   fullWidth
                   multiline
                   rows={4}
+                  required
                   value={formData.cargoSummary}
                   onChange={handleInputChange}
                   margin="normal"
+                  error={formErrors.cargoSummary}
+                  helperText={formErrors.cargoSummary ? 'Cargo Summary is required' : ''}
                   InputLabelProps={{
                     style: {color: 'black' },
-                }}
-              />
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={formData.dangerousGoods}
+                      onChange={handleInputChange}
+                      name="dangerousGoods"
+                      color="primary"
+                    />
+                  }
+                  label="Contains Dangerous Goods"
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  name="specialInstructions"
+                  label="Special Instructions"
+                  fullWidth
+                  multiline
+                  rows={4}
+                  required
+                  value={formData.specialInstructions}
+                  onChange={handleInputChange}
+                  margin="normal"
+                  error={formErrors.specialInstructions}
+                  helperText={formErrors.specialInstructions ? 'Special Instructions are required' : ''}
+                  InputLabelProps={{
+                    style: { color: 'black' },
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  name="status"
+                  label="Status"
+                  fullWidth
+                  value={formData.status}
+                  margin="normal"
+                  InputProps={{
+                    readOnly: true,
+                  }}
+                />
+              </Grid>
             </Grid>
-            <Grid item xs={12}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={formData.dangerousGoods}
-                    onChange={handleInputChange}
-                    name="dangerousGoods"
-                    color="primary"
-                  />
-                }
-                label="Contains Dangerous Goods"
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                name="specialInstructions"
-                label="Special Instructions"
-                fullWidth
-                multiline
-                rows={4}
-                value={formData.specialInstructions}
-                onChange={handleInputChange}
-                margin="normal"
-                InputLabelProps={{
-                  style: { color: 'black' },
-                }}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                name="status"
-                label="Status"
-                fullWidth
-                value={formData.status}
-                margin="normal"
-                InputProps={{
-                  readOnly: true,
-                }}
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
-          <Button onClick={handleSubmit} variant="contained" color="primary">
-            {currentManifest ? 'Update' : 'Submit'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
+            <Button onClick={handleSubmit} variant="contained" color="primary">
+              {currentManifest ? 'Update' : 'Submit'}
+            </Button>
+          </DialogActions>
+        </Dialog>
 
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-      >
-        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </Box>
-  </LocalizationProvider>
-);
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={6000}
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        >
+          <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
+      </Box>
+    </LocalizationProvider>
+  );
 };
 
 export default CargoManifest;
