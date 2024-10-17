@@ -6,7 +6,7 @@ const serviceAccount = require('../config/serviceAccountKey.json');
 // Initialize Firebase Admin SDK
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  databaseURL: "https://your-project-id.firebaseio.com" // Replace with your Firebase project's database URL
+  databaseURL: "https://firestore.googleapis.com/v1/projects/pmis-47493/databases/(default)/documents"
 });
 
 // Initialize Firebase App for client SDK
