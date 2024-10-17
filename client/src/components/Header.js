@@ -1,168 +1,110 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { Box, AppBar, Toolbar, IconButton, Menu, MenuItem, Typography, Avatar, Button, Select, FormControl, CircularProgress } from '@mui/material';
-import { Notifications, Logout, Person, DirectionsBoat } from '@mui/icons-material';
+import { 
+  AppBar, 
+  Toolbar, 
+  Typography, 
+  Button, 
+  IconButton, 
+  Menu, 
+  MenuItem, 
+  Box,
+  Avatar,
+  Tooltip
+} from '@mui/material';
+import {
+  Menu as MenuIcon,
+  AccountCircle,
+  Notifications,
+  Settings,
+  Logout
+} from '@mui/icons-material';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
-
-function Header() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+function Header({ user, onLogout }) {
   const [anchorEl, setAnchorEl] = useState(null);
-  const [notificationAnchorEl, setNotificationAnchorEl] = useState(null);
-  const [language, setLanguage] = useState('EN');
   const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchUserProfile();
-  }, []);
-
-  const fetchUserProfile = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setLoading(false);
-        return;
-      }
-      const response = await axios.get(`${API_URL}/user/profile`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setUser(response.data);
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await axios.post(`${API_URL}/auth/logout`, {}, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      localStorage.removeItem('token');
-      navigate('/login');
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  };
-
-  const handleLanguageChange = (event) => {
-    setLanguage(event.target.value);
-  };
-
-  const handleProfileMenuClick = (event) => {
+  const handleMenu = (event) => {
     setAnchorEl(event.currentTarget);
   };
 
-  const handleProfileMenuClose = () => {
+  const handleClose = () => {
     setAnchorEl(null);
   };
 
-  const handleNotificationClick = (event) => {
-    setNotificationAnchorEl(event.currentTarget);
+  const handleLogout = () => {
+    onLogout();
+    handleClose();
+    navigate('/login');
   };
-
-  const handleNotificationClose = () => {
-    setNotificationAnchorEl(null);
-  };
-
-  if (loading) {
-    return (
-      <AppBar position="fixed" sx={{ backgroundColor: '#ffffff', boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)', zIndex: 1300 }}>
-        <Toolbar>
-          <CircularProgress />
-        </Toolbar>
-      </AppBar>
-    );
-  }
 
   return (
-    <AppBar position="fixed" sx={{ backgroundColor: '#ffffff', boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)', zIndex: 1300 }}>
-      <Toolbar sx={{ justifyContent: 'space-between' }}>
-        {/* Left Section - Boat Icon and Oceania PMIS */}
-        <Box display="flex" alignItems="center">
-          <DirectionsBoat sx={{ color: '#25316D', fontSize: 30, marginRight: 1 }} />
-          <Typography
-            variant="h6"
-            component={Link}
-            to="/"
-            sx={{ textDecoration: 'none', color: '#25316D', fontWeight: 'bold' }}
-          >
-            Oceania PMIS
-          </Typography>
-        </Box>
-
-        {/* Right Section - Language Select, Notifications, and User Profile/Login */}
-        <Box display="flex" alignItems="center">
-          <FormControl>
-            <Select
-              value={language}
-              onChange={handleLanguageChange}
-              sx={{ marginRight: 2 }}
-              displayEmpty
-              inputProps={{ 'aria-label': 'Language Select' }}
-            >
-              <MenuItem value="EN">EN</MenuItem>
-              <MenuItem value="FR">FR</MenuItem>
-              <MenuItem value="ES">ES</MenuItem>
-            </Select>
-          </FormControl>
-
-          {user ? (
-            <>
-              <IconButton onClick={handleNotificationClick} color="inherit" sx={{ marginRight: 2 }}>
-                <Notifications sx={{ color: '#25316D' }} />
+    <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+      <Toolbar>
+        <IconButton
+          size="large"
+          edge="start"
+          color="inherit"
+          aria-label="menu"
+          sx={{ mr: 2 }}
+        >
+          <MenuIcon />
+        </IconButton>
+        <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+          🚢 Oceania PMIS
+        </Typography>
+        {user ? (
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Tooltip title="Notifications">
+              <IconButton color="inherit">
+                <Notifications />
               </IconButton>
-
-              {/* Notification Menu */}
-              <Menu
-                anchorEl={notificationAnchorEl}
-                open={Boolean(notificationAnchorEl)}
-                onClose={handleNotificationClose}
-                keepMounted
+            </Tooltip>
+            <Tooltip title="Account settings">
+              <IconButton
+                size="large"
+                aria-label="account of current user"
+                aria-controls="menu-appbar"
+                aria-haspopup="true"
+                onClick={handleMenu}
+                color="inherit"
               >
-                <MenuItem onClick={handleNotificationClose}>No new notifications</MenuItem>
-              </Menu>
-
-              {/* User Avatar and Profile Menu */}
-              <IconButton onClick={handleProfileMenuClick} color="inherit">
                 {user.photoURL ? (
-                  <Avatar src={user.photoURL} />
+                  <Avatar alt={user.displayName} src={user.photoURL} />
                 ) : (
-                  <Avatar>
-                    <Person />
-                  </Avatar>
+                  <AccountCircle />
                 )}
               </IconButton>
-
-              <Menu
-                anchorEl={anchorEl}
-                open={Boolean(anchorEl)}
-                onClose={handleProfileMenuClose}
-                keepMounted
-              >
-                <MenuItem onClick={() => { navigate('/settings/profile'); handleProfileMenuClose(); }}>
-                  <Person sx={{ marginRight: 1 }} /> Edit Profile
-                </MenuItem>
-                <MenuItem onClick={() => { handleLogout(); handleProfileMenuClose(); }}>
-                  <Logout sx={{ marginRight: 1 }} /> Logout
-                </MenuItem>
-              </Menu>
-            </>
-          ) : (
-            <Button
-              variant="contained"
-              color="primary"
-              component={Link}
-              to="/login"
-              sx={{ textTransform: 'none' }}
+            </Tooltip>
+            <Menu
+              id="menu-appbar"
+              anchorEl={anchorEl}
+              anchorOrigin={{
+                vertical: 'top',
+                horizontal: 'right',
+              }}
+              keepMounted
+              transformOrigin={{
+                vertical: 'top',
+                horizontal: 'right',
+              }}
+              open={Boolean(anchorEl)}
+              onClose={handleClose}
             >
-              Login
-            </Button>
-          )}
-        </Box>
+              <MenuItem onClick={() => { handleClose(); navigate('/settings/profile'); }}>
+                <AccountCircle sx={{ mr: 1 }} /> Profile
+              </MenuItem>
+              <MenuItem onClick={() => { handleClose(); navigate('/settings'); }}>
+                <Settings sx={{ mr: 1 }} /> Settings
+              </MenuItem>
+              <MenuItem onClick={handleLogout}>
+                <Logout sx={{ mr: 1 }} /> Logout
+              </MenuItem>
+            </Menu>
+          </Box>
+        ) : (
+          <Button color="inherit" component={Link} to="/login">Login</Button>
+        )}
       </Toolbar>
     </AppBar>
   );

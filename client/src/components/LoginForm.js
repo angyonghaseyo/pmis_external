@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { 
     TextField, 
@@ -14,7 +14,7 @@ import {
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
-function LoginForm() {
+function LoginForm({ setUserAndToken }) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -25,15 +25,23 @@ function LoginForm() {
         e.preventDefault();
         setError('');
         setLoading(true);
+        console.log('Login form submitted');
 
         try {
+            console.log('Sending login request to:', `${API_URL}/auth/login`);
             const response = await axios.post(`${API_URL}/auth/login`, { email, password });
-            localStorage.setItem('token', response.data.token);
+            console.log('Login response:', response.data);
+            
+            setUserAndToken(response.data.user, response.data.token);
+            console.log('User state and token updated');
+            
+            setLoading(false);
+            console.log('Attempting to navigate to home page');
             navigate('/');
+            console.log('Navigation to home page completed');
         } catch (error) {
             console.error('Login error:', error.response ? error.response.data : error.message);
             setError(error.response ? error.response.data.error : 'An error occurred during login');
-        } finally {
             setLoading(false);
         }
     };
