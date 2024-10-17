@@ -31,7 +31,7 @@ import { db } from "./firebaseConfig";
 import { getUserData } from "./services/api";
 import { auth } from "./firebaseConfig";
 import { CircularProgress } from "@mui/material";
-import Papa from 'papaparse';
+import Papa from "papaparse";
 import {
   doc,
   addDoc,
@@ -318,25 +318,25 @@ const VesselVisits = () => {
     const etaAdjustedDate = new Date();
     const etdAdjustedDate = new Date();
 
-
-
     // Helper function to check if assets are available during a time range
     function isBerthAvailable(facility, eta, etd) {
-      for (const [key, period] of Object.entries(facility.bookedPeriod)) {
-        const [bookedEta, bookedEtd] = period;
-        // If the asset's booked period overlaps with the requested period, it's unavailable
-        if (
-          !(
-            new Date(etd) <= new Date(bookedEta) ||
-            new Date(eta) >= new Date(bookedEtd)
-          )
-        ) {
-          console.log(
-            "Berth " +
-              facility.name +
-              "is not available because it has been reserved"
-          );
-          return false;
+      try {
+        for (const [key, period] of Object.entries(facility.bookedPeriod)) {
+          const [bookedEta, bookedEtd] = period;
+          // If the asset's booked period overlaps with the requested period, it's unavailable
+          if (
+            !(
+              new Date(etd) <= new Date(bookedEta) ||
+              new Date(eta) >= new Date(bookedEtd)
+            )
+          ) {
+            console.log(
+              "Berth " +
+                facility.name +
+                "is not available because it has been reserved"
+            );
+            return false;
+          }
         }
         return true; // Available if no conflicts found
       } catch (error) {
@@ -713,8 +713,8 @@ const VesselVisits = () => {
 
   const handleOpenDialog = (type, visit = null) => {
     setVisitType(type);
-    setSelectedFile(null); 
-    setFileError(""); 
+    setSelectedFile(null);
+    setFileError("");
     if (fileInputRef.current) {
       fileInputRef.current.value = null; // Reset file input
     }
@@ -852,7 +852,7 @@ const VesselVisits = () => {
         },
         error: function (error) {
           reject(error);
-        }
+        },
       });
     });
   };
@@ -910,11 +910,11 @@ const VesselVisits = () => {
       );
       return;
     }
-  
+
     // Simulate resource check
     const resourceCheck = await checkResources();
     console.log(resourceCheck);
-  
+
     // The dates are already stored in ISO format in formData
     const newVisit = {
       vesselName: formData.vesselName,
@@ -938,9 +938,14 @@ const VesselVisits = () => {
       containersOffloaded: formData.containersOffloaded,
       containersOnloaded: formData.containersOnloaded,
       facilityDemandCheckBoolean:
-        resourceCheck.facilitiesDemandCheckBooleanAndBerth.success !== undefined ? false : false, 
+        resourceCheck.facilitiesDemandCheckBooleanAndBerth.success !== undefined
+          ? false
+          : false,
       berthAssigned:
-        resourceCheck.facilitiesDemandCheckBooleanAndBerth.assignedBerth !== undefined ? "" : "",
+        resourceCheck.facilitiesDemandCheckBooleanAndBerth.assignedBerth !==
+        undefined
+          ? ""
+          : "",
       assetDemandCheckBoolean:
         resourceCheck.assetsDemandCheckBooleanAndQuantity.success,
       numberOfCranesNeeded:
@@ -972,7 +977,7 @@ const VesselVisits = () => {
       stowageplan: formData.stowageplan, // Store the parsed stowage plan array
       visitType: formData.visitType,
     };
-  
+
     try {
       // Parsing the CSV file and storing as an array of objects (instead of URL)
       const parsedCSVData = await parseCSVFile(selectedFile);
@@ -986,7 +991,7 @@ const VesselVisits = () => {
     try {
       const docRef = doc(db, "vesselVisitRequests", formData.imoNumber);
       await setDoc(docRef, newVisit);
-  
+
       if (editingId) {
         // Editing an existing record: update the corresponding entry in vesselVisitsData
         setVesselVisitsData((prev) =>
@@ -1003,7 +1008,7 @@ const VesselVisits = () => {
         ]);
       }
       handleCloseDialog();
-  
+
       console.log(
         "Vessel visit request saved successfully with ID:",
         formData.imoNumber
