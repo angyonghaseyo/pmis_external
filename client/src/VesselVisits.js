@@ -153,24 +153,24 @@ const VesselVisits = () => {
     const totalAvailableHours = (etdDate - etaDate) / (1000 * 60 * 60); // Converts ms to hours
 
     // Query Firestore to get all cranes, trucks, and reach stackers
-    const assetsRef = collection(db, "denzel_assets");
+    const assetsRef = collection(db, "assets");
     const assetSnapshot = await getDocs(assetsRef);
     const assets = assetSnapshot.docs.map((doc) => doc.data());
 
     // Separate assets into categories (cranes, trucks, reach stackers)
     const cranes = assets.filter(
-      (asset) => asset.category === "Ship-to-shore cranes"
+      (asset) => asset.category === "Ship-to-Shore Cranes"
     );
     const trucks = assets.filter(
-      (asset) => asset.category === "Trucks and trailers"
+      (asset) => asset.category === "Trucks and Trailers"
     );
     const reachStackers = assets.filter(
-      (asset) => asset.category === "Reach stackers"
+      (asset) => asset.category === "Reach Stackers"
     );
 
     // Helper function to check if assets are available during a time range
     function isAssetAvailable(asset, eta, etd) {
-      for (const period of asset.bookedPeriod) {
+      for (const [key, period] of Object.entries(asset.bookedPeriod)) {
         const [bookedEta, bookedEtd] = period;
         // If the asset's booked period overlaps with the requested period, it's unavailable
         if (
@@ -179,6 +179,11 @@ const VesselVisits = () => {
             new Date(eta) >= new Date(bookedEtd)
           )
         ) {
+          console.log(
+            "Berth " +
+              asset.name +
+              "is not available because it has been reserved"
+          );
           return false;
         }
       }
@@ -195,7 +200,7 @@ const VesselVisits = () => {
             crane.name +
             " is available time-wise and is being demand checked"
         );
-        craneCapacityPerHour += crane.containersPerHour;
+        craneCapacityPerHour += crane.numberOfContainers;
         craneCount += 1;
         requiredCranes += 1; // Add to required cranes
         const requiredHoursForCranes = totalContainers / craneCapacityPerHour;
@@ -231,7 +236,7 @@ const VesselVisits = () => {
           "is available and is being demand checked"
       );
       if (isAssetAvailable(truck, eta, etd)) {
-        truckCapacityPerHour += truck.containersPerHour;
+        truckCapacityPerHour += truck.numberOfContainers;
         truckCount += 1;
         requiredTrucks += 1; // Add to required trucks
         const requiredHoursForTrucks = totalContainers / truckCapacityPerHour;
@@ -256,7 +261,7 @@ const VesselVisits = () => {
     let stackerCount = 0;
     for (const stacker of reachStackers) {
       if (isAssetAvailable(stacker, eta, etd)) {
-        stackerCapacityPerHour += stacker.containersPerHour;
+        stackerCapacityPerHour += stacker.numberOfContainers;
         stackerCount += 1;
         requiredReachStackers += 1; // Add to required reach stackers
         const requiredHoursForReachStackers =
@@ -410,7 +415,7 @@ const VesselVisits = () => {
           "The berth that has been assigned to the vessel is " +
             assignedBerth.name
         );
-        //I need to update the assignedBerth's bookedPeriod map Denzel rectangle
+        //I need to update the assignedBerth's bookedPeriod map. key: vessel's IMO number value: [eta, etd]
         assignedBerth.bookedPeriod[formData.imoNumber] = [eta.toISOString(),etd.toISOString()];
         //Next I need to setDoc
         const toBeUpdatedDocRef = doc(
@@ -1148,7 +1153,7 @@ const VesselVisits = () => {
                           hour: "2-digit",
                           minute: "2-digit",
                         })
-                      : "No Date"}
+                      : "Invalid Date"}
                   </TableCell>
                   <TableCell>
                     {visit.etd
@@ -1160,7 +1165,7 @@ const VesselVisits = () => {
                           hour: "2-digit",
                           minute: "2-digit",
                         })
-                      : "No Date"}
+                      : "Invalid Date"}
                   </TableCell>{" "}
                   {/* ISO string */}
                   <TableCell>{visit.containersOffloaded}</TableCell>
