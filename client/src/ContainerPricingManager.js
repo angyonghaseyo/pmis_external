@@ -29,6 +29,7 @@ import {
     collection,
     query,
     where,
+    onSnapshot
 } from "firebase/firestore";
 import { Add, GridView, ViewList, Delete } from '@mui/icons-material';
 import { db, auth } from "./firebaseConfig";
@@ -47,23 +48,21 @@ const ContainerPricingManager = (user) => {
     // Simulated Firebase functions
     const addContainer = async () => {
         try {
-            // In real implementation, this would be:
-            await addDoc(collection(db, "carrier_container_prices"), {
+            const newContainer = {
                 size: newSize,
                 price: parseFloat(newPrice),
                 company: company
-            });
+            };
+
+            const docRef = await addDoc(collection(db, "carrier_container_prices"), newContainer);
+            console.log("Container added with ID: ", docRef.id);
+
+            // Clear input fields
+            setNewSize('');
+            setNewPrice('');
         } catch (error) {
             console.error("Error adding container: ", error);
         }
-
-        setContainers([...containers, {
-            id: containers.length + 1,
-            size: newSize,
-            price: parseFloat(newPrice),
-        }]);
-        setNewSize('');
-        setNewPrice('');
     };
 
     const getCompany = async () => {
@@ -88,8 +87,13 @@ const ContainerPricingManager = (user) => {
 
     const deleteContainer = async (containerId) => {
         try {
+            if (typeof containerId !== 'string') {
+                console.error("Invalid containerId:", containerId);
+                return;
+            }
+
             await deleteDoc(doc(db, "carrier_container_prices", containerId));
-            setContainers(containers.filter(container => container.id !== containerId));
+            console.log("Container deleted with ID: ", containerId);
         } catch (error) {
             console.error("Error deleting container: ", error);
         }
@@ -97,16 +101,29 @@ const ContainerPricingManager = (user) => {
 
     useEffect(() => {
         const fetchData = async () => {
-            const querySnapshot = await getDocs(collection(db, "carrier_container_prices"));
-            const data = querySnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
-            setContainers(data);
+            try {
+                const userCompany = await getCompany();
+                if (userCompany) {
+                    const q = query(collection(db, "carrier_container_prices"), where("company", "==", userCompany));
+                    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+                        const containerData = querySnapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        }));
+                        setContainers(containerData);
+                    });
+
+                    // Cleanup function to unsubscribe from the listener when the component unmounts
+                    return () => unsubscribe();
+                }
+            } catch (error) {
+                console.error("Error setting up real-time listener:", error);
+            }
         };
+
         fetchData();
-        getCompany();
     }, []);
+
 
 
     const handleViewChange = (event, newView) => {
