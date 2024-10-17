@@ -75,8 +75,11 @@ const Sidebar = ({ user }) => {
       name: "Cargos",
       icon: <Package />,
       path: "/cargos",
-      children: ['Subitem 1', 'Subitem 2'],
-      accessRights: ['View Cargos', 'Manage Cargos']
+      children: [
+        { name: 'Container Request', accessRights: ['Create Container Request', 'View Container Request'] },
+        { name: 'Container Pricing Manager', accessRights: ['Create Container Pricings', 'View Container Pricings'] }
+      ],
+      accessRights: ['Create Container Request', 'View Container Request', 'Create Container Pricings', 'View Container Pricings']
     },
     {
       name: "Customs and Trade Documents",

@@ -23,6 +23,8 @@ import { Box, CssBaseline, CircularProgress } from '@mui/material';
 import { simulateBerthTestData } from './SimulateBerthTestData'; 
 import { simulateManpowerTestData } from './SimulateManpowerTestData';
 import { simulateAssetTestData } from './SimulateAssetTestData';
+import ContainerRequest from './ContainerRequest';
+import ContainerPricingManager from './ContainerPricingManager';
 
 const drawerWidth = 240;
 
@@ -143,6 +145,12 @@ function App() {
                 )}
                 {hasAccessRights(['View Vessel Visit Requests', 'Create Vessel Visit Request', 'Edit Vessel Visit Requests', 'Delete Vessel Visit Requests']) && (
                   <Route path="/vessels/vessel-visit-request" element={<VesselVisits user={user} />} />
+                )}
+                {hasAccessRights(['Create Container Request', 'View Container Request']) && (
+                  <Route path="/cargos/container-request" element={<ContainerRequest user={user} />} />
+                )}
+                {hasAccessRights(['Create Container Pricings', 'View Container Pricings']) && (
+                  <Route path="/cargos/container-pricing-manager" element={<ContainerPricingManager user={user} />} />
                 )}
                 <Route path="*" element={<Navigate to="/" replace />} />
               </>
