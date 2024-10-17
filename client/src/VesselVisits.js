@@ -28,8 +28,10 @@ import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { db } from "./firebaseConfig";
-import { getUserData } from './services/api';
-import { auth } from './firebaseConfig';
+import { getUserData } from "./services/api";
+import { auth } from "./firebaseConfig";
+import { CircularProgress } from "@mui/material";
+import Papa from 'papaparse';
 import {
   doc,
   addDoc,
@@ -59,6 +61,7 @@ const VesselVisits = () => {
   const [tabValue, setTabValue] = useState(0);
   const [editingId, setEditingId] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [formData, setFormData] = useState({
     vesselName: "",
     imoNumber: "",
@@ -107,7 +110,21 @@ const VesselVisits = () => {
   const singaporeTimeZone = "Asia/Singapore";
 
   useEffect(() => {
-    fetchVesselVisits();
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        await Promise.all([
+          fetchVesselVisits(),
+          fetchUserProfile(auth.currentUser.uid),
+        ]);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        // Optionally set an error state here
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
   }, []);
 
   const fetchVesselVisits = async () => {
@@ -180,8 +197,8 @@ const VesselVisits = () => {
       if (isAssetAvailable(crane, eta, etd)) {
         console.log(
           "Crane with id " +
-          crane.name +
-          " is available time-wise and is being demand checked"
+            crane.name +
+            " is available time-wise and is being demand checked"
         );
         craneCapacityPerHour += crane.containersPerHour;
         craneCount += 1;
@@ -215,8 +232,8 @@ const VesselVisits = () => {
     for (const truck of trucks) {
       console.log(
         "Truck with id" +
-        truck.name +
-        "is available and is being demand checked"
+          truck.name +
+          "is available and is being demand checked"
       );
       if (isAssetAvailable(truck, eta, etd)) {
         truckCapacityPerHour += truck.containersPerHour;
@@ -261,7 +278,7 @@ const VesselVisits = () => {
         ) {
           console.log(
             "there is enough reach stackers with a quantity of " +
-            requiredReachStackers
+              requiredReachStackers
           );
           reachStackerPass = true;
           break;
@@ -305,27 +322,21 @@ const VesselVisits = () => {
 
     // Helper function to check if assets are available during a time range
     function isBerthAvailable(facility, eta, etd) {
-      console.log("The facility is: " + facility.name);
-      console.log("eta at isBerthAvailable: " + eta);
-      console.log("etd at isBerthAvailable: " + etd);
-
-      try {
-        // Use Object.entries to iterate over the bookedPeriod map (converted to an object)
-        for (const [periodKey, period] of Object.entries(
-          facility.bookedPeriod
-        )) {
-          const [bookedEta, bookedEtd] = period;
-
-          // If the asset's booked period overlaps with the requested period, it's unavailable
-          if (
-            !(
-              new Date(etd) <= new Date(bookedEta) ||
-              new Date(eta) >= new Date(bookedEtd)
-            )
-          ) {
-            console.log(`Berth is unavailable during period ${periodKey}`);
-            return false;
-          }
+      for (const [key, period] of Object.entries(facility.bookedPeriod)) {
+        const [bookedEta, bookedEtd] = period;
+        // If the asset's booked period overlaps with the requested period, it's unavailable
+        if (
+          !(
+            new Date(etd) <= new Date(bookedEta) ||
+            new Date(eta) >= new Date(bookedEtd)
+          )
+        ) {
+          console.log(
+            "Berth " +
+              facility.name +
+              "is not available because it has been reserved"
+          );
+          return false;
         }
         return true; // Available if no conflicts found
       } catch (error) {
@@ -344,13 +355,19 @@ const VesselVisits = () => {
           draft <= berth.depthCapacity &&
           cargoType === berth.cargoType
         ) {
-          matchedBerths.push(berth); // Store the matched berth name
+          matchedBerths.push(berth); // Store the matched berth
+          console.log("Berth " + berth.name + " added to matchedBerths");
         }
       });
 
       if (matchedBerths.length === 0) {
         console.log("No berths match the vessel's requirements.");
-        return false;
+        return {
+          success: false,
+          assignedBerth: "",
+          adjustedEta: eta,
+          adjustedEtd: etd,
+        };
       }
 
       const startDate = new Date(eta);
@@ -370,308 +387,337 @@ const VesselVisits = () => {
       // Step 2: Loop through each matched berth and check whether it is available during the required hours
       for (const berth of matchedBerths) {
         if (isBerthAvailable(berth, eta, etd)) {
-          //check that berth is available using helper function isBerthAvailable
-          console.log(`Berth ${berth} is available for the entire time range.`);
-        } else {
-          //remove the berth from matchedBerths array
-          const index = matchedBerths.findIndex((obj) => obj === berth); // Find the index of the berth to be removed
-          matchedBerths.splice(index, 1);
           console.log(
-            `Berth ${berth} is NOT available for the entire time range and is removed from matchedBerths array.`
+            `Berth ${berth.name} is available for the entire time range.`
           );
+        } else {
+          const index = matchedBerths.findIndex((obj) => obj === berth);
+          matchedBerths.splice(index, 1);
+          console.log(`Berth ${berth.name} is removed from matchedBerths`);
         }
       }
-      console.log("dfdsf: " + matchedBerths);
-      console.log("oohlahlah" + eta);
-      // If no berth is fully available for the entire time range, find a berth with an availability that closest matches the eta of the vessel
+
+      // If no berth is fully available for the entire time range, adjust ETA/ETD
       if (matchedBerths.length === 0) {
         console.log("No berth is available for the entire time range.");
-        // adjust eta by +1 hour and etd by +1 hour and do demand check again. Keep repeating until you find at least one berth that is free within the eta-etd period
-        // First Convert the ISO string to Date objects
-        etaAdjustedDate = new Date(eta);
-        etaAdjustedDate.setMinutes(eta.getMinutes() + 15);
-        etdAdjustedDate = new Date(etd);
-        etdAdjustedDate.setMinutes(etd.getMinutes() + 15);
+
+        // Adjust ETA and ETD by 15 minutes
+        let etaAdjustedDate = new Date(eta);
+        let etdAdjustedDate = new Date(etd);
+        etaAdjustedDate.setMinutes(etaAdjustedDate.getMinutes() + 15);
+        etdAdjustedDate.setMinutes(etdAdjustedDate.getMinutes() + 15);
+
         console.log(
           `Adjusting ETA and ETD by 15 minutes: New ETA: ${etaAdjustedDate}, New ETD: ${etdAdjustedDate}`
         );
-        const { loa, draft, cargoType, etaAdjustedDate, etdAdjustedDate } = vesselVisitRequest;
-        return checkFacilityAvailability(vesselVisitRequest);
+
+        // Create a new vesselVisitRequest with the adjusted ETA and ETD
+        let vesselVisitRequestX = {
+          loa,
+          draft,
+          cargoType,
+          eta: etaAdjustedDate.toISOString(),
+          etd: etdAdjustedDate.toISOString(),
+        };
+
+        // Recursively call checkFacilityAvailability with adjusted times
+        return checkFacilityAvailability(vesselVisitRequestX);
       } else {
+        // If a berth is available, return success with berth name and original ETA/ETD
         let assignedBerth = matchedBerths.pop();
         console.log(
-          "The berth that has been assigned to the vessel is" +
-          assignedBerth.name
+          "The berth that has been assigned to the vessel is " +
+            assignedBerth.name
         );
-        return { success: true, assignedBerth: assignedBerth.name };
+        return {
+          success: true,
+          assignedBerth: assignedBerth.name,
+          adjustedEta: eta,
+          adjustedEtd: etd,
+        };
       }
     } catch (error) {
       console.error("Error checking facility availability:", error);
-      return { success: false, assignedBerth: "" }; // Return false in case of error
+      return {
+        success: false,
+        assignedBerth: "",
+        adjustedEta: eta,
+        adjustedEtd: etd,
+      };
     }
   };
 
   const checkManpowerAvailability = async (vesselVisitRequest) => {
-    const {
-      eta,
-      etd,
-      numberOfCranesNeeded,
-      numberOfTrucksNeeded,
-      numberOfReachStackersNeeded,
-    } = vesselVisitRequest;
+    try {
+      const {
+        eta,
+        etd,
+        numberOfCranesNeeded,
+        numberOfTrucksNeeded,
+        numberOfReachStackersNeeded,
+      } = vesselVisitRequest;
 
-    // Define the 8-hour time slots
-    const timeSlots = [
-      { start: "00:00", end: "08:00" },
-      { start: "08:00", end: "16:00" },
-      { start: "16:00", end: "00:00" },
-    ];
+      console.log("Received vesselVisitRequest:", vesselVisitRequest);
+      let totalCranesAvailable = 0;
+      let totalTrucksAvailable = 0;
+      let totalReachStackersAvailable = 0;
+      // The ETA and ETD are in UTC (from Date.toISOString())
+      const etaDateUTC = new Date(eta.getTime() + 8 * 60 * 60 * 1000); // ETA in UTC
+      const etdDateUTC = new Date(etd.getTime() + 8 * 60 * 60 * 1000); // ETD in UTC new Date(etaDateUTC.getTime() + 8 * 60 * 60 * 1000);
 
-    // Helper function to calculate overlapping time slots
-    const getOverlappingTimeSlots = (eta, etd) => {
-      const slots = [];
-      let iterator = eta.startOf("day"); // Start from the day of the ETA
+      console.log("Converted ETA (UTC):", etaDateUTC);
+      console.log("Converted ETD (UTC):", etdDateUTC);
 
-      // Loop through each day between ETA and ETD
-      while (iterator.isBefore(etd, "day") || iterator.isSame(etd, "day")) {
-        timeSlots.forEach((slot) => {
-          const slotStart = iterator
-            .hour(Number(slot.start.split(":")[0]))
-            .minute(0);
-          let slotEnd = iterator.hour(Number(slot.end.split(":")[0])).minute(0);
+      // Extract just the date part (YYYY-MM-DD) from ETA and ETD
+      const etaString = etaDateUTC.toISOString().split("T")[0];
+      const etdString = etdDateUTC.toISOString().split("T")[0];
 
-          if (slot.end === "00:00") {
-            slotEnd = slotEnd.add(1, "day");
-          }
+      console.log("ETA Date (UTC)X:", etaString);
+      console.log("ETD Date (UTC)X:", etdString);
 
-          // Check if the slot overlaps with ETA-ETD range
-          if (
-            ((slotStart.isSame(eta) || slotStart.isAfter(eta)) &&
-              slotStart.isBefore(etd)) ||
-            ((slotEnd.isSame(etd) || slotEnd.isBefore(etd)) &&
-              slotEnd.isAfter(eta))
-          ) {
-            slots.push({ start: slotStart.format(), end: slotEnd.format() });
-          }
-        });
+      // Define shift periods (in UTC, adjusted from Singapore time)
+      const shifts = [
+        { start: "16:00", end: "00:00", label: "00:00-08:00" },
+        { start: "00:00", end: "08:00", label: "08:00-16:00" },
+        { start: "08:00", end: "16:00", label: "16:00-24:00" },
+      ];
 
-        iterator = iterator.add(1, "day"); // Move to the next day
-      }
-      console.log(slots);
-      return slots;
-    };
+      console.log("Defined shifts in UTC:", shifts);
 
-    // Helper function to filter manpower documents based on time slots
-    const filterManpowerDocuments = async (calculatedSlots) => {
-      try {
-        const workSchedulesRef = collection(db, "denzel_work_schedule");
-        const manpowerDocs = [];
+      // Loop through the dates and shifts, finding relevant schedules
+      let loopCount = 0; // Initialize a counter
+      let queriedSchedules = [];
+      let currentDate = new Date(etaDateUTC);
+      while (currentDate <= etdDateUTC) {
+        const currentDateString = currentDate.toISOString().split("T")[0];
 
-        // Loop through each calculated slot and query Firestore
-        for (const slot of calculatedSlots) {
-          const { start, end } = slot;
+        console.log(`Checking date: ${currentDateString}`);
 
-          // Create time period string for Firestore query (e.g., "00:00-08:00")
-          const timePeriod = `${start.split("T")[1].slice(0, 5)}-${end
-            .split("T")[1]
-            .slice(0, 5)}`;
-          const startDate = start.split("T")[0];
-          const endDate = end.split("T")[0];
-
-          // Query Firestore for documents matching the time period and date range
-          const q = query(
-            workSchedulesRef,
-            where("startDate", "<=", endDate),
-            where("endDate", ">=", startDate),
-            where("timePeriod", "==", timePeriod)
+        shifts.forEach((shift) => {
+          console.log(
+            `Adding shift ${shift.label} for date ${currentDateString}`
           );
+          queriedSchedules.push({
+            date: currentDateString,
+            shift: shift.label,
+          });
+        });
+        currentDate.setDate(currentDate.getDate() + 1); // Move to the next day
+        loopCount++;
+      }
 
-          const querySnapshot = await getDocs(q);
+      console.log("Total queried schedules:", queriedSchedules);
 
-          // Add matching documents to array
-          querySnapshot.forEach((doc) => {
-            manpowerDocs.push(doc.data());
+      // Start
+      // Query Firebase for schedules with only one condition (startDate <= etdString)
+      const schedulesRef = collection(db, "denzel_work_schedule");
+      const scheduleQuery = query(
+        schedulesRef,
+        where("startDate", "<=", etdString) // Only apply one inequality filter on startDate
+      );
+
+      const scheduleSnapshot = await getDocs(scheduleQuery);
+
+      console.log(
+        "Firebase query completed. Filtering schedules based on other conditions..."
+      );
+
+      // Filter results manually for the other two conditions: endDate and timePeriod
+      const filteredSchedules = scheduleSnapshot.docs.filter((doc) => {
+        const schedule = doc.data();
+        console.log("Checking schedule:", schedule);
+
+        const endDateCheck = schedule.endDate >= etaString; // Manually filter for endDate >= etaString
+        const timePeriodCheck = queriedSchedules.some(
+          (qs) => qs.shift === schedule.timePeriod
+        ); // Manually check timePeriod
+
+        // Step 4: Loop through the assignedUsers map
+        if (schedule.assignedUsers) {
+          // Convert the map into an array and iterate through it
+          Object.values(schedule.assignedUsers).forEach((user) => {
+            if (user.role === "Crane Operator") {
+              totalCranesAvailable += 1;
+            }
+            if (user.role === "Truck Operator") {
+              totalTrucksAvailable += 1;
+            }
+            if (user.role === "Reach Stacker Operator") {
+              totalReachStackersAvailable += 1;
+            }
           });
         }
 
-        return manpowerDocs;
-      } catch (error) {
-        console.error("Error fetching manpower documents:", error);
-      }
-    };
-
-    // Helper function to check if manpower is sufficient
-    const checkManpowerSufficiency = (manpowerDocs, requiredRoles) => {
-      const availableManpower = {};
-
-      manpowerDocs.forEach((doc) => {
-        doc.assignedUsers.forEach((user) => {
-          if (!availableManpower[user.role]) {
-            availableManpower[user.role] = 0;
-          }
-          availableManpower[user.role] += 1;
-        });
+        return endDateCheck && timePeriodCheck; // Return true if both conditions are satisfied
       });
 
-      const isManpowerSufficient = Object.keys(requiredRoles).every((role) => {
-        return (
-          availableManpower[role] &&
-          availableManpower[role] >= requiredRoles[role]
-        );
-      });
+      console.log(
+        "Filtered schedules after all conditions:",
+        filteredSchedules
+      );
 
-      return isManpowerSufficient;
-    };
+      // If fewer schedules than required are found, return false
+      if (filteredSchedules.length * loopCount < queriedSchedules.length) {
+        console.log("Insufficient schedules found.");
+        return {
+          success: false,
+          message: "Insufficient manpower for the vessel visit.",
+        };
+      }
+      //End
+      // Initialize counters for required roles (crane operators, truck operators)
 
-    // Function to fetch documents based on filters
-    const fetchFilteredDocuments = async (
-      timePeriod,
-      startDate,
-      endDate,
-      status
-    ) => {
-      try {
-        const workSchedulesRef = collection(db, "denzel_work_schedule");
+      // scheduleSnapshot.forEach((doc) => {
+      //   const scheduleData = doc.data();
+      //   console.log("Processing schedule data:", scheduleData);
+      // });
 
-        // Create a Firestore query with the provided filters
-        const q = query(
-          workSchedulesRef,
-          where("timePeriod", "==", timePeriod),
-          where("startDate", "==", startDate),
-          where("endDate", "==", endDate),
-          where("status", "==", status)
-        );
+      console.log("Total Cranes Available:", totalCranesAvailable);
+      console.log("Total Trucks Available:", totalTrucksAvailable);
+      console.log(
+        "Total Reach stackers Available:",
+        totalReachStackersAvailable
+      );
 
-        const querySnapshot = await getDocs(q);
+      // Calculate missing workers for each role
+      const missingCranes = numberOfCranesNeeded - totalCranesAvailable;
+      const missingTrucks = numberOfTrucksNeeded - totalTrucksAvailable;
+      const missingReachStackers =
+        numberOfReachStackersNeeded - totalReachStackersAvailable;
 
-        // Check if documents are found
-        if (querySnapshot.empty) {
-          console.log("No matching documents.");
-          return [];
+      console.log("Missing Cranes:", missingCranes > 0 ? missingCranes : 0);
+      console.log("Missing Trucks:", missingTrucks > 0 ? missingTrucks : 0);
+      console.log(
+        "Missing Trucks:",
+        missingReachStackers > 0 ? missingReachStackers : 0
+      );
+
+      // Compare total available manpower with required manpower
+      const cranesSufficient = totalCranesAvailable >= numberOfCranesNeeded;
+      const trucksSufficient = totalTrucksAvailable >= numberOfTrucksNeeded;
+      const reachStackersSufficient =
+        totalReachStackersAvailable >= numberOfReachStackersNeeded;
+
+      console.log("Cranes Sufficient:", cranesSufficient);
+      console.log("Trucks Sufficient:", trucksSufficient);
+      console.log("Trucks Sufficient:", reachStackersSufficient);
+
+      // Return true if sufficient manpower is found, false otherwise with missing details
+      if (cranesSufficient && trucksSufficient && reachStackersSufficient) {
+        console.log("Sufficient manpower available.");
+        return {
+          success: true,
+          message: "Sufficient manpower for the vessel visit.",
+        };
+      } else {
+        const missingRoles = [];
+        if (missingCranes > 0) {
+          missingRoles.push({ role: "Crane Operator", missing: missingCranes });
+        }
+        if (missingTrucks > 0) {
+          missingRoles.push({ role: "Truck Operator", missing: missingTrucks });
+        }
+        if (missingTrucks > 0) {
+          missingRoles.push({
+            role: "Reach Stacker Operator",
+            missing: missingReachStackers,
+          });
         }
 
-        // Map through the found documents and log them
-        const results = [];
-        querySnapshot.forEach((doc) => {
-          results.push(doc.data());
-          console.log(doc.id, " => ", doc.data());
-        });
-
-        return results; // Return the filtered results
-      } catch (error) {
-        console.error("Error fetching filtered documents: ", error);
-      }
-    };
-
-    // Helper function to loop through each day in the range
-    const fetchDocumentsForDateRange = async (
-      timePeriod,
-      startDay,
-      endDay,
-      status
-    ) => {
-      let currentDay = dayjs(startDay);
-      const endDate = dayjs(endDay);
-      const allResults = [];
-
-      // Loop through each day in the range
-      while (currentDay.isBefore(endDate) || currentDay.isSame(endDate)) {
-        const startDateString = currentDay.format("YYYY-MM-DD"); // Format the date as a string
-        const endDateString = currentDay.format("YYYY-MM-DD"); // Use the same date for a single-day check
-        console.log("start" + startDateString);
-        console.log("end" + endDateString);
-
-        // Fetch documents for the current day
-        const docs = await fetchFilteredDocuments(
-          timePeriod,
-          startDateString,
-          endDateString,
-          status
+        console.log(
+          "Insufficient manpower available. Missing roles:",
+          missingRoles
         );
 
-        if (docs.length > 0) {
-          allResults.push(...docs); // Add found documents to the results array
-        }
-
-        currentDay = currentDay.add(1, "day"); // Move to the next day
+        return {
+          success: false,
+          message: "Insufficient manpower for the vessel visit.",
+          missingRoles: missingRoles,
+        };
       }
-
-      return allResults; // Return all found documents
-    };
-
-    const timePeriod = "00:00-08:00";
-    const startDay = "2024-10-21";
-    const endDay = "2024-10-25";
-    const status = "Ad-Hoc";
-
-    // Fetch documents for the date range
-    fetchDocumentsForDateRange(timePeriod, startDay, endDay, status).then(
-      (allDocs) => {
-        console.log("All Filtered Documents: ", allDocs);
-      }
-    );
-
-    // const localETA = dayjs.utc(eta).tz(singaporeTimeZone);
-    // console.log("Local ETA:", localETA.toISOString());
-
-    // const localETD = dayjs.utc(etd).tz(singaporeTimeZone);
-    // console.log("Local ETD:", localETD.toISOString());
-
-    // // Calculate relevant 8-hour time slots
-    // const overlappingSlots = getOverlappingTimeSlots(localETA, localETD);
-    // console.log("Overlapping Time Slots:", overlappingSlots);
-
-    // // Fetch manpower documents that fall within those slots
-    // const manpowerDocs = await filterManpowerDocuments(overlappingSlots);
-    // console.log("Filtered Manpower Documents:", manpowerDocs);
-
-    // Define required roles based on vessel needs
-    const requiredRoles = {
-      "Crane Operator": numberOfCranesNeeded,
-      "Truck Operator": numberOfTrucksNeeded,
-      "Reach Stacker Operator": numberOfReachStackersNeeded,
-    };
-    console.log("Required Roles:", requiredRoles);
-
-    // Check if manpower is sufficient for the vessel visit request
-    // const isSufficient = checkManpowerSufficiency(manpowerDocs, requiredRoles);
-    // console.log("isSuffucient is " + isSufficient);
-
-    return true ? true : false;
+    } catch (error) {
+      console.error("Error checking manpower availability:", error);
+      // Ensure that it returns an object even on failure
+      return {
+        success: false,
+        message: "Error occurred while checking manpower availability.",
+      };
+    }
   };
 
   const checkResources = async () => {
-    const facilitiesDemandCheckBooleanAndBerth =
-      await checkFacilityAvailability({
-        loa: formData.loa,
-        draft: formData.draft,
-        cargoType: formData.cargoType,
+    try {
+      // Step 1: Check facility availability
+      const facilitiesDemandCheckBooleanAndBerth =
+        await checkFacilityAvailability({
+          loa: formData.loa,
+          draft: formData.draft,
+          cargoType: formData.cargoType,
+          eta: formData.eta,
+          etd: formData.etd,
+        });
+
+      // Step 2: Check asset availability
+      const assetsDemandCheckBooleanAndQuantity = await checkAssetAvailability({
         eta: formData.eta,
         etd: formData.etd,
+        containersOffloaded: formData.containersOffloaded,
+        containersOnloaded: formData.containersOnloaded,
       });
-    const assetsDemandCheckBooleanAndQuantity = await checkAssetAvailability({
-      eta: formData.eta,
-      etd: formData.etd,
-      containersOffloaded: formData.containersOffloaded,
-      containersOnloaded: formData.containersOnloaded,
-    });
-    const manpowerDemandCheckBoolean = await checkManpowerAvailability({
-      eta: formData.eta,
-      etd: FormData.etd,
-      numberOfCranesNeeded: formData.numberOfCranesNeeded,
-      numberOfTrucksNeeded: formData.numberOfTrucksNeeded,
-      numberOfReachStackersNeeded: formData.numberOfReachStackersNeeded,
-    });
 
-    return {
-      facilitiesDemandCheckBooleanAndBerth,
-      assetsDemandCheckBooleanAndQuantity,
-      manpowerDemandCheckBoolean,
-    };
+      // Step 3: Check manpower availability
+      const manpowerDemandCheckBoolean = await checkManpowerAvailability({
+        eta: formData.eta,
+        etd: formData.etd,
+        numberOfCranesNeeded: 1,
+        numberOfTrucksNeeded: 1,
+        numberOfReachStackersNeeded: 1,
+      });
+
+      // Handle the result of manpower check
+      if (manpowerDemandCheckBoolean.success) {
+        console.log("Manpower is sufficient for the vessel visit!");
+      } else {
+        console.log(
+          "Insufficient manpower:",
+          manpowerDemandCheckBoolean.message
+        );
+        console.log(
+          "Cranes available:",
+          manpowerDemandCheckBoolean.cranesAvailable
+        );
+        console.log(
+          "Trucks available:",
+          manpowerDemandCheckBoolean.trucksAvailable
+        );
+        console.log(
+          "Missing roles and counts:",
+          manpowerDemandCheckBoolean.missingRoles
+        );
+      }
+
+      // Return all the results
+      return {
+        facilitiesDemandCheckBooleanAndBerth,
+        assetsDemandCheckBooleanAndQuantity,
+        manpowerDemandCheckBoolean,
+      };
+    } catch (error) {
+      console.error("Error checking resources:", error);
+      return {
+        success: false,
+        message: "Error occurred during resource checks",
+      };
+    }
   };
 
   const handleOpenDialog = (type, visit = null) => {
     setVisitType(type);
+    setSelectedFile(null); 
+    setFileError(""); 
+    if (fileInputRef.current) {
+      fileInputRef.current.value = null; // Reset file input
+    }
     if (visit) {
       setFormData({
         vesselName: visit.vesselName,
@@ -694,6 +740,7 @@ const VesselVisits = () => {
         vesselBayCount: visit.vesselBayCount,
         vesselTierCount: visit.vesselTierCount,
         stowageplanURL: visit.stowageplanURL,
+        visitType: type,
       });
       setEditingId("Edit"); //  setEditingId(visit.id); Denzel
     } else {
@@ -719,6 +766,7 @@ const VesselVisits = () => {
         vesselBayCount: 0,
         vesselTierCount: 0,
         stowageplanURL: "",
+        visitType: type,
       });
     }
     setOpenDialog(true);
@@ -794,6 +842,21 @@ const VesselVisits = () => {
     }
   };
 
+  const parseCSVFile = (file) => {
+    return new Promise((resolve, reject) => {
+      Papa.parse(file, {
+        header: true, // Assumes the first row contains the column headers
+        skipEmptyLines: true,
+        complete: function (results) {
+          resolve(results.data); // results.data will be an array of objects
+        },
+        error: function (error) {
+          reject(error);
+        }
+      });
+    });
+  };
+
   const handleSubmit = async () => {
     if (!formData.vesselName) {
       alert("Please fill out the vessel name");
@@ -837,21 +900,21 @@ const VesselVisits = () => {
     }
     if (!formData.containersOffloaded) {
       alert(
-        "Please provide the number of containers that will be offloaded from the vesssel"
+        "Please provide the number of containers that will be offloaded from the vessel"
       );
       return;
     }
     if (!formData.containersOnloaded) {
       alert(
-        "Please provide the number of containers that will be onloaded to the vesssel"
+        "Please provide the number of containers that will be onloaded to the vessel"
       );
       return;
     }
-
+  
     // Simulate resource check
     const resourceCheck = await checkResources();
     console.log(resourceCheck);
-
+  
     // The dates are already stored in ISO format in formData
     const newVisit = {
       vesselName: formData.vesselName,
@@ -859,8 +922,12 @@ const VesselVisits = () => {
       vesselType: formData.vesselType,
       loa: formData.loa,
       draft: formData.draft,
-      eta: formData.eta.toISOString(),
-      etd: formData.etd.toISOString(),
+      eta: resourceCheck.facilitiesDemandCheckBooleanAndBerth.success
+        ? resourceCheck.facilitiesDemandCheckBooleanAndBerth.adjustedEta
+        : formData.eta.toISOString(),
+      etd: resourceCheck.facilitiesDemandCheckBooleanAndBerth.success
+        ? resourceCheck.facilitiesDemandCheckBooleanAndBerth.adjustedEtd
+        : formData.etd.toISOString(),
       cargoType: formData.cargoType,
       cargoVolume: formData.cargoVolume,
       pilotage: formData.pilotage,
@@ -871,7 +938,7 @@ const VesselVisits = () => {
       containersOffloaded: formData.containersOffloaded,
       containersOnloaded: formData.containersOnloaded,
       facilityDemandCheckBoolean:
-        resourceCheck.facilitiesDemandCheckBooleanAndBerth.success !== undefined ? false : false ,
+        resourceCheck.facilitiesDemandCheckBooleanAndBerth.success !== undefined ? false : false, 
       berthAssigned:
         resourceCheck.facilitiesDemandCheckBooleanAndBerth.assignedBerth !== undefined ? "" : "",
       assetDemandCheckBoolean:
@@ -885,12 +952,13 @@ const VesselVisits = () => {
       numberOfReachStackersNeeded:
         resourceCheck.assetsDemandCheckBooleanAndQuantity.requiredAssets
           .requiredReachStackers,
-      manpowerDemandCheckBoolean: resourceCheck.manpowerDemandCheckBoolean,
+      manpowerDemandCheckBoolean:
+        resourceCheck.manpowerDemandCheckBoolean.success,
       // status for UI purposes
       status:
-        resourceCheck.manpowerDemandCheckBoolean &&
-          resourceCheck.assetsDemandCheckBooleanAndQuantity.success &&
-          resourceCheck.facilitiesDemandCheckBooleanAndBerth.success
+        resourceCheck.manpowerDemandCheckBoolean.success &&
+        resourceCheck.assetsDemandCheckBooleanAndQuantity.success &&
+        resourceCheck.facilitiesDemandCheckBooleanAndBerth.success
           ? "confirmed"
           : "pending user intervention",
       vesselGridCount:
@@ -901,35 +969,24 @@ const VesselVisits = () => {
         formData.vesselTierCount !== undefined ? formData.vesselTierCount : 0, // Provide default value for undefined
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      stowageplanURL: formData.stowageplanURL,
+      stowageplan: formData.stowageplan, // Store the parsed stowage plan array
+      visitType: formData.visitType,
     };
-    //denzel: facility demand check - checking booking time slots is wrong - no longer using 1 hour slots done
-    //denzel: facilitydemandcheck should always return true except if there is an error caused in the demand heck
-    //file uploading
+  
     try {
-      const storage = getStorage();
-      const storageRef = ref(
-        storage,
-        `stowage-plans/${formData.imoNumber}_stowageplan.csv`
-      );
-      // Upload the file
-      await uploadBytes(storageRef, selectedFile);
-      // Get the download URL after upload
-      newVisit.stowageplanURL = await getDownloadURL(storageRef);
-      setDownloadURL(newVisit.stowageplanURL);
-      console.log(
-        "File uploaded and renamed successfully:",
-        newVisit.stowageplanURL
-      );
+      // Parsing the CSV file and storing as an array of objects (instead of URL)
+      const parsedCSVData = await parseCSVFile(selectedFile);
+      newVisit.stowageplan = parsedCSVData;
+      console.log("Stowage plan data stored as an array:", parsedCSVData);
     } catch (error) {
-      setFileError("Missing stowage plan.");
-      console.error("Error updating stowage plan's URL to newVisit:", error);
+      setFileError("Error parsing the CSV file.");
+      console.error("Error parsing the CSV file:", error);
+      return; // Exit the function if CSV parsing fails
     }
-    console.log(newVisit);
     try {
       const docRef = doc(db, "vesselVisitRequests", formData.imoNumber);
       await setDoc(docRef, newVisit);
-
+  
       if (editingId) {
         // Editing an existing record: update the corresponding entry in vesselVisitsData
         setVesselVisitsData((prev) =>
@@ -946,7 +1003,7 @@ const VesselVisits = () => {
         ]);
       }
       handleCloseDialog();
-
+  
       console.log(
         "Vessel visit request saved successfully with ID:",
         formData.imoNumber
@@ -989,8 +1046,8 @@ const VesselVisits = () => {
       const profileData = await getUserData(userId);
       setUserProfile(profileData);
     } catch (error) {
-      console.error('Error fetching user profile:', error);
-      setError('Failed to fetch user profile. Please try again later.');
+      console.error("Error fetching user profile:", error);
+      setError("Failed to fetch user profile. Please try again later.");
     }
   };
 
@@ -998,16 +1055,30 @@ const VesselVisits = () => {
     if (!userProfile || !Array.isArray(userProfile.accessRights)) return false;
 
     // Check if the user has any of the required roles
-    const hasRequiredRole = requiredRoles.some(role => userProfile.accessRights.includes(role));
+    const hasRequiredRole = requiredRoles.some((role) =>
+      userProfile.accessRights.includes(role)
+    );
 
     // Return true if the user has a required role or is an Admin
-    return hasRequiredRole || userProfile.role === 'Admin';
+    return hasRequiredRole || userProfile.role === "Admin";
   };
 
-  useEffect(() => {
-    fetchUserProfile(auth.currentUser.uid);
-  }, []);
-
+  if (isLoading) {
+    return (
+      <Container
+        maxWidth="lg"
+        sx={{
+          mt: 4,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "80vh",
+        }}
+      >
+        <CircularProgress />
+      </Container>
+    );
+  }
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4 }}>
@@ -1020,12 +1091,12 @@ const VesselVisits = () => {
         <Typography variant="h4" component="h1">
           Vessel Visits
         </Typography>
-        {hasRole(['Create Vessel Visit Request']) && (
+        {hasRole(["Create Vessel Visit Request"]) && (
           <Box>
             <Button
               variant="contained"
               color="primary"
-              onClick={() => handleOpenDialog('Scheduled')}
+              onClick={() => handleOpenDialog("Scheduled")}
               sx={{ mr: 2 }}
             >
               Scheduled Vessel Visit
@@ -1033,7 +1104,7 @@ const VesselVisits = () => {
             <Button
               variant="contained"
               color="primary"
-              onClick={() => handleOpenDialog('Ad Hoc')}
+              onClick={() => handleOpenDialog("Ad-Hoc")}
             >
               Ad Hoc Vessel Visit
             </Button>
@@ -1063,9 +1134,10 @@ const VesselVisits = () => {
                 <TableCell>Containers Onloaded</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell>Assigned Berth</TableCell>
-                {hasRole(["Edit Vessel Visit Requests", "Delete Vessel Visit Requests"]) && (
-                <TableCell>Actions</TableCell>
-                )}
+                {hasRole([
+                  "Edit Vessel Visit Requests",
+                  "Delete Vessel Visit Requests",
+                ]) && <TableCell>Actions</TableCell>}
               </TableRow>
             </TableHead>
             <TableBody>
@@ -1104,12 +1176,18 @@ const VesselVisits = () => {
                   <TableCell>{visit.berthAssigned}</TableCell>
                   <TableCell>
                     {hasRole(["Edit Vessel Visit Requests"]) && (
-                      <IconButton onClick={() => handleOpenDialog(visit.visitType, visit)} color="primary">
+                      <IconButton
+                        onClick={() => handleOpenDialog(visit.visitType, visit)}
+                        color="primary"
+                      >
                         <EditIcon />
                       </IconButton>
                     )}
                     {hasRole(["Delete Vessel Visit Requests"]) && (
-                      <IconButton onClick={() => handleDelete(visit.id)} color="secondary">
+                      <IconButton
+                        onClick={() => handleDelete(visit.documentId)}
+                        color="secondary"
+                      >
                         <DeleteIcon />
                       </IconButton>
                     )}
@@ -1142,12 +1220,12 @@ const VesselVisits = () => {
                 onChange={handleChange}
                 fullWidth
                 required
-              // disabled={!!formData.vesselName}
-              // helperText={
-              //   formData.vesselName
-              //     ? "This field cannot be edited after it is set"
-              //     : ""
-              // }
+                // disabled={!!formData.vesselName}
+                // helperText={
+                //   formData.vesselName
+                //     ? "This field cannot be edited after it is set"
+                //     : ""
+                // }
               />
             </Grid>
             <Grid item xs={6}>
@@ -1159,12 +1237,12 @@ const VesselVisits = () => {
                 onChange={handleChange}
                 fullWidth
                 required
-              // disabled={!!formData.imoNumber}
-              // helperText={
-              //   formData.imoNumber
-              //     ? "This field cannot be edited after it is set"
-              //     : ""
-              // }
+                // disabled={!!formData.imoNumber}
+                // helperText={
+                //   formData.imoNumber
+                //     ? "This field cannot be edited after it is set"
+                //     : ""
+                // }
               />
             </Grid>
             <Grid item xs={6}>
@@ -1434,4 +1512,3 @@ const VesselVisits = () => {
 };
 
 export default VesselVisits;
-

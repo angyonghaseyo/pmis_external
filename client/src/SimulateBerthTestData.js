@@ -24,11 +24,11 @@ export const simulateBerthTestData = async () => {
       bookedPeriod: new Map([
         [
           "period1",
-          [new Date("2024-10-08T10:00:00"), new Date("2024-10-08T12:00:00")],
+          [new Date("2024-10-08T10:00:00").toISOString(), new Date("2024-10-08T12:00:00").toISOString()],
         ],
         [
           "period2",
-          [new Date("2024-11-01T10:00:00"), new Date("2024-11-03T12:00:00")],
+          [new Date("2024-11-01T10:00:00").toISOString(), new Date("2024-11-03T12:00:00").toISOString()],
         ],
       ]),
     },

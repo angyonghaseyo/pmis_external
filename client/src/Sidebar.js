@@ -75,8 +75,10 @@ const Sidebar = ({ user }) => {
       name: "Cargos",
       icon: <Package />,
       path: "/cargos",
-      children: ['Subitem 1', 'Subitem 2'],
-      accessRights: ['View Cargos', 'Manage Cargos']
+      children: [
+        { name: 'Cargo Manifest', accessRights: ['View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest'] }
+      ],
+      accessRights: ['View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest']
     },
     {
       name: "Customs and Trade Documents",
