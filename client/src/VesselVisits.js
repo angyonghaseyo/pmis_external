@@ -51,8 +51,9 @@ import {
   listAll,
   deleteObject,
 } from "firebase/storage";
-
-// import firebase from './firebase'; // Assume Firebase is properly configured
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
 
 const VesselVisits = () => {
   const [openDialog, setOpenDialog] = useState(false);
@@ -103,6 +104,10 @@ const VesselVisits = () => {
   const [fileError, setFileError] = useState("");
   const fileInputRef = useRef(null); // Create a ref for the file input
   const [downloadURL, setDownloadURL] = useState("");
+
+  dayjs.extend(utc);
+  dayjs.extend(timezone);
+  const singaporeTimeZone = "Asia/Singapore";
 
   useEffect(() => {
     const fetchData = async () => {
@@ -307,6 +312,13 @@ const VesselVisits = () => {
 
   const checkFacilityAvailability = async (vesselVisitRequest) => {
     const { loa, draft, cargoType, eta, etd } = vesselVisitRequest;
+    const facilityListCollectionRef = collection(db, "facilityList");
+    const facilityListSnapshot = await getDocs(facilityListCollectionRef);
+    const matchedBerths = [];
+    const etaAdjustedDate = new Date();
+    const etdAdjustedDate = new Date();
+
+
 
     // Helper function to check if assets are available during a time range
     function isBerthAvailable(facility, eta, etd) {
@@ -326,16 +338,14 @@ const VesselVisits = () => {
           );
           return false;
         }
+        return true; // Available if no conflicts found
+      } catch (error) {
+        console.error("Error checking berth availability: ", error);
       }
-      return true;
     }
 
     try {
       // Step 1: Check the facilityList to find berths that match the vessel's LOA, draft, and cargoType
-      const facilityListCollectionRef = collection(db, "facilityList");
-      const facilityListSnapshot = await getDocs(facilityListCollectionRef);
-      const matchedBerths = [];
-
       facilityListSnapshot.forEach((doc) => {
         const berth = doc.data();
 
@@ -362,7 +372,18 @@ const VesselVisits = () => {
 
       const startDate = new Date(eta);
       const endDate = new Date(etd);
+      console.log("!The start date is " + startDate);
+      console.log("!The end date is " + endDate);
+      console.log("!The eta is " + eta);
+      console.log("!The etd is " + etd);
+      console.log("!As of now, matchedBerths contains: " + matchedBerths);
+    } catch (error) {
+      console.log(
+        "Step 1 for facility demand check has failed because of: " + error
+      );
+    }
 
+    try {
       // Step 2: Loop through each matched berth and check whether it is available during the required hours
       for (const berth of matchedBerths) {
         if (isBerthAvailable(berth, eta, etd)) {
@@ -962,7 +983,6 @@ const VesselVisits = () => {
       console.error("Error parsing the CSV file:", error);
       return; // Exit the function if CSV parsing fails
     }
-  
     try {
       const docRef = doc(db, "vesselVisitRequests", formData.imoNumber);
       await setDoc(docRef, newVisit);
