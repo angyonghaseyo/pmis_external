@@ -32,7 +32,7 @@ import { db } from '../firebaseConfig';
 
 const storage = getStorage();
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
 const authAxios = axios.create({
   baseURL: API_URL,
@@ -569,6 +569,47 @@ export const updateProgramCompletionStatus = async () => {
   }
 };
 
+export const getCargoManifests = async () => {
+  try {
+    const manifestsRef = collection(db, 'cargo_manifests');
+    const snapshot = await getDocs(manifestsRef);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  } catch (error) {
+    console.error('Error fetching cargo manifests:', error);
+    throw error;
+  }
+};
+
+export const submitCargoManifest = async (manifestData) => {
+  try {
+    const manifestsRef = collection(db, 'cargo_manifests');
+    const docRef = await addDoc(manifestsRef, manifestData);
+    return docRef.id;
+  } catch (error) {
+    console.error('Error submitting cargo manifest:', error);
+    throw error;
+  }
+};
+
+export const updateCargoManifest = async (id, manifestData) => {
+  try {
+    const manifestRef = doc(db, 'cargo_manifests', id);
+    await updateDoc(manifestRef, manifestData);
+  } catch (error) {
+    console.error('Error updating cargo manifest:', error);
+    throw error;
+  }
+};
+
+export const deleteCargoManifest = async (id) => {
+  try {
+    const manifestRef = doc(db, 'cargo_manifests', id);
+    await deleteDoc(manifestRef);
+  } catch (error) {
+    console.error('Error deleting cargo manifest:', error);
+    throw error;
+  }
+};
 
 // Dashboard data
 export const getLeaveStatistics = () => authAxios.get('/leave-statistics').catch(handleApiError);
@@ -676,7 +717,11 @@ const api = {
   submitCustomsDocument,
   getUserSettings,
   updateUserSettings,
-  getAllUsersInCompany
+  getAllUsersInCompany,
+  getCargoManifests,
+  submitCargoManifest,
+  updateCargoManifest,
+  deleteCargoManifest
 };
 
 export default api;
