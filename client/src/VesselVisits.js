@@ -51,9 +51,8 @@ import {
   listAll,
   deleteObject,
 } from "firebase/storage";
-import dayjs from "dayjs";
-import utc from "dayjs/plugin/utc";
-import timezone from "dayjs/plugin/timezone";
+
+// import firebase from './firebase'; // Assume Firebase is properly configured
 
 const VesselVisits = () => {
   const [openDialog, setOpenDialog] = useState(false);
@@ -104,10 +103,6 @@ const VesselVisits = () => {
   const [fileError, setFileError] = useState("");
   const fileInputRef = useRef(null); // Create a ref for the file input
   const [downloadURL, setDownloadURL] = useState("");
-
-  dayjs.extend(utc);
-  dayjs.extend(timezone);
-  const singaporeTimeZone = "Asia/Singapore";
 
   useEffect(() => {
     const fetchData = async () => {
@@ -311,41 +306,40 @@ const VesselVisits = () => {
   }
 
   const checkFacilityAvailability = async (vesselVisitRequest) => {
-    const { loa, draft, cargoType, eta, etd } = vesselVisitRequest;
-    const facilityListCollectionRef = collection(db, "facilityList");
-    const facilityListSnapshot = await getDocs(facilityListCollectionRef);
-    const matchedBerths = [];
-    const etaAdjustedDate = new Date();
-    const etdAdjustedDate = new Date();
+    const {imoNumber, loa, draft, cargoType, eta, etd } = vesselVisitRequest;
 
     // Helper function to check if assets are available during a time range
     function isBerthAvailable(facility, eta, etd) {
-      try {
-        for (const [key, period] of Object.entries(facility.bookedPeriod)) {
-          const [bookedEta, bookedEtd] = period;
-          // If the asset's booked period overlaps with the requested period, it's unavailable
-          if (
-            !(
-              new Date(etd) <= new Date(bookedEta) ||
-              new Date(eta) >= new Date(bookedEtd)
-            )
-          ) {
-            console.log(
-              "Berth " +
-                facility.name +
-                "is not available because it has been reserved"
-            );
-            return false;
-          }
+      for (const [key, period] of Object.entries(facility.bookedPeriod)) {
+        const [bookedEta, bookedEtd] = period;
+        // If the asset's booked period overlaps with the requested period, it's unavailable
+        if (
+          !(
+            new Date(etd) <= new Date(bookedEta) ||
+            new Date(eta) >= new Date(bookedEtd)
+          )
+        ) {
+          console.log(
+            "Berth " +
+              facility.name +
+              "is not available because it has been reserved"
+          );
+          return false;
         }
-        return true; // Available if no conflicts found
-      } catch (error) {
-        console.error("Error checking berth availability: ", error);
       }
+      return true;
     }
 
     try {
       // Step 1: Check the facilityList to find berths that match the vessel's LOA, draft, and cargoType
+      const facilityListCollectionRef = collection(db, "portConfigurations");
+      const facilityListQuery = query(
+        facilityListCollectionRef,
+        where("type", "==", "berth")
+      );
+      const facilityListSnapshot = await getDocs(facilityListQuery);
+      const matchedBerths = [];
+
       facilityListSnapshot.forEach((doc) => {
         const berth = doc.data();
 
@@ -370,20 +364,6 @@ const VesselVisits = () => {
         };
       }
 
-      const startDate = new Date(eta);
-      const endDate = new Date(etd);
-      console.log("!The start date is " + startDate);
-      console.log("!The end date is " + endDate);
-      console.log("!The eta is " + eta);
-      console.log("!The etd is " + etd);
-      console.log("!As of now, matchedBerths contains: " + matchedBerths);
-    } catch (error) {
-      console.log(
-        "Step 1 for facility demand check has failed because of: " + error
-      );
-    }
-
-    try {
       // Step 2: Loop through each matched berth and check whether it is available during the required hours
       for (const berth of matchedBerths) {
         if (isBerthAvailable(berth, eta, etd)) {
@@ -413,10 +393,11 @@ const VesselVisits = () => {
 
         // Create a new vesselVisitRequest with the adjusted ETA and ETD
         let vesselVisitRequestX = {
+          imoNumber,
           loa,
           draft,
           cargoType,
-          eta: etaAdjustedDate.toISOString(),
+          eta: etaAdjustedDate.toISOString(), //star-denzel remove toISOString()
           etd: etdAdjustedDate.toISOString(),
         };
 
@@ -429,6 +410,21 @@ const VesselVisits = () => {
           "The berth that has been assigned to the vessel is " +
             assignedBerth.name
         );
+        //I need to update the assignedBerth's bookedPeriod map Denzel rectangle
+        assignedBerth.bookedPeriod[formData.imoNumber] = [eta.toISOString(),etd.toISOString()];
+        //Next I need to setDoc
+        const toBeUpdatedDocRef = doc(
+          db,
+          "portConfigurations",
+          assignedBerth.name
+        );
+        await setDoc(toBeUpdatedDocRef, assignedBerth)
+          .then(() => {
+            console.log("Document successfully replaced");
+          })
+          .catch((error) => {
+            console.error("Error replacing document: ", error);
+          });
         return {
           success: true,
           assignedBerth: assignedBerth.name,
@@ -650,6 +646,7 @@ const VesselVisits = () => {
       // Step 1: Check facility availability
       const facilitiesDemandCheckBooleanAndBerth =
         await checkFacilityAvailability({
+          imoNumber: formData.imoNumber,
           loa: formData.loa,
           draft: formData.draft,
           cargoType: formData.cargoType,
@@ -713,11 +710,6 @@ const VesselVisits = () => {
 
   const handleOpenDialog = (type, visit = null) => {
     setVisitType(type);
-    setSelectedFile(null);
-    setFileError("");
-    if (fileInputRef.current) {
-      fileInputRef.current.value = null; // Reset file input
-    }
     if (visit) {
       setFormData({
         vesselName: visit.vesselName,
@@ -923,10 +915,10 @@ const VesselVisits = () => {
       loa: formData.loa,
       draft: formData.draft,
       eta: resourceCheck.facilitiesDemandCheckBooleanAndBerth.success
-        ? resourceCheck.facilitiesDemandCheckBooleanAndBerth.adjustedEta
+        ? resourceCheck.facilitiesDemandCheckBooleanAndBerth.adjustedEta.toISOString()
         : formData.eta.toISOString(),
       etd: resourceCheck.facilitiesDemandCheckBooleanAndBerth.success
-        ? resourceCheck.facilitiesDemandCheckBooleanAndBerth.adjustedEtd
+        ? resourceCheck.facilitiesDemandCheckBooleanAndBerth.adjustedEtd.toISOString()
         : formData.etd.toISOString(),
       cargoType: formData.cargoType,
       cargoVolume: formData.cargoVolume,
@@ -938,14 +930,9 @@ const VesselVisits = () => {
       containersOffloaded: formData.containersOffloaded,
       containersOnloaded: formData.containersOnloaded,
       facilityDemandCheckBoolean:
-        resourceCheck.facilitiesDemandCheckBooleanAndBerth.success !== undefined
-          ? false
-          : false,
+        resourceCheck.facilitiesDemandCheckBooleanAndBerth.success,
       berthAssigned:
-        resourceCheck.facilitiesDemandCheckBooleanAndBerth.assignedBerth !==
-        undefined
-          ? ""
-          : "",
+        resourceCheck.facilitiesDemandCheckBooleanAndBerth.assignedBerth,
       assetDemandCheckBoolean:
         resourceCheck.assetsDemandCheckBooleanAndQuantity.success,
       numberOfCranesNeeded:
@@ -988,6 +975,7 @@ const VesselVisits = () => {
       console.error("Error parsing the CSV file:", error);
       return; // Exit the function if CSV parsing fails
     }
+
     try {
       const docRef = doc(db, "vesselVisitRequests", formData.imoNumber);
       await setDoc(docRef, newVisit);
