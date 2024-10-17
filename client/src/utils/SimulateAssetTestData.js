@@ -1,5 +1,5 @@
-import { db } from './firebaseConfig';
-import { collection, setDoc, doc, getDocs } from 'firebase/firestore';
+const { db } = require('../config/firebaseAdmin');
+const { collection, setDoc, doc, getDocs } = require('firebase-admin/firestore');
 
 // Function to generate asset data
 function generateAssetData(category, name, description, location, ownership, status, expiryDate = null, containersPerHour) {
@@ -19,7 +19,7 @@ function generateAssetData(category, name, description, location, ownership, sta
 }
 
 // Function to create and persist asset data into Firestore
-export async function simulateAssetTestData() {
+async function simulateAssetTestData() {
   const assetsRef = collection(db, "denzel_assets");
 
   // Check if any documents already exist in the collection
@@ -49,7 +49,6 @@ export async function simulateAssetTestData() {
       generateAssetData("Reach stackers", "Stacker Foxtrot", "Reach stacker for dense storage areas", { type: "Point", coordinates: [103.8540, 1.2925] }, "Acquired", "Available", null, 5),
       generateAssetData("Reach stackers", "Stacker Hotel", "Heavy-duty reach stacker for oversized containers", { type: "Point", coordinates: [103.8542, 1.2927] }, "Acquired", "Available", null, 5),
       generateAssetData("Reach stackers", "Stacker India", "Heavy-duty reach stacker for oversized containers", { type: "Point", coordinates: [103.8545, 1.2926] }, "Acquired", "Available", null, 5)
-
     ];
 
     // Persist assets into Firestore
@@ -64,3 +63,5 @@ export async function simulateAssetTestData() {
     console.error("Error creating assets:", error);
   }
 }
+
+module.exports = { simulateAssetTestData };

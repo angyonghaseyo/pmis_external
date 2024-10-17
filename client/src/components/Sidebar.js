@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import axios from 'axios';
 import {
   Drawer,
   List,
@@ -24,15 +25,35 @@ import {
 } from 'lucide-react';
 
 const drawerWidth = 240;
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
-const Sidebar = ({ user }) => {
+const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [expandedItems, setExpandedItems] = useState({});
+  const [userProfile, setUserProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchUserProfile();
+  }, []);
+
+  const fetchUserProfile = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/user/profile`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      setUserProfile(response.data);
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const hasAccessRights = (requiredRights) => {
-    if (!user || !user.accessRights) return false;
-    return requiredRights.some(right => user.accessRights.includes(right));
+    if (!userProfile || !userProfile.accessRights) return false;
+    return requiredRights.some(right => userProfile.accessRights.includes(right));
   };
 
   const navItems = [
@@ -87,7 +108,6 @@ const Sidebar = ({ user }) => {
       children: ['Subitem 1', 'Subitem 2'],
       accessRights: ['View Documents', 'Manage Documents']
     },
-
     {
       name: "Settings",
       icon: <Settings />,
@@ -99,7 +119,6 @@ const Sidebar = ({ user }) => {
       accessRights: ['View Company Information', 'Edit Company Information', 'View Users List', 'Delete User', 'Invite User', 'Delete User Invitations', 'View Invitations List']
     },
   ];
-
 
   const toggleExpand = (index) => {
     setExpandedItems(prev => ({ ...prev, [index]: !prev[index] }));
@@ -129,6 +148,10 @@ const Sidebar = ({ user }) => {
     if (!item.accessRights) return true;
     return hasAccessRights(item.accessRights);
   };
+
+  if (loading) {
+    return null; // or a loading spinner
+  }
 
   return (
     <Drawer

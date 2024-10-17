@@ -1,5 +1,5 @@
-import { db } from "./firebaseConfig";
-import { collection, setDoc, doc, getDocs } from "firebase/firestore";
+const { db } = require('../config/firebaseAdmin');
+const { collection, setDoc, doc, getDocs } = require('firebase-admin/firestore');
 
 // Function to generate team data
 function generateTeamData(timePeriod, startDate, endDate) {
@@ -101,7 +101,7 @@ function generateTeamData(timePeriod, startDate, endDate) {
 }
 
 // Function to create and persist documents into Firestore
-export async function simulateManpowerTestData() {
+async function simulateManpowerTestData() {
   const workSchedulesRef = collection(db, "denzel_work_schedule");
 
   const workScheduleSnapShot = await getDocs(workSchedulesRef);
@@ -130,8 +130,6 @@ export async function simulateManpowerTestData() {
     // Loop over time periods and create documents
     for (let i = 0; i < timePeriods.length; i++) {
       const teamData = generateTeamData(timePeriods[i], startDate, endDate);
-      // Generate the document title by including timePeriod, startDate, and endDate
-      //   const docRef = doc(workSchedulesRef, 'schedule-${timePeriods[i]}-${startDate}-${endDate}`);
       const docRef = doc(
         workSchedulesRef,
         `${timePeriods[i]}^${startDate}^${endDate}`
@@ -146,4 +144,4 @@ export async function simulateManpowerTestData() {
   }
 }
 
-// Call the function to persist the work schedules
+module.exports = { simulateManpowerTestData };

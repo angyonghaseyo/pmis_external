@@ -1,7 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Button, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, CircularProgress, Snackbar, Alert, Tabs, Tab } from '@mui/material';
-import { getTrainingPrograms, registerForProgram, withdrawFromProgram, getUserData } from './services/api';
-import { auth } from './firebaseConfig';
+import axios from 'axios';
+import { 
+    Box, 
+    Typography, 
+    Button, 
+    Paper, 
+    Table, 
+    TableBody, 
+    TableCell, 
+    TableContainer, 
+    TableHead, 
+    TableRow, 
+    CircularProgress, 
+    Snackbar, 
+    Alert, 
+    Tabs, 
+    Tab 
+} from '@mui/material';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
 function TrainingProgram() {
   const [loading, setLoading] = useState(true);
@@ -10,51 +27,41 @@ function TrainingProgram() {
   const [availablePrograms, setAvailablePrograms] = useState([]);
   const [completedPrograms, setCompletedPrograms] = useState([]);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
-  const [user, setUser] = useState(null);
   const [tabValue, setTabValue] = useState(0);
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        fetchTrainingPrograms();
-      } else {
-        setLoading(false);
-        setError('Please log in to view training programs.');
-      }
-    });
-
-    return () => unsubscribe();
+    fetchTrainingPrograms();
   }, []);
 
   const fetchTrainingPrograms = async () => {
     try {
       setLoading(true);
-      const user = auth.currentUser;
-      if (!user) {
+      const token = localStorage.getItem('token');
+      if (!token) {
         setError('No authenticated user found');
         setLoading(false);
         return;
       }
 
-      const userData = await getUserData(user.uid);
-      const allPrograms = await getTrainingPrograms();
-
+      const response = await axios.get(`${API_URL}/training-programs`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      const allPrograms = response.data;
       const now = new Date();
       const enrolled = [];
       const available = [];
       const completed = [];
 
       allPrograms.forEach((program) => {
-        const startDate = program.startDate.toDate();
-        const endDate = program.endDate.toDate();
-        const userEnrollment = userData.enrolledPrograms?.find(ep => ep.programId === program.id);
+        const startDate = new Date(program.startDate);
+        const endDate = new Date(program.endDate);
 
-        if (userEnrollment) {
+        if (program.isEnrolled) {
           if (now <= endDate) {
-            enrolled.push({ ...program, enrollmentDate: userEnrollment.enrollmentDate });
+            enrolled.push(program);
           } else {
-            completed.push({ ...program, enrollmentDate: userEnrollment.enrollmentDate });
+            completed.push(program);
           }
         } else if (now < startDate && program.numberOfCurrentRegistrations < program.participantCapacity) {
           available.push(program);
@@ -74,12 +81,14 @@ function TrainingProgram() {
 
   const handleRegisterClick = async (programId) => {
     try {
-      const user = auth.currentUser;
-      if (!user) {
+      const token = localStorage.getItem('token');
+      if (!token) {
         setSnackbar({ open: true, message: 'You must be logged in to register', severity: 'error' });
         return;
       }
-      await registerForProgram(programId, user.uid);
+      await axios.post(`${API_URL}/training-programs/${programId}/register`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setSnackbar({ open: true, message: 'Successfully registered for the program', severity: 'success' });
       fetchTrainingPrograms(); // Refresh the programs list
     } catch (error) {
@@ -89,12 +98,14 @@ function TrainingProgram() {
 
   const handleWithdrawClick = async (programId) => {
     try {
-      const user = auth.currentUser;
-      if (!user) {
+      const token = localStorage.getItem('token');
+      if (!token) {
         setSnackbar({ open: true, message: 'You must be logged in to withdraw', severity: 'error' });
         return;
       }
-      await withdrawFromProgram(programId, user.uid);
+      await axios.post(`${API_URL}/training-programs/${programId}/withdraw`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setSnackbar({ open: true, message: 'Successfully withdrawn from the program', severity: 'success' });
       fetchTrainingPrograms(); // Refresh the programs list
     } catch (error) {
@@ -157,10 +168,10 @@ function TrainingProgram() {
                   <TableRow key={program.id}>
                     <TableCell>{program.name}</TableCell>
                     <TableCell>{program.description}</TableCell>
-                    <TableCell>{program.startDate.toDate().toLocaleDateString()}</TableCell>
-                    <TableCell>{program.endDate.toDate().toLocaleDateString()}</TableCell>
+                    <TableCell>{new Date(program.startDate).toLocaleDateString()}</TableCell>
+                    <TableCell>{new Date(program.endDate).toLocaleDateString()}</TableCell>
                     <TableCell>{program.mode}</TableCell>
-                    <TableCell>{program.enrollmentDate.toDate().toLocaleDateString()}</TableCell>
+                    <TableCell>{new Date(program.enrollmentDate).toLocaleDateString()}</TableCell>
                     <TableCell>
                       <Button
                         variant="contained"
@@ -202,8 +213,8 @@ function TrainingProgram() {
                   <TableRow key={program.id}>
                     <TableCell>{program.name}</TableCell>
                     <TableCell>{program.description}</TableCell>
-                    <TableCell>{program.startDate.toDate().toLocaleDateString()}</TableCell>
-                    <TableCell>{program.endDate.toDate().toLocaleDateString()}</TableCell>
+                    <TableCell>{new Date(program.startDate).toLocaleDateString()}</TableCell>
+                    <TableCell>{new Date(program.endDate).toLocaleDateString()}</TableCell>
                     <TableCell>{program.mode}</TableCell>
                     <TableCell>{program.participantCapacity - program.numberOfCurrentRegistrations}</TableCell>
                     <TableCell>
@@ -246,10 +257,10 @@ function TrainingProgram() {
                   <TableRow key={program.id}>
                     <TableCell>{program.name}</TableCell>
                     <TableCell>{program.description}</TableCell>
-                    <TableCell>{program.startDate.toDate().toLocaleDateString()}</TableCell>
-                    <TableCell>{program.endDate.toDate().toLocaleDateString()}</TableCell>
+                    <TableCell>{new Date(program.startDate).toLocaleDateString()}</TableCell>
+                    <TableCell>{new Date(program.endDate).toLocaleDateString()}</TableCell>
                     <TableCell>{program.mode}</TableCell>
-                    <TableCell>{program.enrollmentDate.toDate().toLocaleDateString()}</TableCell>
+                    <TableCell>{new Date(program.enrollmentDate).toLocaleDateString()}</TableCell>
                   </TableRow>
                 ))
               )}
@@ -265,6 +276,6 @@ function TrainingProgram() {
       </Snackbar>
     </Box>
   );
-};
+}
 
 export default TrainingProgram;

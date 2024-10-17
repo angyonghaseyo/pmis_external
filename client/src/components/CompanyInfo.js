@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
 import {
   Box,
   TextField,
@@ -14,11 +15,8 @@ import {
   Container
 } from '@mui/material';
 import PhotoCamera from '@mui/icons-material/PhotoCamera';
-import { doc, getDoc } from 'firebase/firestore';
-import { db, auth } from './firebaseConfig';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from './firebaseConfig';
-import { getCompanyInfo, updateCompanyInfo, getUserData } from './services/api';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
 const currencies = [
   { value: 'USD', label: '$ - US Dollar' },
@@ -44,21 +42,26 @@ const CompanyInfo = () => {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [userProfile, setUserProfile] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
 
   const fetchCompanyData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const user = auth.currentUser;
-      if (!user) throw new Error('No authenticated user');
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No authenticated user');
 
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      const userData = userDoc.data();
+      const userResponse = await axios.get(`${API_URL}/user/profile`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const userData = userResponse.data;
+      setUserProfile(userData);
+
       if (!userData || !userData.company) throw new Error('User company not found');
 
-      const companyInfo = await getCompanyInfo(userData.company);
-      setCompanyData({ ...companyInfo, name: userData.company });
+      const companyResponse = await axios.get(`${API_URL}/company/${userData.company}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setCompanyData({ ...companyResponse.data, name: userData.company });
     } catch (err) {
       console.error('Error fetching company data:', err);
       setError('Failed to load company information: ' + err.message);
@@ -67,46 +70,8 @@ const CompanyInfo = () => {
     }
   }, []);
 
-  const fetchUserProfile = async (userId) => {
-    try {
-      const profileData = await getUserData(userId);
-      setUserProfile(profileData);
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-      setError('Failed to fetch user profile. Please try again later.');
-    }
-  };
-
-  const hasRole = (requiredRoles) => {
-    if (!userProfile || !Array.isArray(userProfile.accessRights)) return false;
-    const hasRequiredRole = requiredRoles.some(role => userProfile.accessRights.includes(role));
-    return hasRequiredRole || userProfile.role === 'Admin';
-  };
-
   useEffect(() => {
-    const fetchData = async () => {
-      if (!auth.currentUser) {
-        setError('Please log in to view this page.');
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        setIsLoading(true);
-        setError(null);
-        await Promise.all([
-          fetchCompanyData(),
-          fetchUserProfile(auth.currentUser.uid)
-        ]);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        setError('An error occurred while fetching data. Please try again.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
+    fetchCompanyData();
   }, [fetchCompanyData]);
 
   const handleInputChange = (e) => {
@@ -118,10 +83,15 @@ const CompanyInfo = () => {
     const file = event.target.files[0];
     if (file) {
       try {
-        const storageRef = ref(storage, `company_logos/${companyData.name}`);
-        await uploadBytes(storageRef, file);
-        const logoUrl = await getDownloadURL(storageRef);
-        setCompanyData(prev => ({ ...prev, logoUrl }));
+        const formData = new FormData();
+        formData.append('logo', file);
+        const response = await axios.post(`${API_URL}/company/upload-logo`, formData, {
+          headers: { 
+            'Content-Type': 'multipart/form-data',
+            Authorization: `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        setCompanyData(prev => ({ ...prev, logoUrl: response.data.logoUrl }));
       } catch (err) {
         console.error('Error uploading logo:', err);
         setError('Failed to upload logo: ' + err.message);
@@ -140,11 +110,8 @@ const CompanyInfo = () => {
         address: companyData.address,
         zipCode: companyData.zipCode,
         currencySymbol: companyData.currencySymbol,
+        logoUrl: companyData.logoUrl
       };
-
-      if (companyData.logoUrl) {
-        updatedData.logoUrl = companyData.logoUrl;
-      }
 
       const requiredFields = ['country', 'state', 'city', 'area', 'address', 'zipCode'];
       const missingFields = requiredFields.filter(field => !updatedData[field]);
@@ -152,7 +119,9 @@ const CompanyInfo = () => {
         throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
       }
 
-      await updateCompanyInfo(companyData.name, updatedData);
+      await axios.put(`${API_URL}/company/${companyData.name}`, updatedData, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
       setIsEditable(false);
       setSuccessMessage('Company information updated successfully');
     } catch (err) {
@@ -163,14 +132,13 @@ const CompanyInfo = () => {
     }
   };
 
+  const hasRole = (requiredRoles) => {
+    if (!userProfile || !Array.isArray(userProfile.accessRights)) return false;
+    const hasRequiredRole = requiredRoles.some(role => userProfile.accessRights.includes(role));
+    return hasRequiredRole || userProfile.role === 'Admin';
+  };
+
   if (loading) return <Box display="flex" justifyContent="center" alignItems="center" height="100vh"><CircularProgress /></Box>;
-  if (isLoading) {
-    return (
-      <Container maxWidth="lg" sx={{ mt: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
-        <CircularProgress />
-      </Container>
-    );
-  }
 
   return (
     <Box sx={{ maxWidth: '1000px', mx: 'auto', p: 3 }}>

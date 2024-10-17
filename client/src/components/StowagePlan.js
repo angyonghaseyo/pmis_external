@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import Papa from 'papaparse';
+import axios from 'axios';
 import { Button, Typography, Box, TextField, Snackbar, Alert } from '@mui/material';
-import { createStowagePlan } from './services/api';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
 const StowagePlan = () => {
-  const [parsedData, setParsedData] = useState([]);
+  const [file, setFile] = useState(null);
   const [rows, setRows] = useState(10);
   const [bays, setBays] = useState(10);
   const [tiers, setTiers] = useState(3);
@@ -14,19 +15,15 @@ const StowagePlan = () => {
   const [toastSeverity, setToastSeverity] = useState('success');
 
   const handleFileUpload = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      Papa.parse(file, {
-        delimiter: ',',
-        header: true,
-        skipEmptyLines: true,
-        complete: (result) => {
-          const { data } = result;
-          setParsedData(data);
-          setCsvUploaded(true);
-          showToast('CSV file successfully uploaded!', 'success');
-        },
-      });
+    const uploadedFile = event.target.files[0];
+    if (uploadedFile) {
+      if (uploadedFile.type !== "text/csv") {
+        showToast('Please upload a valid CSV file.', 'error');
+        return;
+      }
+      setFile(uploadedFile);
+      setCsvUploaded(true);
+      showToast('CSV file successfully uploaded!', 'success');
     }
   };
 
@@ -47,15 +44,19 @@ const StowagePlan = () => {
       return;
     }
 
-    const planData = {
-      rows,
-      bays,
-      tiers,
-      data: parsedData,
-    };
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('rows', rows);
+    formData.append('bays', bays);
+    formData.append('tiers', tiers);
 
     try {
-      await createStowagePlan(planData);
+      await axios.post(`${API_URL}/stowage-plan`, formData, {
+        headers: { 
+          'Content-Type': 'multipart/form-data',
+          Authorization: `Bearer ${localStorage.getItem('token')}`
+        }
+      });
       showToast('Stowage plan successfully submitted!', 'success');
     } catch (error) {
       console.error('Error submitting stowage plan:', error);
@@ -123,7 +124,6 @@ const StowagePlan = () => {
         </Button>
       </Box>
 
-      {/* Snackbar for Toast Messages */}
       <Snackbar open={toastOpen} autoHideDuration={6000} onClose={handleCloseToast}>
         <Alert onClose={handleCloseToast} severity={toastSeverity} sx={{ width: '100%' }}>
           {toastMessage}

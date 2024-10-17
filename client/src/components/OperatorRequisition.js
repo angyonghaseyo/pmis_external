@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
 import {
   Box,
   Typography,
@@ -27,11 +28,11 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import { Close } from '@mui/icons-material';
-import { getOperatorRequisitions, createOperatorRequisition, updateOperatorRequisition, deleteOperatorRequisition, getUserData } from './services/api';
-import { auth } from './firebaseConfig';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
 const operatorSkills = ['Crane Operator', 'Forklift Operator', 'Equipment Technician'];
-const durations = ['1 Hour', '2 Hours', '3 Hours', '4 Hours']; // Fixed duration options
+const durations = ['1 Hour', '2 Hours', '3 Hours', '4 Hours'];
 
 const OperatorRequisition = () => {
   const [pendingRequests, setPendingRequests] = useState([]);
@@ -49,18 +50,15 @@ const OperatorRequisition = () => {
   const [isEditing, setIsEditing] = useState(null);
   const [tabValue, setTabValue] = useState(0);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
-  const [userProfile, setUserProfile] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+
   const fetchRequisitions = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const user = auth.currentUser;
-      if (!user) {
-        setError('No authenticated user found');
-        return;
-      }
-      const requisitions = await getOperatorRequisitions(user.uid);
+      const response = await axios.get(`${API_URL}/operator-requisitions`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      const requisitions = response.data;
 
       // Filter pending, approved, and rejected requests
       const pending = requisitions.filter(req => req.status === 'Pending');
@@ -76,54 +74,8 @@ const OperatorRequisition = () => {
   }, []);
 
   useEffect(() => {
-    const fetchData = async (user) => {
-      if (user) {
-        try {
-          setIsLoading(true);
-          setError(null);
-          await Promise.all([
-            fetchRequisitions(),
-            fetchUserProfile(user.uid)
-          ]);
-        } catch (error) {
-          console.error('Error fetching data:', error);
-          setError('An error occurred while fetching data. Please try again.');
-        } finally {
-          setIsLoading(false);
-        }
-      } else {
-        setError('Please log in to view requisitions.');
-        setUserProfile(null);
-        setIsLoading(false);
-      }
-    };
-
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      fetchData(user);
-    });
-
-    return () => unsubscribe();
+    fetchRequisitions();
   }, [fetchRequisitions]);
-
-  const fetchUserProfile = async (userId) => {
-    try {
-      const profileData = await getUserData(userId);
-      setUserProfile(profileData);
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-      setError('Failed to fetch user profile. Please try again later.');
-    }
-  };
-  const hasRole = (requiredRoles) => {
-    if (!userProfile || !Array.isArray(userProfile.accessRights)) return false;
-
-    // Check if the user has any of the required roles
-    const hasRequiredRole = requiredRoles.some(role => userProfile.accessRights.includes(role));
-
-    // Return true if the user has a required role or is an Admin
-    return hasRequiredRole || userProfile.role === 'Admin';
-  };
-
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -144,9 +96,6 @@ const OperatorRequisition = () => {
 
   const handleSubmit = async () => {
     try {
-      const user = auth.currentUser;
-      if (!user) throw new Error('No authenticated user');
-
       if (!formData.time) {
         setSnackbar({ open: true, message: 'Time is a required field', severity: 'error' });
         return;
@@ -161,9 +110,13 @@ const OperatorRequisition = () => {
       }
 
       if (isEditing !== null) {
-        await updateOperatorRequisition(isEditing, { ...formData, userId: user.uid });
+        await axios.put(`${API_URL}/operator-requisitions/${isEditing}`, formData, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
       } else {
-        await createOperatorRequisition({ ...formData, userId: user.uid, status: 'Pending' });
+        await axios.post(`${API_URL}/operator-requisitions`, formData, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
       }
       handleCloseDialog();
       await fetchRequisitions();
@@ -173,11 +126,12 @@ const OperatorRequisition = () => {
     }
   };
 
-
   const handleDelete = async (id) => {
     try {
-      await deleteOperatorRequisition(id);
-      await fetchRequisitions(); // Refetch after deletion
+      await axios.delete(`${API_URL}/operator-requisitions/${id}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      await fetchRequisitions();
       setSnackbar({ open: true, message: 'Requisition deleted successfully', severity: 'success' });
     } catch (err) {
       setSnackbar({ open: true, message: 'Failed to delete requisition', severity: 'error' });
@@ -210,26 +164,16 @@ const OperatorRequisition = () => {
     );
   }
 
-  if (isLoading) {
-    return (
-      <Container maxWidth="lg" sx={{ mt: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
-        <CircularProgress />
-      </Container>
-    );
-  }
-
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
         Operator Requisition
       </Typography>
-      {hasRole(["Create Operator Requisition"]) && (
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
-          <Button variant="contained" color="primary" onClick={handleOpenDialog}>
-            Create New Request
-          </Button>
-        </Box>
-      )}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
+        <Button variant="contained" color="primary" onClick={handleOpenDialog}>
+          Create New Request
+        </Button>
+      </Box>
 
       <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 2 }}>
         <Tab label="Pending Requests" />

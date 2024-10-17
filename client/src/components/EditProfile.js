@@ -1,10 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { TextField, Button, Box, Typography, Select, MenuItem, InputLabel, FormControl, Grid, Avatar, Chip, Snackbar, Alert } from '@mui/material';
-import { getCurrentUser, updateUserProfile, sendPasswordResetEmailToUser, deleteUserAccount } from './services/api';
-import { auth, db, storage } from './firebaseConfig';
-import { updateProfile } from 'firebase/auth';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import axios from 'axios';
+import {
+  TextField,
+  Button,
+  Box,
+  Typography,
+  Select,
+  MenuItem,
+  InputLabel,
+  FormControl,
+  Grid,
+  Avatar,
+  Chip,
+  Snackbar,
+  Alert,
+  CircularProgress
+} from '@mui/material';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
 const teams = [
   'Assets and Facilities',
@@ -27,7 +40,6 @@ function EditProfile() {
     teams: [],
     accessRights: [],
   });
-  const [selectedImage, setSelectedImage] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
@@ -39,25 +51,10 @@ function EditProfile() {
   const fetchUserProfile = async () => {
     try {
       setLoading(true);
-      const user = auth.currentUser;
-      if (user) {
-        const userDocRef = doc(db, 'users', user.uid);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          setProfile({
-            email: user.email || '',
-            salutation: userData.salutation || '',
-            firstName: userData.firstName || '',
-            lastName: userData.lastName || '',
-            company: userData.company || 'Oceania Port',
-            userType: userData.userType || 'Normal',
-            teams: userData.teams || [],
-            accessRights: userData.accessRights || [],
-          });
-          setSelectedImage(user.photoURL);
-        }
-      }
+      const response = await axios.get(`${API_URL}/user/profile`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      setProfile(response.data);
     } catch (err) {
       console.error("Error fetching user profile:", err);
       setError('Failed to fetch user profile');
@@ -74,49 +71,12 @@ function EditProfile() {
     }));
   };
 
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const imageUrl = URL.createObjectURL(file);
-      setSelectedImage(imageUrl);
-    }
-  };
-
   const handleSubmit = async () => {
     try {
       setLoading(true);
-      let photoURL = selectedImage;
-
-      if (selectedImage && selectedImage.startsWith('blob:')) {
-        const imageRef = ref(storage, `profile_photos/${auth.currentUser.uid}`);
-        const response = await fetch(selectedImage);
-        const blob = await response.blob();
-        await uploadBytes(imageRef, blob);
-        photoURL = await getDownloadURL(imageRef);
-      }
-
-      const fullName = `${profile.salutation} ${profile.firstName} ${profile.lastName}`.trim();
-      const updatedProfile = {
-        displayName: fullName,
-        photoURL: photoURL,
-      };
-
-      // Update Firebase Auth user profile
-      await updateProfile(auth.currentUser, updatedProfile);
-
-      // Update Firestore document
-      const userDocRef = doc(db, 'users', auth.currentUser.uid);
-      await updateDoc(userDocRef, {
-        salutation: profile.salutation,
-        firstName: profile.firstName,
-        lastName: profile.lastName,
-        displayName: fullName,
-        photoURL: photoURL,
-        company: profile.company,
-        userType: profile.userType,
-        // Note: We're not updating 'teams' here as it should be managed elsewhere
+      await axios.put(`${API_URL}/user/profile`, profile, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
-
       setSnackbar({ open: true, message: 'Profile updated successfully', severity: 'success' });
     } catch (err) {
       console.error('Error updating profile:', err);
@@ -128,7 +88,7 @@ function EditProfile() {
 
   const handlePasswordReset = async () => {
     try {
-      await sendPasswordResetEmailToUser(profile.email);
+      await axios.post(`${API_URL}/auth/forgot-password`, { email: profile.email });
       setSnackbar({ open: true, message: 'Password reset email sent. Please check your inbox.', severity: 'success' });
     } catch (err) {
       console.error('Error sending password reset email:', err);
@@ -139,7 +99,9 @@ function EditProfile() {
   const handleDeleteAccount = async () => {
     if (window.confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
       try {
-        await deleteUserAccount();
+        await axios.delete(`${API_URL}/user/profile`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
         setSnackbar({ open: true, message: 'Your account has been deleted successfully.', severity: 'success' });
         // Redirect to login page or show a goodbye message
       } catch (err) {
@@ -156,25 +118,12 @@ function EditProfile() {
     setSnackbar({ ...snackbar, open: false });
   };
 
-  if (loading) return <Typography>Loading...</Typography>;
+  if (loading) return <CircularProgress />;
   if (error) return <Typography color="error">{error}</Typography>;
 
   return (
     <Box sx={{ padding: '1rem' }}>
       <Typography variant="h4" gutterBottom>Profile</Typography>
-
-      <Box display="flex" alignItems="center" sx={{ marginBottom: '2rem' }}>
-        <Avatar
-          sx={{ width: 100, height: 100, marginRight: '1rem' }}
-          src={selectedImage || ''}
-        >
-          {!selectedImage && profile.firstName[0]}
-        </Avatar>
-        <Button variant="outlined" component="label">
-          Upload Photo
-          <input hidden accept="image/*" type="file" onChange={handleImageUpload} />
-        </Button>
-      </Box>
 
       <Grid container spacing={2}>
         <Grid item xs={12}>

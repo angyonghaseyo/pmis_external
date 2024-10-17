@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { auth, sendPasswordResetEmail } from './firebaseConfig';
+import axios from 'axios';
 import {
     TextField,
     Button,
@@ -11,6 +11,8 @@ import {
     Paper,
     Container
 } from '@mui/material';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
 function ForgotPassword() {
     const [email, setEmail] = useState('');
@@ -24,23 +26,11 @@ function ForgotPassword() {
         setIsLoading(true);
 
         try {
-            await sendPasswordResetEmail(auth, email);
+            await axios.post(`${API_URL}/auth/forgot-password`, { email });
             setIsSubmitted(true);
         } catch (error) {
             console.error('Error sending reset email:', error);
-            switch (error.code) {
-                case 'auth/user-not-found':
-                    setError('No user found with this email address.');
-                    break;
-                case 'auth/invalid-email':
-                    setError('Invalid email address. Please check and try again.');
-                    break;
-                case 'auth/too-many-requests':
-                    setError('Too many requests. Please try again later.');
-                    break;
-                default:
-                    setError('Failed to send reset email. Please try again.');
-            }
+            setError(error.response?.data?.error || 'Failed to send reset email. Please try again.');
         } finally {
             setIsLoading(false);
         }

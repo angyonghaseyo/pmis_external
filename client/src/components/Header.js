@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { auth, signOut } from './firebaseConfig';
+import axios from 'axios';
 import { Box, AppBar, Toolbar, IconButton, Menu, MenuItem, Typography, Avatar, Button, Select, FormControl, CircularProgress } from '@mui/material';
 import { Notifications, Logout, Person, DirectionsBoat } from '@mui/icons-material';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
 function Header() {
   const [user, setUser] = useState(null);
@@ -13,17 +15,33 @@ function Header() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
-      setUser(currentUser);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
+    fetchUserProfile();
   }, []);
+
+  const fetchUserProfile = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+      const response = await axios.get(`${API_URL}/user/profile`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setUser(response.data);
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      await axios.post(`${API_URL}/auth/logout`, {}, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      localStorage.removeItem('token');
       navigate('/login');
     } catch (error) {
       console.error('Error signing out:', error);

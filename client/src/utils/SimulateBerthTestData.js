@@ -1,8 +1,8 @@
-import { db } from "./firebaseConfig"; // Firestore configuration
-import { collection, getDocs, setDoc, doc } from "firebase/firestore";
+const { db } = require('../config/firebaseAdmin');
+const { collection, getDocs, setDoc, doc } = require('firebase-admin/firestore');
 
 // Function to simulate adding test data to Firestore
-export const simulateBerthTestData = async () => {
+async function simulateBerthTestData() {
   const facilityListCollectionRef = collection(db, "facilityList");
 
   // Check if the "facilityList" collection already has documents
@@ -21,16 +21,10 @@ export const simulateBerthTestData = async () => {
       beamCapacity: 45, // in meters
       displacementCapacity: 150000, // in tons
       cargoType: "Container",
-      bookedPeriod: new Map([
-        [
-          "period1",
-          [new Date("2024-10-08T10:00:00").toISOString(), new Date("2024-10-08T12:00:00").toISOString()],
-        ],
-        [
-          "period2",
-          [new Date("2024-11-01T10:00:00").toISOString(), new Date("2024-11-03T12:00:00").toISOString()],
-        ],
-      ]),
+      bookedPeriod: {
+        period1: [new Date("2024-10-08T10:00:00").toISOString(), new Date("2024-10-08T12:00:00").toISOString()],
+        period2: [new Date("2024-11-01T10:00:00").toISOString(), new Date("2024-11-03T12:00:00").toISOString()],
+      },
     },
     {
       name: "B2",
@@ -39,14 +33,9 @@ export const simulateBerthTestData = async () => {
       beamCapacity: 50, // in meters
       displacementCapacity: 200000, // in tons
       cargoType: "Bulk",
-      bookedPeriod: new Map([]),
+      bookedPeriod: {},
     },
   ];
-
-// Convert the bookedPeriod Map to an object for Firebase
-  berths.forEach((berth) => {
-    berth.bookedPeriod = Object.fromEntries(berth.bookedPeriod);
-  });
 
   // Add the berths to the facilityList collection
   for (const berth of berths) {
@@ -60,4 +49,6 @@ export const simulateBerthTestData = async () => {
   }
 
   console.log("FacilityList data simulation completed.");
-};
+}
+
+module.exports = { simulateBerthTestData };

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import {
   Box,
   Typography,
@@ -26,17 +27,14 @@ import {
   Container
 } from '@mui/material';
 import { Edit, Reply } from '@mui/icons-material';
-import { getUserInquiriesFeedback, createInquiryFeedback, updateInquiryFeedback, getUserData } from './services/api';
-import { auth } from './firebaseConfig';
 import { format } from 'date-fns';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
-const InquiryFeedback = ({ userType }) => {
-  const [user, setUser] = useState(null);
+const InquiryFeedback = () => {
   const [inquiries, setInquiries] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [formData, setFormData] = useState({
-    incrementalId: '',
     type: 'Inquiry',
     subject: '',
     description: '',
@@ -47,52 +45,26 @@ const InquiryFeedback = ({ userType }) => {
   const [formErrors, setFormErrors] = useState({ subject: false, description: false });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [submitError, setSubmitError] = useState(null);
   const [editingInquiry, setEditingInquiry] = useState(null);
   const [replyDialogOpen, setReplyDialogOpen] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
-  const [userProfile, setUserProfile] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = async (currentUser) => {
-      if (currentUser) {
-        try {
-          await Promise.all([
-            fetchUserProfile(currentUser.uid),
-            fetchInquiriesFeedback(),
-
-          ]);
-        } catch (error) {
-          console.error('Error fetching data:', error);
-          // Optionally set an error state here
-        }
-      } else {
-        setUserProfile(null);
-        // Optionally, you might want to clear other data here as well
-      }
-      setIsLoading(false);
-    };
-
-    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
-      setUser(currentUser);
-      setIsLoading(true); // Set loading to true when auth state changes
-      fetchData(currentUser);
-    });
-
-    return () => unsubscribe();
+    fetchInquiriesFeedback();
   }, []);
 
   const fetchInquiriesFeedback = async () => {
     try {
       setLoading(true);
-      const data = await getUserInquiriesFeedback();
-      setInquiries(data);
-      setLoading(false);
+      const response = await axios.get(`${API_URL}/inquiries`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      setInquiries(response.data);
     } catch (err) {
       console.error('Error fetching inquiries and feedback:', err);
       setError('Failed to fetch inquiries and feedback. Please try again later.');
+    } finally {
       setLoading(false);
     }
   };
@@ -101,7 +73,6 @@ const InquiryFeedback = ({ userType }) => {
     if (inquiry) {
       setEditingInquiry(inquiry);
       setFormData({
-        incrementalId: inquiry.incrementalId,
         type: inquiry.type,
         subject: inquiry.subject,
         description: inquiry.description,
@@ -112,7 +83,6 @@ const InquiryFeedback = ({ userType }) => {
     } else {
       setEditingInquiry(null);
       setFormData({
-        incrementalId: '',
         type: 'Inquiry',
         subject: '',
         description: '',
@@ -122,13 +92,11 @@ const InquiryFeedback = ({ userType }) => {
       });
     }
     setOpenDialog(true);
-    setSubmitError(null);
   };
 
   const handleDialogClose = () => {
     setOpenDialog(false);
     setFormErrors({ subject: false, description: false });
-    setSubmitError(null);
     setEditingInquiry(null);
   };
 
@@ -152,21 +120,27 @@ const InquiryFeedback = ({ userType }) => {
     if (!errors.subject && !errors.description) {
       try {
         setLoading(true);
-        setSubmitError(null);
 
-        const submissionData = {
-          type: formData.type,
-          subject: formData.subject,
-          description: formData.description,
-          status: 'Pending',
-          urgency: formData.urgency,
-          file: formData.file instanceof File ? formData.file : null
-        };
+        const submitData = new FormData();
+        for (const key in formData) {
+          submitData.append(key, formData[key]);
+        }
 
+        let response;
         if (editingInquiry) {
-          await updateInquiryFeedback(editingInquiry.incrementalId, submissionData);
+          response = await axios.put(`${API_URL}/inquiries/${editingInquiry.id}`, submitData, {
+            headers: { 
+              'Content-Type': 'multipart/form-data',
+              Authorization: `Bearer ${localStorage.getItem('token')}`
+            }
+          });
         } else {
-          await createInquiryFeedback(submissionData);
+          response = await axios.post(`${API_URL}/inquiries`, submitData, {
+            headers: { 
+              'Content-Type': 'multipart/form-data',
+              Authorization: `Bearer ${localStorage.getItem('token')}`
+            }
+          });
         }
 
         handleDialogClose();
@@ -174,7 +148,6 @@ const InquiryFeedback = ({ userType }) => {
         setSnackbar({ open: true, message: 'Submission successful', severity: 'success' });
       } catch (err) {
         console.error('Error submitting inquiry/feedback:', err);
-        setSubmitError(`Failed to submit: ${err.message}`);
         setSnackbar({ open: true, message: 'Submission failed', severity: 'error' });
       } finally {
         setLoading(false);
@@ -196,8 +169,10 @@ const InquiryFeedback = ({ userType }) => {
   const handleReplySubmit = async () => {
     try {
       setLoading(true);
-      await updateInquiryFeedback(editingInquiry.incrementalId, {
-        userReply: replyText,
+      await axios.post(`${API_URL}/inquiries/${editingInquiry.id}/reply`, {
+        reply: replyText
+      }, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       handleReplyClose();
       fetchInquiriesFeedback();
@@ -217,46 +192,16 @@ const InquiryFeedback = ({ userType }) => {
     setSnackbar({ ...snackbar, open: false });
   };
 
-  const hasRole = (requiredRoles) => {
-    if (!userProfile || !Array.isArray(userProfile.accessRights)) return false;
-
-    // Check if the user has any of the required roles
-    const hasRequiredRole = requiredRoles.some(role => userProfile.accessRights.includes(role));
-
-    // Return true if the user has a required role or is an Admin
-    return hasRequiredRole || userProfile.role === 'Admin';
-  };
-
-  const fetchUserProfile = async (userId) => {
-    try {
-      const profileData = await getUserData(userId);
-      setUserProfile(profileData);
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-      setError('Failed to fetch user profile. Please try again later.');
-    }
-  };
-
   if (loading) return <Box display="flex" justifyContent="center" alignItems="center" height="100vh"><CircularProgress /></Box>;
   if (error) return <Typography color="error" align="center">{error}</Typography>;
-
-  if (isLoading) {
-    return (
-      <Container maxWidth="lg" sx={{ mt: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
-        <CircularProgress />
-      </Container>
-    );
-  }
 
   return (
     <Box sx={{ p: 3 }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4" component="h2">Inquiries & Feedback</Typography>
-        {hasRole(["Create Inquiries and Feedback"]) &&
-          <Button variant="contained" color="primary" onClick={() => handleDialogOpen()}>
-            Create New Inquiry / Feedback
-          </Button>
-        }
+        <Button variant="contained" color="primary" onClick={() => handleDialogOpen()}>
+          Create New Inquiry / Feedback
+        </Button>
       </Box>
 
       <Grid container spacing={3} mb={3}>
@@ -297,13 +242,13 @@ const InquiryFeedback = ({ userType }) => {
           </TableHead>
           <TableBody>
             {inquiries.map((inquiry) => (
-              <TableRow key={inquiry.incrementalId}>
-                <TableCell>{inquiry.incrementalId}</TableCell>
+              <TableRow key={inquiry.id}>
+                <TableCell>{inquiry.id}</TableCell>
                 <TableCell>{inquiry.type}</TableCell>
                 <TableCell>{inquiry.subject}</TableCell>
                 <TableCell>{inquiry.status}</TableCell>
                 <TableCell>
-                  {inquiry.createdAt ? format(inquiry.createdAt.toDate(), 'yyyy-MM-dd HH:mm') : 'N/A'}
+                  {format(new Date(inquiry.createdAt), 'yyyy-MM-dd HH:mm')}
                 </TableCell>
                 <TableCell>{inquiry.urgency}</TableCell>
                 <TableCell>
@@ -327,7 +272,6 @@ const InquiryFeedback = ({ userType }) => {
       <Dialog open={openDialog} onClose={handleDialogClose} maxWidth="sm" fullWidth>
         <DialogTitle>{editingInquiry ? 'Edit Inquiry / Feedback' : 'Create New Inquiry / Feedback'}</DialogTitle>
         <DialogContent>
-          {submitError && <Alert severity="error" sx={{ mb: 2 }}>{submitError}</Alert>}
           <TextField
             select
             fullWidth
