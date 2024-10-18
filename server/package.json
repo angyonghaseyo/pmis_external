@@ -1,18 +1,22 @@
 {
-  "name": "external-port-management-system-server",
+  "name": "pmis-server",
   "version": "1.0.0",
-  "description": "Server for External Port Management System",
-  "main": "index.js",
+  "description": "Server for Port Management Information System",
+  "main": "server.js",
   "scripts": {
-    "start": "set PORT=5001 && node index.js",
-    "dev": "nodemon index.js"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
   "dependencies": {
+    "body-parser": "^1.19.0",
     "cors": "^2.8.5",
+    "dotenv": "^10.0.0",
     "express": "^4.17.1",
-    "firebase-admin": "^12.4.0"
+    "firebase-admin": "^12.6.0",
+    "helmet": "^4.6.0",
+    "morgan": "^1.10.0"
   },
   "devDependencies": {
-    "nodemon": "^2.0.7"
+    "nodemon": "^2.0.12"
   }
 }

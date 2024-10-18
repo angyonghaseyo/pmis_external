@@ -1,4 +1,5 @@
 /server/config/serviceAccountKey.json
+/server/.env
 # Ignore node_modules in client
 client/node_modules/
 

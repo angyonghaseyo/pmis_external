@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const admin = require('../config/firebaseAdmin');
+const admin = require('../config/firebase-admin');
 
 router.get('/resources', async (req, res) => {
   try {

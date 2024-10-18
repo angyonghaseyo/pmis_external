@@ -1,9 +1,44 @@
 import React, { useState, useEffect } from 'react';
+import {
+  Box,
+  Typography,
+  Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  TextField,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  CircularProgress,
+  Snackbar,
+  Alert
+} from '@mui/material';
 import { getUsers, createUser, updateUser, deleteUser } from '../services/api';
 
 const UserAccountManagement = () => {
   const [users, setUsers] = useState([]);
-  const [newUser, setNewUser] = useState({ name: '', email: '', role: '' });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [openDialog, setOpenDialog] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [formData, setFormData] = useState({
+    email: '',
+    firstName: '',
+    lastName: '',
+    role: '',
+    status: 'Active'
+  });
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
 
   useEffect(() => {
     fetchUsers();
@@ -11,76 +46,175 @@ const UserAccountManagement = () => {
 
   const fetchUsers = async () => {
     try {
-      const response = await getUsers();
-      setUsers(response.data);
-    } catch (error) {
-      console.error('Error fetching users:', error);
+      setLoading(true);
+      const data = await getUsers();
+      setUsers(data);
+      setLoading(false);
+    } catch (err) {
+      console.error('Error fetching users:', err);
+      setError('Failed to fetch users. Please try again later.');
+      setLoading(false);
     }
   };
 
-  const handleAddUser = async (e) => {
-    e.preventDefault();
+  const handleOpenDialog = (user = null) => {
+    setCurrentUser(user);
+    setFormData(user || {
+      email: '',
+      firstName: '',
+      lastName: '',
+      role: '',
+      status: 'Active'
+    });
+    setOpenDialog(true);
+  };
+
+  const handleCloseDialog = () => {
+    setOpenDialog(false);
+    setCurrentUser(null);
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prevState => ({ ...prevState, [name]: value }));
+  };
+
+  const handleSubmit = async () => {
     try {
-      await createUser(newUser);
-      setNewUser({ name: '', email: '', role: '' });
+      if (currentUser) {
+        await updateUser(currentUser.id, formData);
+      } else {
+        await createUser(formData);
+      }
+      handleCloseDialog();
       fetchUsers();
-    } catch (error) {
-      console.error('Error adding user:', error);
+      setSnackbar({ open: true, message: `User ${currentUser ? 'updated' : 'created'} successfully`, severity: 'success' });
+    } catch (err) {
+      console.error('Error submitting user:', err);
+      setSnackbar({ open: true, message: 'Failed to submit user', severity: 'error' });
     }
   };
 
-  const handleUpdateUser = async (userId, updatedData) => {
+  const handleDelete = async (id) => {
     try {
-      await updateUser(userId, updatedData);
+      await deleteUser(id);
       fetchUsers();
-    } catch (error) {
-      console.error('Error updating user:', error);
+      setSnackbar({ open: true, message: 'User deleted successfully', severity: 'success' });
+    } catch (err) {
+      console.error('Error deleting user:', err);
+      setSnackbar({ open: true, message: 'Failed to delete user', severity: 'error' });
     }
   };
 
-  const handleDeleteUser = async (userId) => {
-    try {
-      await deleteUser(userId);
-      fetchUsers();
-    } catch (error) {
-      console.error('Error deleting user:', error);
-    }
-  };
+  if (loading) return <CircularProgress />;
+  if (error) return <Typography color="error">{error}</Typography>;
 
   return (
-    <div>
-      <h2>External User Account Management</h2>
-      <form onSubmit={handleAddUser}>
-        <input
-          type="text"
-          placeholder="Name"
-          value={newUser.name}
-          onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-        />
-        <input
-          type="email"
-          placeholder="Email"
-          value={newUser.email}
-          onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-        />
-        <input
-          type="text"
-          placeholder="Role"
-          value={newUser.role}
-          onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
-        />
-        <button type="submit">Add User</button>
-      </form>
-      <ul>
-        {users.map(user => (
-          <li key={user.id}>
-            {user.name} - {user.email} - {user.role}
-            <button onClick={() => handleUpdateUser(user.id, { role: 'new role' })}>Update</button>
-            <button onClick={() => handleDeleteUser(user.id)}>Delete</button>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <Box>
+      <Typography variant="h4" gutterBottom>User Account Management</Typography>
+      <Button variant="contained" color="primary" onClick={() => handleOpenDialog()} sx={{ mb: 2 }}>
+        Add New User
+      </Button>
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>Name</TableCell>
+              <TableCell>Email</TableCell>
+              <TableCell>Role</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell>Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {users.map((user) => (
+              <TableRow key={user.id}>
+                <TableCell>{`${user.firstName} ${user.lastName}`}</TableCell>
+                <TableCell>{user.email}</TableCell>
+                <TableCell>{user.role}</TableCell>
+                <TableCell>{user.status}</TableCell>
+                <TableCell>
+                  <Button onClick={() => handleOpenDialog(user)}>Edit</Button>
+                  <Button onClick={() => handleDelete(user.id)} color="secondary">Delete</Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      <Dialog open={openDialog} onClose={handleCloseDialog}>
+        <DialogTitle>{currentUser ? 'Edit User' : 'Add New User'}</DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            margin="normal"
+            name="email"
+            label="Email"
+            type="email"
+            value={formData.email}
+            onChange={handleInputChange}
+            disabled={!!currentUser}
+          />
+          <TextField
+            fullWidth
+            margin="normal"
+            name="firstName"
+            label="First Name"
+            value={formData.firstName}
+            onChange={handleInputChange}
+          />
+          <TextField
+            fullWidth
+            margin="normal"
+            name="lastName"
+            label="Last Name"
+            value={formData.lastName}
+            onChange={handleInputChange}
+          />
+          <FormControl fullWidth margin="normal">
+            <InputLabel>Role</InputLabel>
+            <Select
+              name="role"
+              value={formData.role}
+              onChange={handleInputChange}
+            >
+              <MenuItem value="Admin">Admin</MenuItem>
+              <MenuItem value="Manager">Manager</MenuItem>
+              <MenuItem value="Operator">Operator</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl fullWidth margin="normal">
+            <InputLabel>Status</InputLabel>
+            <Select
+              name="status"
+              value={formData.status}
+              onChange={handleInputChange}
+            >
+              <MenuItem value="Active">Active</MenuItem>
+              <MenuItem value="Inactive">Inactive</MenuItem>
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog}>Cancel</Button>
+          <Button onClick={handleSubmit} color="primary">
+            {currentUser ? 'Update' : 'Add'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </Box>
   );
 };
 
