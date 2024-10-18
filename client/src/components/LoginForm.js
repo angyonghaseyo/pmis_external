@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth, db } from './firebaseConfig';
-import { doc, getDoc } from 'firebase/firestore';
+import { loginUser } from '../services/api';
 import { 
     TextField, 
     Button, 
@@ -27,19 +25,11 @@ function LoginForm() {
         setLoading(true);
 
         try {
-            const userCredential = await signInWithEmailAndPassword(auth, email, password);
-            const user = userCredential.user;
-
-            // Check if user exists in the 'users' collection
-            const userDocRef = doc(db, 'users', user.uid);
-            const userDoc = await getDoc(userDocRef);
-
-            if (!userDoc.exists()) {
-                throw new Error('No user profile found');
-            }
-
-            // If we reach here, the user is authenticated and has a profile in the 'users' collection
-            // The App component will handle the redirection
+            const user = await loginUser(email, password);
+            // The loginUser function should handle setting the user in the app's state
+            // and storing the authentication token if necessary
+            setLoading(false);
+            navigate('/'); // Redirect to home page or dashboard
         } catch (error) {
             console.error('Login error:', error);
             setLoading(false);

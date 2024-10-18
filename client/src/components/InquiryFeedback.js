@@ -26,12 +26,10 @@ import {
   Container
 } from '@mui/material';
 import { Edit, Reply } from '@mui/icons-material';
-import { getUserInquiriesFeedback, createInquiryFeedback, updateInquiryFeedback, getUserData } from './services/api';
-import { auth } from './firebaseConfig';
+import { getUserInquiriesFeedback, createInquiryFeedback, updateInquiryFeedback, getUserData } from '../services/api';
 import { format } from 'date-fns';
 
-
-const InquiryFeedback = ({ userType }) => {
+const InquiryFeedback = () => {
   const [user, setUser] = useState(null);
   const [inquiries, setInquiries] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
@@ -53,47 +51,33 @@ const InquiryFeedback = ({ userType }) => {
   const [replyText, setReplyText] = useState('');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [userProfile, setUserProfile] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = async (currentUser) => {
-      if (currentUser) {
-        try {
-          await Promise.all([
-            fetchUserProfile(currentUser.uid),
-            fetchInquiriesFeedback(),
-
-          ]);
-        } catch (error) {
-          console.error('Error fetching data:', error);
-          // Optionally set an error state here
-        }
-      } else {
-        setUserProfile(null);
-        // Optionally, you might want to clear other data here as well
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const userData = await getUserData();
+        setUser(userData);
+        await fetchInquiriesFeedback();
+        await fetchUserProfile();
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        setError('An error occurred while fetching data. Please try again.');
+      } finally {
+        setLoading(false);
       }
-      setIsLoading(false);
     };
 
-    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
-      setUser(currentUser);
-      setIsLoading(true); // Set loading to true when auth state changes
-      fetchData(currentUser);
-    });
-
-    return () => unsubscribe();
+    fetchData();
   }, []);
 
   const fetchInquiriesFeedback = async () => {
     try {
-      setLoading(true);
       const data = await getUserInquiriesFeedback();
       setInquiries(data);
-      setLoading(false);
     } catch (err) {
       console.error('Error fetching inquiries and feedback:', err);
       setError('Failed to fetch inquiries and feedback. Please try again later.');
-      setLoading(false);
     }
   };
 
@@ -219,17 +203,13 @@ const InquiryFeedback = ({ userType }) => {
 
   const hasRole = (requiredRoles) => {
     if (!userProfile || !Array.isArray(userProfile.accessRights)) return false;
-
-    // Check if the user has any of the required roles
     const hasRequiredRole = requiredRoles.some(role => userProfile.accessRights.includes(role));
-
-    // Return true if the user has a required role or is an Admin
     return hasRequiredRole || userProfile.role === 'Admin';
   };
 
-  const fetchUserProfile = async (userId) => {
+  const fetchUserProfile = async () => {
     try {
-      const profileData = await getUserData(userId);
+      const profileData = await getUserData();
       setUserProfile(profileData);
     } catch (error) {
       console.error('Error fetching user profile:', error);
@@ -239,14 +219,6 @@ const InquiryFeedback = ({ userType }) => {
 
   if (loading) return <Box display="flex" justifyContent="center" alignItems="center" height="100vh"><CircularProgress /></Box>;
   if (error) return <Typography color="error" align="center">{error}</Typography>;
-
-  if (isLoading) {
-    return (
-      <Container maxWidth="lg" sx={{ mt: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
-        <CircularProgress />
-      </Container>
-    );
-  }
 
   return (
     <Box sx={{ p: 3 }}>
@@ -303,7 +275,7 @@ const InquiryFeedback = ({ userType }) => {
                 <TableCell>{inquiry.subject}</TableCell>
                 <TableCell>{inquiry.status}</TableCell>
                 <TableCell>
-                  {inquiry.createdAt ? format(inquiry.createdAt.toDate(), 'yyyy-MM-dd HH:mm') : 'N/A'}
+                  {inquiry.createdAt ? format(new Date(inquiry.createdAt), 'yyyy-MM-dd HH:mm') : 'N/A'}
                 </TableCell>
                 <TableCell>{inquiry.urgency}</TableCell>
                 <TableCell>

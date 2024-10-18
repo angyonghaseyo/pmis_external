@@ -87,7 +87,6 @@ const Sidebar = ({ user }) => {
       children: ['Subitem 1', 'Subitem 2'],
       accessRights: ['View Documents', 'Manage Documents']
     },
-
     {
       name: "Settings",
       icon: <Settings />,
@@ -99,7 +98,6 @@ const Sidebar = ({ user }) => {
       accessRights: ['View Company Information', 'Edit Company Information', 'View Users List', 'Delete User', 'Invite User', 'Delete User Invitations', 'View Invitations List']
     },
   ];
-
 
   const toggleExpand = (index) => {
     setExpandedItems(prev => ({ ...prev, [index]: !prev[index] }));

@@ -14,11 +14,9 @@ import {
   Container
 } from '@mui/material';
 import PhotoCamera from '@mui/icons-material/PhotoCamera';
-import { doc, getDoc } from 'firebase/firestore';
-import { db, auth } from './firebaseConfig';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from './firebaseConfig';
-import { getCompanyInfo, updateCompanyInfo, getUserData } from './services/api';
+import { storage } from '../firebaseConfig';
+import { getCompanyInfo, updateCompanyInfo, getUserData } from '../services/api';
 
 const currencies = [
   { value: 'USD', label: '$ - US Dollar' },
@@ -50,15 +48,11 @@ const CompanyInfo = () => {
     try {
       setLoading(true);
       setError(null);
-      const user = auth.currentUser;
+      const user = await getUserData();
       if (!user) throw new Error('No authenticated user');
 
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      const userData = userDoc.data();
-      if (!userData || !userData.company) throw new Error('User company not found');
-
-      const companyInfo = await getCompanyInfo(userData.company);
-      setCompanyData({ ...companyInfo, name: userData.company });
+      const companyInfo = await getCompanyInfo(user.company);
+      setCompanyData({ ...companyInfo, name: user.company });
     } catch (err) {
       console.error('Error fetching company data:', err);
       setError('Failed to load company information: ' + err.message);
@@ -67,9 +61,28 @@ const CompanyInfo = () => {
     }
   }, []);
 
-  const fetchUserProfile = async (userId) => {
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        await Promise.all([
+          fetchCompanyData(),
+          fetchUserProfile()
+        ]);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        setError('An error occurred while fetching data. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [fetchCompanyData]);
+
+  const fetchUserProfile = async () => {
     try {
-      const profileData = await getUserData(userId);
+      const profileData = await getUserData();
       setUserProfile(profileData);
     } catch (error) {
       console.error('Error fetching user profile:', error);
@@ -82,32 +95,6 @@ const CompanyInfo = () => {
     const hasRequiredRole = requiredRoles.some(role => userProfile.accessRights.includes(role));
     return hasRequiredRole || userProfile.role === 'Admin';
   };
-
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!auth.currentUser) {
-        setError('Please log in to view this page.');
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        setIsLoading(true);
-        setError(null);
-        await Promise.all([
-          fetchCompanyData(),
-          fetchUserProfile(auth.currentUser.uid)
-        ]);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        setError('An error occurred while fetching data. Please try again.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [fetchCompanyData]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;

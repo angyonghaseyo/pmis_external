@@ -32,11 +32,8 @@ import {
   Container
 } from '@mui/material';
 import { Edit2, Trash2 } from 'lucide-react';
-import { getUsers, updateUser, deleteUser, inviteUser, getCurrentUser, cancelInvitation, getAllUsersInCompany, getUserData } from '../services/api';
-import { doc, getDoc } from 'firebase/firestore';
-import { db, auth } from '../firebaseConfig';
+import { getUsers, updateUser, deleteUser, inviteUser, cancelInvitation, getAllUsersInCompany, getUserData } from '../services/api';
 import Pagination from '@mui/material/Pagination';
-
 
 const RECORDS_PER_PAGE = 10;
 
@@ -45,8 +42,8 @@ const SettingsUsers = () => {
   const [allCompanyUsers, setAllCompanyUsers] = useState([]);
   const [filteredAllUsers, setFilteredAllUsers] = useState([]);
   const [filteredStatusUsers, setFilteredStatusUsers] = useState([]);
-  const [searchAllUsers, setSearchAllUsers] = useState(''); // Search for "All Users"
-  const [searchStatusUsers, setSearchStatusUsers] = useState(''); // Search for status tables
+  const [searchAllUsers, setSearchAllUsers] = useState('');
+  const [searchStatusUsers, setSearchStatusUsers] = useState('');
   const [allUsersPage, setAllUsersPage] = useState(1);
   const [statusUsersPage, setStatusUsersPage] = useState(1);
   const [allUsersTotalPages, setAllUsersTotalPages] = useState(1);
@@ -107,7 +104,7 @@ const SettingsUsers = () => {
           fetchUsers(),
           fetchCurrentUserCompany(),
           fetchUsersInCompany(),
-          fetchUserProfile(auth.currentUser.uid)
+          fetchUserProfile()
         ])
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -120,25 +117,23 @@ const SettingsUsers = () => {
   }, []);
 
   useEffect(() => {
-    // Filter for All Users search bar
     const filtered = allCompanyUsers.filter(user =>
       user.firstName.toLowerCase().includes(searchAllUsers.toLowerCase()) ||
       user.lastName.toLowerCase().includes(searchAllUsers.toLowerCase()) ||
       user.email.toLowerCase().includes(searchAllUsers.toLowerCase())
     );
     setFilteredAllUsers(filtered);
-    setAllUsersPage(1); // Reset to first page when filtering
+    setAllUsersPage(1);
   }, [searchAllUsers, allCompanyUsers]);
 
   useEffect(() => {
-    // Filter for Status search bar
     const filtered = users.filter(user =>
       user.firstName.toLowerCase().includes(searchStatusUsers.toLowerCase()) ||
       user.lastName.toLowerCase().includes(searchStatusUsers.toLowerCase()) ||
       user.email.toLowerCase().includes(searchStatusUsers.toLowerCase())
     );
     setFilteredStatusUsers(filtered);
-    setStatusUsersPage(1); // Reset to first page when filtering
+    setStatusUsersPage(1);
   }, [searchStatusUsers, users]);
 
   useEffect(() => {
@@ -168,7 +163,6 @@ const SettingsUsers = () => {
     try {
       setLoading(true);
       const companyUsers = await getAllUsersInCompany();
-
       setAllCompanyUsers(companyUsers);
       setFilteredAllUsers(companyUsers);
       setLoading(false);
@@ -181,9 +175,8 @@ const SettingsUsers = () => {
 
   const fetchCurrentUserCompany = async () => {
     try {
-      const user = await getCurrentUser();
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      setCurrentUserCompany(userDoc.data().company);
+      const user = await getUserData();
+      setCurrentUserCompany(user.company);
     } catch (err) {
       console.error('Error fetching current user company:', err);
     }
@@ -255,6 +248,9 @@ const SettingsUsers = () => {
 
     setFormErrors(errors);
 
+    if (Object.values(errors).some(error => error)) {
+      return;
+    }
 
     try {
       await inviteUser({ ...newUser, company: currentUserCompany });
@@ -281,19 +277,11 @@ const SettingsUsers = () => {
         severity: 'error',
       });
     }
-
   };
 
   const handleInputChange = (field, value) => {
     setNewUser({ ...newUser, [field]: value });
-
-    if (field === 'teams') {
-      setFormErrors({ ...formErrors, [field]: value.length === 0 });
-    } else if (field === 'accessRights') {
-      // No validation needed for accessRights, it can be empty
-    } else {
-      setFormErrors({ ...formErrors, [field]: value.trim() === '' });
-    }
+    setFormErrors({ ...formErrors, [field]: value.trim() === '' });
   };
 
   const handleCloseSnackbar = (event, reason) => {
@@ -319,32 +307,27 @@ const SettingsUsers = () => {
     setStatusUsersPage(value);
   };
 
-  // Update the slicing of currentAllUsers
   const indexOfLastAllUser = allUsersPage * RECORDS_PER_PAGE;
   const indexOfFirstAllUser = indexOfLastAllUser - RECORDS_PER_PAGE;
   const currentAllUsers = filteredAllUsers.slice(indexOfFirstAllUser, indexOfLastAllUser);
 
-  // Update the slicing of currentStatusUsers
   const indexOfLastStatusUser = statusUsersPage * RECORDS_PER_PAGE;
   const indexOfFirstStatusUser = indexOfLastStatusUser - RECORDS_PER_PAGE;
   const currentStatusUsers = filteredByStatus.slice(indexOfFirstStatusUser, indexOfLastStatusUser);
 
-  const fetchUserProfile = async (userId) => {
+  const fetchUserProfile = async () => {
     try {
-      const profileData = await getUserData(userId);
+      const profileData = await getUserData();
       setUserProfile(profileData);
     } catch (error) {
       console.error('Error fetching user profile:', error);
       setError('Failed to fetch user profile. Please try again later.');
     }
   };
+
   const hasRole = (requiredRoles) => {
     if (!userProfile || !Array.isArray(userProfile.accessRights)) return false;
-
-    // Check if the user has any of the required roles
     const hasRequiredRole = requiredRoles.some(role => userProfile.accessRights.includes(role));
-
-    // Return true if the user has a required role or is an Admin
     return hasRequiredRole || userProfile.role === 'Admin';
   };
 
@@ -360,15 +343,11 @@ const SettingsUsers = () => {
 
   return (
     <Box sx={{ p: 3 }}>
-      {/* All Users Table */}
       {hasRole(['View Users List', 'Delete User']) && (
         <>
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
             <Typography variant="h4" gutterBottom>All Users</Typography>
           </Box>
-
-
-          {/* Search bar for All Users */}
 
           <TextField
             label="Search all users"
@@ -378,8 +357,6 @@ const SettingsUsers = () => {
             value={searchAllUsers}
             onChange={(e) => setSearchAllUsers(e.target.value)}
           />
-
-
 
           <TableContainer component={Paper}>
             <Table>
@@ -411,7 +388,6 @@ const SettingsUsers = () => {
             </Table>
           </TableContainer>
 
-
           <Box mt={3} display="flex" justifyContent="center">
             <Pagination
               count={allUsersTotalPages}
@@ -435,14 +411,11 @@ const SettingsUsers = () => {
             )}
           </Box>
 
-          {/* Tabs and Pending, Approved, Rejected tables */}
           <Tabs value={selectedTab} onChange={(e, newValue) => setSelectedTab(newValue)} aria-label="user status tabs" sx={{ mt: 4 }}>
             <Tab label="Pending Requests" />
             <Tab label="Approved Requests" />
             <Tab label="Rejected Requests" />
           </Tabs>
-
-          {/* Search bar for Status-based Users */}
 
           <TextField
             label={`Search ${selectedTab === 0 ? 'Pending' : selectedTab === 1 ? 'Approved' : 'Rejected'} users`}
@@ -452,8 +425,6 @@ const SettingsUsers = () => {
             value={searchStatusUsers}
             onChange={(e) => setSearchStatusUsers(e.target.value)}
           />
-
-
 
           <TableContainer component={Paper} sx={{ mt: 2 }}>
             <Table>
@@ -467,7 +438,7 @@ const SettingsUsers = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {filteredByStatus.map((user) => (
+                {currentStatusUsers.map((user) => (
                   <TableRow key={user.id}>
                     <TableCell>{`${user.firstName} ${user.lastName}`}</TableCell>
                     <TableCell>{user.email}</TableCell>
@@ -491,7 +462,6 @@ const SettingsUsers = () => {
             </Table>
           </TableContainer>
 
-
           <Box mt={3} display="flex" justifyContent="center">
             <Pagination
               count={statusUsersTotalPages}
@@ -506,7 +476,7 @@ const SettingsUsers = () => {
 
       {/* Edit User Dialog */}
       <Dialog open={!!editingUser} onClose={() => setEditingUser(null)}>
-        <DialogTitle>View User</DialogTitle> {/* Change the title to 'View User' */}
+        <DialogTitle>View User</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
@@ -545,7 +515,6 @@ const SettingsUsers = () => {
               )}
             </Box>
           </Grid>
-
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setEditingUser(null)}>Close</Button>
@@ -630,7 +599,6 @@ const SettingsUsers = () => {
               ))}
             </Select>
           </FormControl>
-
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setInviteDialogOpen(false)}>Cancel</Button>

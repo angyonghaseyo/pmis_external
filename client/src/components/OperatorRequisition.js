@@ -27,8 +27,7 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import { Close } from '@mui/icons-material';
-import { getOperatorRequisitions, createOperatorRequisition, updateOperatorRequisition, deleteOperatorRequisition, getUserData } from './services/api';
-import { auth } from './firebaseConfig';
+import { getOperatorRequisitions, createOperatorRequisition, updateOperatorRequisition, deleteOperatorRequisition, getUserData } from '../services/api';
 
 const operatorSkills = ['Crane Operator', 'Forklift Operator', 'Equipment Technician'];
 const durations = ['1 Hour', '2 Hours', '3 Hours', '4 Hours']; // Fixed duration options
@@ -51,16 +50,12 @@ const OperatorRequisition = () => {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [userProfile, setUserProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+
   const fetchRequisitions = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const user = auth.currentUser;
-      if (!user) {
-        setError('No authenticated user found');
-        return;
-      }
-      const requisitions = await getOperatorRequisitions(user.uid);
+      const requisitions = await getOperatorRequisitions();
 
       // Filter pending, approved, and rejected requests
       const pending = requisitions.filter(req => req.status === 'Pending');
@@ -76,54 +71,40 @@ const OperatorRequisition = () => {
   }, []);
 
   useEffect(() => {
-    const fetchData = async (user) => {
-      if (user) {
-        try {
-          setIsLoading(true);
-          setError(null);
-          await Promise.all([
-            fetchRequisitions(),
-            fetchUserProfile(user.uid)
-          ]);
-        } catch (error) {
-          console.error('Error fetching data:', error);
-          setError('An error occurred while fetching data. Please try again.');
-        } finally {
-          setIsLoading(false);
-        }
-      } else {
-        setError('Please log in to view requisitions.');
-        setUserProfile(null);
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        await Promise.all([
+          fetchRequisitions(),
+          fetchUserProfile()
+        ]);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        setError('An error occurred while fetching data. Please try again.');
+      } finally {
         setIsLoading(false);
       }
     };
 
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      fetchData(user);
-    });
-
-    return () => unsubscribe();
+    fetchData();
   }, [fetchRequisitions]);
 
-  const fetchUserProfile = async (userId) => {
+  const fetchUserProfile = async () => {
     try {
-      const profileData = await getUserData(userId);
+      const profileData = await getUserData();
       setUserProfile(profileData);
     } catch (error) {
       console.error('Error fetching user profile:', error);
       setError('Failed to fetch user profile. Please try again later.');
     }
   };
+
   const hasRole = (requiredRoles) => {
     if (!userProfile || !Array.isArray(userProfile.accessRights)) return false;
-
-    // Check if the user has any of the required roles
     const hasRequiredRole = requiredRoles.some(role => userProfile.accessRights.includes(role));
-
-    // Return true if the user has a required role or is an Admin
     return hasRequiredRole || userProfile.role === 'Admin';
   };
-
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -144,9 +125,6 @@ const OperatorRequisition = () => {
 
   const handleSubmit = async () => {
     try {
-      const user = auth.currentUser;
-      if (!user) throw new Error('No authenticated user');
-
       if (!formData.time) {
         setSnackbar({ open: true, message: 'Time is a required field', severity: 'error' });
         return;
@@ -161,9 +139,9 @@ const OperatorRequisition = () => {
       }
 
       if (isEditing !== null) {
-        await updateOperatorRequisition(isEditing, { ...formData, userId: user.uid });
+        await updateOperatorRequisition(isEditing, formData);
       } else {
-        await createOperatorRequisition({ ...formData, userId: user.uid, status: 'Pending' });
+        await createOperatorRequisition({ ...formData, status: 'Pending' });
       }
       handleCloseDialog();
       await fetchRequisitions();
@@ -172,7 +150,6 @@ const OperatorRequisition = () => {
       setSnackbar({ open: true, message: 'Failed to save requisition', severity: 'error' });
     }
   };
-
 
   const handleDelete = async (id) => {
     try {

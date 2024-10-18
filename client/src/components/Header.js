@@ -1,8 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { auth, signOut } from './firebaseConfig';
-import { Box, AppBar, Toolbar, IconButton, Menu, MenuItem, Typography, Avatar, Button, Select, FormControl, CircularProgress } from '@mui/material';
-import { Notifications, Logout, Person, DirectionsBoat } from '@mui/icons-material';
+import { 
+  Box, 
+  AppBar, 
+  Toolbar, 
+  IconButton, 
+  Menu, 
+  MenuItem, 
+  Typography, 
+  Avatar, 
+  Button, 
+  Select, 
+  FormControl, 
+  CircularProgress 
+} from '@mui/material';
+import { 
+  Notifications, 
+  Logout, 
+  Person, 
+  DirectionsBoat 
+} from '@mui/icons-material';
+import { getUserData, logoutUser } from '../services/api';
+
+const drawerWidth = 240;
 
 function Header() {
   const [user, setUser] = useState(null);
@@ -13,17 +33,23 @@ function Header() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
-      setUser(currentUser);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
+    fetchUserData();
   }, []);
+
+  const fetchUserData = async () => {
+    try {
+      const userData = await getUserData();
+      setUser(userData);
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      await logoutUser();
       navigate('/login');
     } catch (error) {
       console.error('Error signing out:', error);

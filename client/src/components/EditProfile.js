@@ -1,20 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { TextField, Button, Box, Typography, Select, MenuItem, InputLabel, FormControl, Grid, Avatar, Chip, Snackbar, Alert } from '@mui/material';
-import { getCurrentUser, updateUserProfile, sendPasswordResetEmailToUser, deleteUserAccount } from './services/api';
-import { auth, db, storage } from './firebaseConfig';
-import { updateProfile } from 'firebase/auth';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import {
+  TextField,
+  Button,
+  Box,
+  Typography,
+  Select,
+  MenuItem,
+  InputLabel,
+  FormControl,
+  Grid,
+  Avatar,
+  Chip,
+  Snackbar,
+  Alert,
+  CircularProgress
+} from '@mui/material';
+import { getUserData, updateUserProfile, sendPasswordResetEmailToUser, deleteUserAccount } from '../services/api';
+import { storage } from '../firebaseConfig';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-
-const teams = [
-  'Assets and Facilities',
-  'Manpower',
-  'Vessel Visits',
-  'Port Operations and Resources',
-  'Cargos',
-  'Financial',
-  'Customs and Trade Documents'
-];
 
 function EditProfile() {
   const [profile, setProfile] = useState({
@@ -24,7 +27,6 @@ function EditProfile() {
     lastName: '',
     company: '',
     userType: '',
-    teams: [],
     accessRights: [],
   });
   const [selectedImage, setSelectedImage] = useState(null);
@@ -39,24 +41,18 @@ function EditProfile() {
   const fetchUserProfile = async () => {
     try {
       setLoading(true);
-      const user = auth.currentUser;
-      if (user) {
-        const userDocRef = doc(db, 'users', user.uid);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          setProfile({
-            email: user.email || '',
-            salutation: userData.salutation || '',
-            firstName: userData.firstName || '',
-            lastName: userData.lastName || '',
-            company: userData.company || 'Oceania Port',
-            userType: userData.userType || 'Normal',
-            teams: userData.teams || [],
-            accessRights: userData.accessRights || [],
-          });
-          setSelectedImage(user.photoURL);
-        }
+      const userData = await getUserData();
+      if (userData) {
+        setProfile({
+          email: userData.email || '',
+          salutation: userData.salutation || '',
+          firstName: userData.firstName || '',
+          lastName: userData.lastName || '',
+          company: userData.company || '',
+          userType: userData.userType || 'Normal',
+          accessRights: userData.accessRights || [],
+        });
+        setSelectedImage(userData.photoURL);
       }
     } catch (err) {
       console.error("Error fetching user profile:", err);
@@ -88,35 +84,19 @@ function EditProfile() {
       let photoURL = selectedImage;
 
       if (selectedImage && selectedImage.startsWith('blob:')) {
-        const imageRef = ref(storage, `profile_photos/${auth.currentUser.uid}`);
+        const imageRef = ref(storage, `profile_photos/${profile.email}`);
         const response = await fetch(selectedImage);
         const blob = await response.blob();
         await uploadBytes(imageRef, blob);
         photoURL = await getDownloadURL(imageRef);
       }
 
-      const fullName = `${profile.salutation} ${profile.firstName} ${profile.lastName}`.trim();
       const updatedProfile = {
-        displayName: fullName,
+        ...profile,
         photoURL: photoURL,
       };
 
-      // Update Firebase Auth user profile
-      await updateProfile(auth.currentUser, updatedProfile);
-
-      // Update Firestore document
-      const userDocRef = doc(db, 'users', auth.currentUser.uid);
-      await updateDoc(userDocRef, {
-        salutation: profile.salutation,
-        firstName: profile.firstName,
-        lastName: profile.lastName,
-        displayName: fullName,
-        photoURL: photoURL,
-        company: profile.company,
-        userType: profile.userType,
-        // Note: We're not updating 'teams' here as it should be managed elsewhere
-      });
-
+      await updateUserProfile(updatedProfile);
       setSnackbar({ open: true, message: 'Profile updated successfully', severity: 'success' });
     } catch (err) {
       console.error('Error updating profile:', err);
@@ -156,7 +136,7 @@ function EditProfile() {
     setSnackbar({ ...snackbar, open: false });
   };
 
-  if (loading) return <Typography>Loading...</Typography>;
+  if (loading) return <Box display="flex" justifyContent="center" alignItems="center" height="100vh"><CircularProgress /></Box>;
   if (error) return <Typography color="error">{error}</Typography>;
 
   return (
