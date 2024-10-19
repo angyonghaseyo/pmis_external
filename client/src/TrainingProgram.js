@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, Button, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, CircularProgress, Snackbar, Alert, Tabs, Tab } from '@mui/material';
 import { getTrainingPrograms, registerForProgram, withdrawFromProgram, getUserData } from './services/api';
-import { auth } from './firebaseConfig';
+import { useAuth } from './AuthContext';
 
 function TrainingProgram() {
   const [loading, setLoading] = useState(true);
@@ -10,44 +10,48 @@ function TrainingProgram() {
   const [availablePrograms, setAvailablePrograms] = useState([]);
   const [completedPrograms, setCompletedPrograms] = useState([]);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
+
   const [tabValue, setTabValue] = useState(0);
 
-  useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        fetchTrainingPrograms();
-      } else {
-        setLoading(false);
-        setError('Please log in to view training programs.');
-      }
-    });
 
-    return () => unsubscribe();
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([
+          fetchTrainingPrograms(),
+        ]);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
   }, []);
+
 
   const fetchTrainingPrograms = async () => {
     try {
       setLoading(true);
-      const user = auth.currentUser;
       if (!user) {
         setError('No authenticated user found');
         setLoading(false);
         return;
       }
 
-      const userData = await getUserData(user.uid);
+      const userData = user;
       const allPrograms = await getTrainingPrograms();
 
       const now = new Date();
       const enrolled = [];
       const available = [];
       const completed = [];
-
+      console.log(allPrograms)
       allPrograms.forEach((program) => {
-        const startDate = program.startDate.toDate();
-        const endDate = program.endDate.toDate();
+        const startDate = program.startDate
+        const endDate = program.endDate
         const userEnrollment = userData.enrolledPrograms?.find(ep => ep.programId === program.id);
 
         if (userEnrollment) {
@@ -74,7 +78,6 @@ function TrainingProgram() {
 
   const handleRegisterClick = async (programId) => {
     try {
-      const user = auth.currentUser;
       if (!user) {
         setSnackbar({ open: true, message: 'You must be logged in to register', severity: 'error' });
         return;
@@ -89,7 +92,6 @@ function TrainingProgram() {
 
   const handleWithdrawClick = async (programId) => {
     try {
-      const user = auth.currentUser;
       if (!user) {
         setSnackbar({ open: true, message: 'You must be logged in to withdraw', severity: 'error' });
         return;

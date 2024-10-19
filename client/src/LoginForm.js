@@ -3,14 +3,16 @@ import { Link, useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from './firebaseConfig';
 import { doc, getDoc } from 'firebase/firestore';
-import { 
-    TextField, 
-    Button, 
-    Typography, 
-    Alert, 
-    CircularProgress, 
-    Box, 
-    Container, 
+import { useAuth } from './AuthContext';
+
+import {
+    TextField,
+    Button,
+    Typography,
+    Alert,
+    CircularProgress,
+    Box,
+    Container,
     Paper
 } from '@mui/material';
 
@@ -19,6 +21,8 @@ function LoginForm() {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const { login } = useAuth();
+
     const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
@@ -27,38 +31,28 @@ function LoginForm() {
         setLoading(true);
 
         try {
-            const userCredential = await signInWithEmailAndPassword(auth, email, password);
-            const user = userCredential.user;
+            const response = await fetch('http://localhost:3001/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ email, password })
+            });
 
-            // Check if user exists in the 'users' collection
-            const userDocRef = doc(db, 'users', user.uid);
-            const userDoc = await getDoc(userDocRef);
-
-            if (!userDoc.exists()) {
-                throw new Error('No user profile found');
+            if (!response.ok) {
+                throw new Error('Login failed');
             }
 
-            // If we reach here, the user is authenticated and has a profile in the 'users' collection
-            // The App component will handle the redirection
+            const data = await response.json();
+            const token = data.token;
+
+            login(token);
+
         } catch (error) {
+            console.log(error)
             console.error('Login error:', error);
             setLoading(false);
-            switch (error.code) {
-                case 'auth/user-not-found':
-                    setError('No account found with this email. Please sign up.');
-                    break;
-                case 'auth/wrong-password':
-                    setError('Incorrect password. Please try again.');
-                    break;
-                case 'auth/invalid-email':
-                    setError('Invalid email address. Please check your email.');
-                    break;
-                case 'auth/user-disabled':
-                    setError('This account has been disabled. Please contact support.');
-                    break;
-                default:
-                    setError('Failed to log in. Please try again.');
-            }
+            setError('Failed to log in. Please try again.');
         }
     };
 

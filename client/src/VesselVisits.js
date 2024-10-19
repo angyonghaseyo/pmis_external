@@ -46,15 +46,15 @@ import {
 import {
   getStorage,
   ref,
-  uploadBytes,
-  getDownloadURL,
-  listAll,
   deleteObject,
 } from "firebase/storage";
+import { useAuth } from './AuthContext';
 
 // import firebase from './firebase'; // Assume Firebase is properly configured
 
 const VesselVisits = () => {
+  const { user } = useAuth();
+
   const [openDialog, setOpenDialog] = useState(false);
   const [visitType, setVisitType] = useState("");
   const [tabValue, setTabValue] = useState(0);
@@ -110,11 +110,10 @@ const VesselVisits = () => {
       try {
         await Promise.all([
           fetchVesselVisits(),
-          fetchUserProfile(auth.currentUser.uid),
+          fetchUserProfile(user.email),
         ]);
       } catch (error) {
         console.error("Error fetching data:", error);
-        // Optionally set an error state here
       } finally {
         setIsLoading(false);
       }
@@ -122,14 +121,33 @@ const VesselVisits = () => {
     fetchData();
   }, []);
 
+
   const fetchVesselVisits = async () => {
-    const querySnapshot = await getDocs(collection(db, "vesselVisitRequests"));
-    const visitsArray = querySnapshot.docs.map((doc) => ({
-      documentId: doc.id,
-      ...doc.data(),
-    }));
-    setVesselVisitsData(visitsArray); // Load data into vesselVisitsData state
+    try {
+      const response = await fetch('http://localhost:3001/vessel-visits');
+      if (!response.ok) {
+        throw new Error('Failed to fetch vessel visits');
+      }
+      const data = await response.json();
+      setVesselVisitsData(data);
+    } catch (error) {
+      console.error('Error fetching vessel visits:', error);
+    }
   };
+
+  const fetchUserProfile = async (uid) => {
+    try {
+      const response = await fetch(`http://localhost:3001/user-profile/${uid}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch user profile');
+      }
+      const data = await response.json();
+      setUserProfile(data);
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  };
+
 
   async function checkAssetAvailability(vesselVisitRequest) {
     const { eta, etd, containersOffloaded, containersOnloaded } =
@@ -181,8 +199,8 @@ const VesselVisits = () => {
         ) {
           console.log(
             "Berth " +
-              asset.name +
-              "is not available because it has been reserved"
+            asset.name +
+            "is not available because it has been reserved"
           );
           return false;
         }
@@ -197,8 +215,8 @@ const VesselVisits = () => {
       if (isAssetAvailable(crane, eta, etd)) {
         console.log(
           "Crane with id " +
-            crane.name +
-            " is available time-wise and is being demand checked"
+          crane.name +
+          " is available time-wise and is being demand checked"
         );
         craneCapacityPerHour += crane.numberOfContainers;
         craneCount += 1;
@@ -232,8 +250,8 @@ const VesselVisits = () => {
     for (const truck of trucks) {
       console.log(
         "Truck with id" +
-          truck.name +
-          "is available and is being demand checked"
+        truck.name +
+        "is available and is being demand checked"
       );
       if (isAssetAvailable(truck, eta, etd)) {
         truckCapacityPerHour += truck.numberOfContainers;
@@ -278,7 +296,7 @@ const VesselVisits = () => {
         ) {
           console.log(
             "there is enough reach stackers with a quantity of " +
-              requiredReachStackers
+            requiredReachStackers
           );
           reachStackerPass = true;
           break;
@@ -311,143 +329,24 @@ const VesselVisits = () => {
   }
 
   const checkFacilityAvailability = async (vesselVisitRequest) => {
-    const {imoNumber, loa, draft, cargoType, eta, etd } = vesselVisitRequest;
-
-    // Helper function to check if assets are available during a time range
-    function isBerthAvailable(facility, eta, etd) {
-      for (const [key, period] of Object.entries(facility.bookedPeriod)) {
-        const [bookedEta, bookedEtd] = period;
-        // If the asset's booked period overlaps with the requested period, it's unavailable
-        if (
-          !(
-            new Date(etd) <= new Date(bookedEta) ||
-            new Date(eta) >= new Date(bookedEtd)
-          )
-        ) {
-          console.log(
-            "Berth " +
-              facility.name +
-              "is not available because it has been reserved"
-          );
-          return false;
-        }
-      }
-      return true;
-    }
-
     try {
-      // Step 1: Check the facilityList to find berths that match the vessel's LOA, draft, and cargoType
-      const facilityListCollectionRef = collection(db, "portConfigurations");
-      const facilityListQuery = query(
-        facilityListCollectionRef,
-        where("type", "==", "berth")
-      );
-      const facilityListSnapshot = await getDocs(facilityListQuery);
-      const matchedBerths = [];
-
-      facilityListSnapshot.forEach((doc) => {
-        const berth = doc.data();
-
-        // Check if LOA, draft, and cargoType match
-        if (
-          loa <= berth.lengthCapacity &&
-          draft <= berth.depthCapacity &&
-          cargoType === berth.cargoType
-        ) {
-          matchedBerths.push(berth); // Store the matched berth
-          console.log("Berth " + berth.name + " added to matchedBerths");
-        }
+      const response = await fetch('http://localhost:3001/check-facility-availability', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(vesselVisitRequest),
       });
-
-      if (matchedBerths.length === 0) {
-        console.log("No berths match the vessel's requirements.");
-        return {
-          success: false,
-          assignedBerth: "",
-          adjustedEta: eta,
-          adjustedEtd: etd,
-        };
+      if (!response.ok) {
+        throw new Error('Error checking facility availability');
       }
-
-      // Step 2: Loop through each matched berth and check whether it is available during the required hours
-      for (const berth of matchedBerths) {
-        if (isBerthAvailable(berth, eta, etd)) {
-          console.log(
-            `Berth ${berth.name} is available for the entire time range.`
-          );
-        } else {
-          const index = matchedBerths.findIndex((obj) => obj === berth);
-          matchedBerths.splice(index, 1);
-          console.log(`Berth ${berth.name} is removed from matchedBerths`);
-        }
-      }
-
-      // If no berth is fully available for the entire time range, adjust ETA/ETD
-      if (matchedBerths.length === 0) {
-        console.log("No berth is available for the entire time range.");
-
-        // Adjust ETA and ETD by 15 minutes
-        let etaAdjustedDate = new Date(eta);
-        let etdAdjustedDate = new Date(etd);
-        etaAdjustedDate.setMinutes(etaAdjustedDate.getMinutes() + 15);
-        etdAdjustedDate.setMinutes(etdAdjustedDate.getMinutes() + 15);
-
-        console.log(
-          `Adjusting ETA and ETD by 15 minutes: New ETA: ${etaAdjustedDate}, New ETD: ${etdAdjustedDate}`
-        );
-
-        // Create a new vesselVisitRequest with the adjusted ETA and ETD
-        let vesselVisitRequestX = {
-          imoNumber,
-          loa,
-          draft,
-          cargoType,
-          eta: etaAdjustedDate.toISOString(), //star-denzel remove toISOString()
-          etd: etdAdjustedDate.toISOString(),
-        };
-
-        // Recursively call checkFacilityAvailability with adjusted times
-        return checkFacilityAvailability(vesselVisitRequestX);
-      } else {
-        // If a berth is available, return success with berth name and original ETA/ETD
-        let assignedBerth = matchedBerths.pop();
-        console.log(
-          "The berth that has been assigned to the vessel is " +
-            assignedBerth.name
-        );
-        //I need to update the assignedBerth's bookedPeriod map. key: vessel's IMO number value: [eta, etd]
-        assignedBerth.bookedPeriod[formData.imoNumber] = [eta.toISOString(),etd.toISOString()];
-        //Next I need to setDoc
-        const toBeUpdatedDocRef = doc(
-          db,
-          "portConfigurations",
-          assignedBerth.name
-        );
-        await setDoc(toBeUpdatedDocRef, assignedBerth)
-          .then(() => {
-            console.log("Document successfully replaced");
-          })
-          .catch((error) => {
-            console.error("Error replacing document: ", error);
-          });
-        return {
-          success: true,
-          assignedBerth: assignedBerth.name,
-          adjustedEta: eta,
-          adjustedEtd: etd,
-        };
-      }
+      const data = await response.json();
+      return data;
     } catch (error) {
-      console.error("Error checking facility availability:", error);
-      return {
-        success: false,
-        assignedBerth: "",
-        adjustedEta: eta,
-        adjustedEtd: etd,
-      };
+      console.error('Error checking facility availability:', error);
+      throw error;
     }
   };
-
   const checkManpowerAvailability = async (vesselVisitRequest) => {
     try {
       const {
@@ -954,8 +853,8 @@ const VesselVisits = () => {
       // status for UI purposes
       status:
         resourceCheck.manpowerDemandCheckBoolean.success &&
-        resourceCheck.assetsDemandCheckBooleanAndQuantity.success &&
-        resourceCheck.facilitiesDemandCheckBooleanAndBerth.success
+          resourceCheck.assetsDemandCheckBooleanAndQuantity.success &&
+          resourceCheck.facilitiesDemandCheckBooleanAndBerth.success
           ? "confirmed"
           : "pending user intervention",
       vesselGridCount:
@@ -1037,16 +936,6 @@ const VesselVisits = () => {
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
-  };
-
-  const fetchUserProfile = async (userId) => {
-    try {
-      const profileData = await getUserData(userId);
-      setUserProfile(profileData);
-    } catch (error) {
-      console.error("Error fetching user profile:", error);
-      setError("Failed to fetch user profile. Please try again later.");
-    }
   };
 
   const hasRole = (requiredRoles) => {
@@ -1146,25 +1035,25 @@ const VesselVisits = () => {
                   <TableCell>
                     {visit.eta
                       ? new Date(visit.eta).toLocaleString("en-SG", {
-                          hour12: true,
-                          year: "numeric",
-                          month: "2-digit",
-                          day: "2-digit",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
+                        hour12: true,
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
                       : "Invalid Date"}
                   </TableCell>
                   <TableCell>
                     {visit.etd
                       ? new Date(visit.etd).toLocaleString("en-SG", {
-                          hour12: true,
-                          year: "numeric",
-                          month: "2-digit",
-                          day: "2-digit",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
+                        hour12: true,
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
                       : "Invalid Date"}
                   </TableCell>{" "}
                   {/* ISO string */}
@@ -1218,12 +1107,12 @@ const VesselVisits = () => {
                 onChange={handleChange}
                 fullWidth
                 required
-                // disabled={!!formData.vesselName}
-                // helperText={
-                //   formData.vesselName
-                //     ? "This field cannot be edited after it is set"
-                //     : ""
-                // }
+              // disabled={!!formData.vesselName}
+              // helperText={
+              //   formData.vesselName
+              //     ? "This field cannot be edited after it is set"
+              //     : ""
+              // }
               />
             </Grid>
             <Grid item xs={6}>
@@ -1235,12 +1124,12 @@ const VesselVisits = () => {
                 onChange={handleChange}
                 fullWidth
                 required
-                // disabled={!!formData.imoNumber}
-                // helperText={
-                //   formData.imoNumber
-                //     ? "This field cannot be edited after it is set"
-                //     : ""
-                // }
+              // disabled={!!formData.imoNumber}
+              // helperText={
+              //   formData.imoNumber
+              //     ? "This field cannot be edited after it is set"
+              //     : ""
+              // }
               />
             </Grid>
             <Grid item xs={6}>

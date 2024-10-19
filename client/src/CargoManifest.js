@@ -28,7 +28,7 @@ import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
-import { getCargoManifests, submitCargoManifest, updateCargoManifest, deleteCargoManifest } from './services/api';
+import { submitCargoManifest, updateCargoManifest, deleteCargoManifest } from './services/api';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 
@@ -62,44 +62,55 @@ const CargoManifest = () => {
     cargoSummary: false,
     specialInstructions: false
   });
-
   useEffect(() => {
-    fetchManifests();
-    fetchVesselVisits();
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([
+          fetchManifests(),
+          fetchVesselVisits(),
+        ]);
+      } catch (err) {
+        setError('Failed to fetch data');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
   }, []);
 
   const fetchManifests = async () => {
     try {
-      setLoading(true);
-      const data = await getCargoManifests();
+      const response = await fetch('http://localhost:3001/cargo-manifests');
+      if (!response.ok) {
+        throw new Error('Failed to fetch cargo manifests');
+      }
+      const data = await response.json();
       setManifests(data);
     } catch (err) {
+      console.error('Error fetching cargo manifests:', err);
       setError('Failed to fetch cargo manifests');
-    } finally {
-      setLoading(false);
     }
   };
-
   const fetchVesselVisits = async () => {
     try {
-      const vesselVisitsRef = collection(db, 'vesselVisitRequests');
-      const vesselVisitsSnapshot = await getDocs(vesselVisitsRef);
-      const vesselVisitsData = vesselVisitsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setVesselVisits(vesselVisitsData);
+      const response = await fetch('http://localhost:3001/vessel-visits');
+      if (!response.ok) {
+        throw new Error('Failed to fetch vessel visits');
+      }
+      const data = await response.json();
+      setVesselVisits(data);
     } catch (err) {
       console.error('Error fetching vessel visits:', err);
       setError('Failed to fetch vessel visits');
     }
-  };
+  }
 
   const handleInputChange = (event) => {
     const { name, value, checked, type } = event.target;
-    setFormData({ 
-      ...formData, 
-      [name]: type === 'checkbox' ? checked : value 
+    setFormData({
+      ...formData,
+      [name]: type === 'checkbox' ? checked : value
     });
     setFormErrors({
       ...formErrors,
@@ -114,7 +125,7 @@ const CargoManifest = () => {
   const handleImoNumberChange = (event) => {
     const selectedImoNumber = event.target.value;
     const selectedVessel = vesselVisits.find(visit => visit.imoNumber === selectedImoNumber);
-    
+
     if (selectedVessel) {
       setFormData({
         ...formData,
@@ -432,7 +443,7 @@ const CargoManifest = () => {
                   error={formErrors.cargoSummary}
                   helperText={formErrors.cargoSummary ? 'Cargo Summary is required' : ''}
                   InputLabelProps={{
-                    style: {color: 'black' },
+                    style: { color: 'black' },
                   }}
                 />
               </Grid>

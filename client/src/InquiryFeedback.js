@@ -29,10 +29,11 @@ import { Edit, Reply } from '@mui/icons-material';
 import { getUserInquiriesFeedback, createInquiryFeedback, updateInquiryFeedback, getUserData } from './services/api';
 import { auth } from './firebaseConfig';
 import { format } from 'date-fns';
+import { useAuth } from './AuthContext';
 
 
 const InquiryFeedback = ({ userType }) => {
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [inquiries, setInquiries] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [formData, setFormData] = useState({
@@ -55,44 +56,45 @@ const InquiryFeedback = ({ userType }) => {
   const [userProfile, setUserProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
+
   useEffect(() => {
-    const fetchData = async (currentUser) => {
-      if (currentUser) {
+    const fetchData = async () => {
+      if (user) {
+        console.log("user found")
         try {
           await Promise.all([
-            fetchUserProfile(currentUser.uid),
             fetchInquiriesFeedback(),
 
           ]);
         } catch (error) {
+          console.log("Error", error)
           console.error('Error fetching data:', error);
-          // Optionally set an error state here
         }
       } else {
         setUserProfile(null);
-        // Optionally, you might want to clear other data here as well
       }
       setIsLoading(false);
     };
 
-    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
-      setUser(currentUser);
-      setIsLoading(true); // Set loading to true when auth state changes
-      fetchData(currentUser);
-    });
-
-    return () => unsubscribe();
+    fetchData();
   }, []);
+
+
 
   const fetchInquiriesFeedback = async () => {
     try {
       setLoading(true);
-      const data = await getUserInquiriesFeedback();
+      if (!user) {
+        setError('No authenticated user found');
+        setLoading(false);
+        return;
+      }
+      const data = await getUserInquiriesFeedback(user.email);
       setInquiries(data);
-      setLoading(false);
     } catch (err) {
       console.error('Error fetching inquiries and feedback:', err);
       setError('Failed to fetch inquiries and feedback. Please try again later.');
+    } finally {
       setLoading(false);
     }
   };
@@ -160,6 +162,7 @@ const InquiryFeedback = ({ userType }) => {
           description: formData.description,
           status: 'Pending',
           urgency: formData.urgency,
+          email: user.email,
           file: formData.file instanceof File ? formData.file : null
         };
 
@@ -218,23 +221,12 @@ const InquiryFeedback = ({ userType }) => {
   };
 
   const hasRole = (requiredRoles) => {
-    if (!userProfile || !Array.isArray(userProfile.accessRights)) return false;
+    if (!user || !Array.isArray(user.accessRights)) return false;
 
     // Check if the user has any of the required roles
-    const hasRequiredRole = requiredRoles.some(role => userProfile.accessRights.includes(role));
-
+    const hasRequiredRole = requiredRoles.some(role => user.accessRights.includes(role));
     // Return true if the user has a required role or is an Admin
     return hasRequiredRole || userProfile.role === 'Admin';
-  };
-
-  const fetchUserProfile = async (userId) => {
-    try {
-      const profileData = await getUserData(userId);
-      setUserProfile(profileData);
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-      setError('Failed to fetch user profile. Please try again later.');
-    }
   };
 
   if (loading) return <Box display="flex" justifyContent="center" alignItems="center" height="100vh"><CircularProgress /></Box>;
@@ -303,7 +295,7 @@ const InquiryFeedback = ({ userType }) => {
                 <TableCell>{inquiry.subject}</TableCell>
                 <TableCell>{inquiry.status}</TableCell>
                 <TableCell>
-                  {inquiry.createdAt ? format(inquiry.createdAt.toDate(), 'yyyy-MM-dd HH:mm') : 'N/A'}
+                  {inquiry.createdAt ? inquiry.createdAt : 'N/A'}
                 </TableCell>
                 <TableCell>{inquiry.urgency}</TableCell>
                 <TableCell>

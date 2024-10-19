@@ -28,12 +28,14 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import { Close } from '@mui/icons-material';
 import { getOperatorRequisitions, createOperatorRequisition, updateOperatorRequisition, deleteOperatorRequisition, getUserData } from './services/api';
-import { auth } from './firebaseConfig';
+import { useAuth } from './AuthContext';
 
 const operatorSkills = ['Crane Operator', 'Forklift Operator', 'Equipment Technician'];
 const durations = ['1 Hour', '2 Hours', '3 Hours', '4 Hours']; // Fixed duration options
 
 const OperatorRequisition = () => {
+  const { user } = useAuth();
+
   const [pendingRequests, setPendingRequests] = useState([]);
   const [resolvedRequests, setResolvedRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -55,12 +57,11 @@ const OperatorRequisition = () => {
     try {
       setLoading(true);
       setError(null);
-      const user = auth.currentUser;
       if (!user) {
         setError('No authenticated user found');
         return;
       }
-      const requisitions = await getOperatorRequisitions(user.uid);
+      const requisitions = await getOperatorRequisitions(user.email);
 
       // Filter pending, approved, and rejected requests
       const pending = requisitions.filter(req => req.status === 'Pending');
@@ -76,14 +77,14 @@ const OperatorRequisition = () => {
   }, []);
 
   useEffect(() => {
-    const fetchData = async (user) => {
+    const fetchData = async () => {
       if (user) {
         try {
           setIsLoading(true);
           setError(null);
           await Promise.all([
             fetchRequisitions(),
-            fetchUserProfile(user.uid)
+            fetchUserProfile(user.email)
           ]);
         } catch (error) {
           console.error('Error fetching data:', error);
@@ -98,30 +99,33 @@ const OperatorRequisition = () => {
       }
     };
 
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      fetchData(user);
-    });
+    fetchData();
+  }, [user, fetchRequisitions]);
 
-    return () => unsubscribe();
-  }, [fetchRequisitions]);
 
-  const fetchUserProfile = async (userId) => {
+  const fetchUserProfile = async (uid) => {
     try {
-      const profileData = await getUserData(userId);
-      setUserProfile(profileData);
+      const response = await fetch(`http://localhost:3001/user-profile/${uid}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch user profile');
+      }
+      const data = await response.json();
+      setUserProfile(data);
     } catch (error) {
       console.error('Error fetching user profile:', error);
-      setError('Failed to fetch user profile. Please try again later.');
     }
   };
   const hasRole = (requiredRoles) => {
+
     if (!userProfile || !Array.isArray(userProfile.accessRights)) return false;
 
     // Check if the user has any of the required roles
-    const hasRequiredRole = requiredRoles.some(role => userProfile.accessRights.includes(role));
+    const hasRequiredRole = requiredRoles.some(role => user.accessRights.includes(role));
 
     // Return true if the user has a required role or is an Admin
     return hasRequiredRole || userProfile.role === 'Admin';
+
+
   };
 
 
@@ -144,7 +148,6 @@ const OperatorRequisition = () => {
 
   const handleSubmit = async () => {
     try {
-      const user = auth.currentUser;
       if (!user) throw new Error('No authenticated user');
 
       if (!formData.time) {
@@ -163,7 +166,7 @@ const OperatorRequisition = () => {
       if (isEditing !== null) {
         await updateOperatorRequisition(isEditing, { ...formData, userId: user.uid });
       } else {
-        await createOperatorRequisition({ ...formData, userId: user.uid, status: 'Pending' });
+        await createOperatorRequisition({ ...formData, email: user.email, status: 'Pending' });
       }
       handleCloseDialog();
       await fetchRequisitions();
@@ -172,7 +175,6 @@ const OperatorRequisition = () => {
       setSnackbar({ open: true, message: 'Failed to save requisition', severity: 'error' });
     }
   };
-
 
   const handleDelete = async (id) => {
     try {
@@ -183,7 +185,6 @@ const OperatorRequisition = () => {
       setSnackbar({ open: true, message: 'Failed to delete requisition', severity: 'error' });
     }
   };
-
   const handleEdit = (request) => {
     setFormData(request);
     setIsEditing(request.id);

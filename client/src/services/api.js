@@ -8,16 +8,16 @@ import {
   updateProfile,
   deleteUser as firebaseDeleteUser
 } from '../firebaseConfig';
-import { 
-  collection, 
-  query, 
-  where, 
-  getDocs, 
-  doc, 
-  getDoc, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
   addDoc,
   serverTimestamp,
   increment,
@@ -61,7 +61,7 @@ export const registerUser = async (email, password, userData) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
     await setDoc(doc(db, 'users', user.uid), { ...userData, uid: user.uid });
-    
+
     // Update or create company document
     const companyRef = doc(db, 'companies', userData.company);
     const companyDoc = await getDoc(companyRef);
@@ -70,7 +70,7 @@ export const registerUser = async (email, password, userData) => {
     } else {
       await setDoc(companyRef, { name: userData.company, userCount: 1 });
     }
-    
+
     return userCredential;
   } catch (error) {
     return handleApiError(error);
@@ -102,80 +102,35 @@ export const sendPasswordResetEmailToUser = (email) =>
 export const confirmUserPasswordReset = (oobCode, newPassword) =>
   confirmPasswordReset(auth, oobCode, newPassword).catch(handleApiError);
 
-// User Account Management
-export const getUsers = async () => {
+export const getUsers = async (userId) => {
   try {
-    const currentUser = auth.currentUser;
-    if (!currentUser) {
-      throw new Error('No authenticated user');
+
+    const response = await fetch(`http://localhost:3001/users?email=${userId}`);
+    if (!response.ok) {
+      throw new Error('Error fetching users');
     }
-
-    const userDocRef = doc(db, 'users', currentUser.uid);
-    const userDocSnap = await getDoc(userDocRef);
-    const currentUserData = userDocSnap.data();
-
-    if (!currentUserData || !currentUserData.company) {
-      throw new Error('User company information not found');
-    }
-
-    // Fetch users from the 'users' collection
-    const usersQuery = query(
-      collection(db, 'users'),
-      where('company', '==', currentUserData.company)
-    );
-    const usersSnapshot = await getDocs(usersQuery);
-    const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), status: 'Active' }));
-
-    // Fetch invitations - pending, approved, and rejected ones
-    const invitationsQuery = query(
-      collection(db, 'invitations'),
-      where('company', '==', currentUserData.company),
-      where('status', 'in', ['Pending', 'Approved', 'Rejected']) 
-    );
-    const invitationsSnapshot = await getDocs(invitationsQuery);
-    const invitationUsers = invitationsSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      status: doc.data().status === 'Rejected' ? 'Rejected' : doc.data().status === 'Approved' ? 'Approved' : 'Pending',
-    }));
-
-    return [...users, ...invitationUsers];
+    const users = await response.json();
+    return users;
   } catch (error) {
     console.error('Error fetching users:', error);
     throw error;
   }
 };
 
-export const getAllUsersInCompany = async () => {
+
+export const getAllUsersInCompany = async (userId) => {
   try {
-    const currentUser = auth.currentUser;
-    if (!currentUser) {
-      throw new Error('No authenticated user');
+    const response = await fetch(`http://localhost:3001/all-users-in-company?email=${userId}`);
+    if (!response.ok) {
+      throw new Error('Error fetching users in company');
     }
-
-    const userDocRef = doc(db, 'users', currentUser.uid);
-    const userDocSnap = await getDoc(userDocRef);
-    const currentUserData = userDocSnap.data();
-
-    if (!currentUserData || !currentUserData.company) {
-      throw new Error('User company information not found');
-    }
-
-    const usersQuery = query(
-      collection(db, 'users'),
-      where('company', '==', currentUserData.company)
-    );
-    const usersSnapshot = await getDocs(usersQuery);
-
-    const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-    return users; 
+    const users = await response.json();
+    return users;
   } catch (error) {
     console.error('Error fetching users in company:', error);
     throw error;
   }
 };
-
 
 export const createUser = async (userData) => {
   try {
@@ -190,9 +145,9 @@ export const updateUser = async (userId, userData, isPending = false) => {
   try {
     const dataToUpdate = {
       ...userData,
-      userType: 'Normal' 
+      userType: 'Normal'
     };
-    
+
     if (isPending) {
       await updateDoc(doc(db, 'invitations', userId), dataToUpdate);
     } else {
@@ -203,19 +158,27 @@ export const updateUser = async (userId, userData, isPending = false) => {
   }
 };
 
-export const deleteUser = async (userId) => {
+export const deleteUser = async (email) => {
   try {
-    await deleteDoc(doc(db, 'users', userId));
+    const response = await fetch(`http://localhost:3001/users?email=${encodeURIComponent(email)}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      throw new Error('Error deleting user');
+    }
   } catch (error) {
     handleApiError(error);
   }
 };
-
 export const deleteUserAccount = async () => {
   try {
-    const user = auth.currentUser;
-    await deleteDoc(doc(db, 'users', user.uid));
-    await firebaseDeleteUser(user);
+    const response = await fetch('http://localhost:3001/user-account', {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      throw new Error('Error deleting user account');
+    }
   } catch (error) {
     handleApiError(error);
   }
@@ -223,13 +186,18 @@ export const deleteUserAccount = async () => {
 
 export const inviteUser = async (userData) => {
   try {
-    const invitationRef = await addDoc(collection(db, 'invitations'), {
-      ...userData,
-      userType: 'Normal', 
-      createdAt: new Date(),
-      status: 'Pending'
+    const response = await fetch('http://localhost:3001/invitations', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(userData),
     });
-    return invitationRef.id;
+    if (!response.ok) {
+      throw new Error('Error inviting user');
+    }
+    const result = await response.json();
+    return result.id;
   } catch (error) {
     handleApiError(error);
   }
@@ -237,127 +205,77 @@ export const inviteUser = async (userData) => {
 
 export const cancelInvitation = async (invitationId) => {
   try {
-    await deleteDoc(doc(db, 'invitations', invitationId));
+    const response = await fetch(`http://localhost:3001/invitations/${invitationId}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      throw new Error('Error canceling invitation');
+    }
   } catch (error) {
     handleApiError(error);
   }
 };
 
 // Get user's inquiries and feedback
-export const getUserInquiriesFeedback = async () => {
+export const getUserInquiriesFeedback = async (userId) => {
   try {
-    const user = auth.currentUser;
-    if (!user) throw new Error('No authenticated user');
-
-    const q = query(collection(db, 'inquiries_feedback'), where('userId', '==', user.uid));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const response = await fetch(`http://localhost:3001/inquiries-feedback/${userId}`);
+    if (!response.ok) {
+      throw new Error('Error fetching inquiries and feedback');
+    }
+    const results = await response.json();
+    console.log(results)
+    return results;
   } catch (error) {
     console.error('Error fetching inquiries and feedback:', error);
     throw error;
   }
 };
-
 // Create new inquiry or feedback with auto-incrementing ID
 export const createInquiryFeedback = async (data) => {
   try {
-    const user = auth.currentUser;
-    if (!user) {
-      throw new Error('No authenticated user');
+    const formData = new FormData();
+    for (const key in data) {
+      formData.append(key, data[key]);
     }
 
-    let fileURL = null;
+    const response = await fetch('http://localhost:3001/inquiries-feedback', {
+      method: 'POST',
+      body: formData,
+    });
 
-    // Process file upload if a file exists
-    if (data.file && data.file instanceof File) {
-      try {
-        const fileExtension = data.file.name.split('.').pop();
-        const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 15)}.${fileExtension}`;
-        const fileRef = storageRef(storage, `inquiries_feedback/${fileName}`);
-        const snapshot = await uploadBytes(fileRef, data.file);
-        fileURL = await getDownloadURL(snapshot.ref);
-      } catch (uploadError) {
-        console.error('Error uploading file:', uploadError);
-        throw new Error('Failed to upload file: ' + uploadError.message);
-      }
+    if (!response.ok) {
+      throw new Error('Error creating inquiry/feedback');
     }
 
-    const { file, ...dataWithoutFile } = data;
-    const inquiriesRef = collection(db, 'inquiries_feedback');
-    const snapshot = await getDocs(inquiriesRef);
-    const newIncrementalId = snapshot.size + 1; 
-
-    const docData = {
-      ...dataWithoutFile,
-      incrementalId: newIncrementalId, 
-      userId: user.uid,
-      createdAt: serverTimestamp(),
-      status: 'Pending',
-      fileURL: fileURL,
-    };
-
-    console.log('Final document data:', docData);
-
-    const docRef = await addDoc(inquiriesRef, docData);
-    return docRef.id;
+    const result = await response.json();
+    return result.id;
   } catch (error) {
     console.error('Error in createInquiryFeedback:', error);
     throw error;
   }
 };
 
-// Update inquiry or feedback
 export const updateInquiryFeedback = async (incrementalId, data) => {
   try {
-    const user = auth.currentUser;
-    if (!user) {
-      throw new Error('No authenticated user');
+    const formData = new FormData();
+    for (const key in data) {
+      formData.append(key, data[key]);
     }
 
-    const inquiriesRef = collection(db, 'inquiries_feedback');
-    const querySnapshot = await getDocs(inquiriesRef);
-    let docId = null;
-
-    querySnapshot.forEach((doc) => {
-      const inquiryData = doc.data();
-      if (inquiryData.incrementalId === incrementalId) {
-        docId = doc.id; 
-      }
+    const response = await fetch(`http://localhost:3001/inquiries-feedback/${incrementalId}`, {
+      method: 'PUT',
+      body: formData,
     });
 
-    if (!docId) {
-      throw new Error(`No inquiry/feedback found with incremental ID: ${incrementalId}`);
+    if (!response.ok) {
+      throw new Error('Error updating inquiry/feedback');
     }
-
-    // Process file upload if there is a new file
-    let fileURL = data.fileURL || null;  
-    if (data.file && data.file instanceof File) {
-      try {
-        const fileExtension = data.file.name.split('.').pop();
-        const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 15)}.${fileExtension}`;
-        const fileRef = storageRef(storage, `inquiries_feedback/${fileName}`);
-        const snapshot = await uploadBytes(fileRef, data.file);
-        fileURL = await getDownloadURL(snapshot.ref);
-      } catch (uploadError) {
-        console.error('Error uploading file:', uploadError);
-        throw new Error('Failed to upload file: ' + uploadError.message);
-      }
-    }
-
-    const { file, ...dataWithoutFile } = data;
-    const updateData = {
-      ...dataWithoutFile,
-      fileURL: fileURL,
-    };
-
-    const docRef = doc(db, 'inquiries_feedback', docId);
-    await updateDoc(docRef, updateData);
   } catch (error) {
     console.error('Error updating inquiry/feedback:', error);
     throw error;
   }
 };
-
 // Delete inquiry or feedback
 export const deleteInquiryFeedback = async (id) => {
   try {
@@ -372,59 +290,63 @@ export const deleteInquiryFeedback = async (id) => {
 // Company operations
 export const getCompanyInfo = async (companyName) => {
   try {
-    const companyDoc = await getDoc(doc(db, 'companies', companyName));
-    if (companyDoc.exists()) {
-      return companyDoc.data();
-    } else {
-      throw new Error('Company not found');
+    const response = await fetch(`http://localhost:3001/company-data?companyName=${encodeURIComponent(companyName)}`);
+    if (!response.ok) {
+      throw new Error('Error fetching company data');
     }
+    const companyData = await response.json();
+    return companyData;
   } catch (error) {
-    console.error('Error fetching company info:', error);
+    console.error('Error fetching company data:', error);
     throw error;
   }
 };
 
 export const updateCompanyInfo = async (companyName, data) => {
   try {
-    const companyRef = doc(db, 'companies', companyName);
-    await updateDoc(companyRef, data);
+    const response = await fetch(`http://localhost:3001/company-data/${companyName}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      throw new Error('Error updating company info');
+    }
   } catch (error) {
     console.error('Error updating company info:', error);
     throw new Error(`Failed to update company information: ${error.message}`);
   }
 };
-
 export const getOperatorRequisitions = async (userId) => {
   try {
-    console.log('Fetching operator requisitions for user:', userId);
-    const q = query(
-      collection(db, 'operator_requisitions'),
-      where('userId', '==', userId),
-      orderBy('createdAt', 'desc')
-    );
-    const querySnapshot = await getDocs(q);
-    console.log('Query snapshot:', querySnapshot);
-    const results = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    console.log('Fetched requisitions:', results);
+    const response = await fetch(`http://localhost:3001/operator-requisitions/${userId}`);
+    if (!response.ok) {
+      throw new Error('Error fetching operator requisitions');
+    }
+    const results = await response.json();
     return results;
   } catch (error) {
     console.error('Error fetching operator requisitions:', error);
-    if (error.code === 'failed-precondition') {
-      console.error('This query requires an index. Please check the Firebase console for a link to create the index, or create it manually.');
-    }
     throw error;
   }
 };
 
 export const createOperatorRequisition = async (requisitionData) => {
   try {
-    const docRef = await addDoc(collection(db, 'operator_requisitions'), {
-      ...requisitionData,
-      createdAt: serverTimestamp(),
-      status: 'Pending'  
+    const response = await fetch('http://localhost:3001/operator-requisitions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requisitionData),
     });
-    console.log('Created new requisition with ID:', docRef.id);
-    return docRef.id;
+    if (!response.ok) {
+      throw new Error('Error creating operator requisition');
+    }
+    const data = await response.json();
+    return data.id;
   } catch (error) {
     console.error('Error creating operator requisition:', error);
     throw error;
@@ -433,9 +355,16 @@ export const createOperatorRequisition = async (requisitionData) => {
 
 export const updateOperatorRequisition = async (requisitionId, updateData) => {
   try {
-    const requisitionRef = doc(db, 'operator_requisitions', requisitionId);
-    await updateDoc(requisitionRef, updateData);
-    console.log('Updated requisition:', requisitionId);
+    const response = await fetch(`http://localhost:3001/operator-requisitions/${requisitionId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updateData),
+    });
+    if (!response.ok) {
+      throw new Error('Error updating operator requisition');
+    }
   } catch (error) {
     console.error('Error updating operator requisition:', error);
     throw error;
@@ -444,8 +373,12 @@ export const updateOperatorRequisition = async (requisitionId, updateData) => {
 
 export const deleteOperatorRequisition = async (requisitionId) => {
   try {
-    await deleteDoc(doc(db, 'operator_requisitions', requisitionId));
-    console.log('Deleted requisition:', requisitionId);
+    const response = await fetch(`http://localhost:3001/operator-requisitions/${requisitionId}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      throw new Error('Error deleting operator requisition');
+    }
   } catch (error) {
     console.error('Error deleting operator requisition:', error);
     throw error;
@@ -454,9 +387,12 @@ export const deleteOperatorRequisition = async (requisitionId) => {
 
 export const getTrainingPrograms = async () => {
   try {
-    const programsRef = collection(db, 'training_programs');
-    const programsSnapshot = await getDocs(programsRef);
-    return programsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const response = await fetch('http://localhost:3001/training-programs');
+    if (!response.ok) {
+      throw new Error('Error fetching training programs');
+    }
+    const programs = await response.json();
+    return programs;
   } catch (error) {
     console.error('Error fetching training programs:', error);
     throw error;
@@ -582,9 +518,18 @@ export const getCargoManifests = async () => {
 
 export const submitCargoManifest = async (manifestData) => {
   try {
-    const manifestsRef = collection(db, 'cargo_manifests');
-    const docRef = await addDoc(manifestsRef, manifestData);
-    return docRef.id;
+    const response = await fetch('http://localhost:3001/cargo-manifests', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(manifestData),
+    });
+    if (!response.ok) {
+      throw new Error('Error submitting cargo manifest');
+    }
+    const data = await response.json();
+    return data.id;
   } catch (error) {
     console.error('Error submitting cargo manifest:', error);
     throw error;
@@ -593,18 +538,31 @@ export const submitCargoManifest = async (manifestData) => {
 
 export const updateCargoManifest = async (id, manifestData) => {
   try {
-    const manifestRef = doc(db, 'cargo_manifests', id);
-    await updateDoc(manifestRef, manifestData);
+    const response = await fetch(`http://localhost:3001/cargo-manifests/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(manifestData),
+    });
+    if (!response.ok) {
+      throw new Error('Error updating cargo manifest');
+    }
   } catch (error) {
     console.error('Error updating cargo manifest:', error);
     throw error;
   }
 };
 
+
 export const deleteCargoManifest = async (id) => {
   try {
-    const manifestRef = doc(db, 'cargo_manifests', id);
-    await deleteDoc(manifestRef);
+    const response = await fetch(`http://localhost:3001/cargo-manifests/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      throw new Error('Error deleting cargo manifest');
+    }
   } catch (error) {
     console.error('Error deleting cargo manifest:', error);
     throw error;

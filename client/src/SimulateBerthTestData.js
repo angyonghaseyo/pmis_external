@@ -43,7 +43,7 @@ export const simulateBerthTestData = async () => {
     },
   ];
 
-// Convert the bookedPeriod Map to an object for Firebase
+  // Convert the bookedPeriod Map to an object for Firebase
   berths.forEach((berth) => {
     berth.bookedPeriod = Object.fromEntries(berth.bookedPeriod);
   });
