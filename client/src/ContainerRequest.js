@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
     Box,
     Button,
-    Container,
     Typography,
     TextField,
     FormControlLabel,
@@ -23,26 +22,25 @@ import {
     DialogActions,
     DialogContent,
     DialogTitle,
-    IconButton,
     Snackbar,
+    IconButton
 } from "@mui/material";
 import MuiAlert from '@mui/material/Alert';
-import PrintIcon from '@mui/icons-material/Print';
 import {
     doc,
     addDoc,
-    setDoc,
-    getDoc,
     getDocs,
-    deleteDoc,
     collection,
     query,
     where,
-    Timestamp
+    Timestamp,
+    getDoc
 } from "firebase/firestore";
 import { LocalizationProvider, DateTimePicker } from "@mui/x-date-pickers";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { db } from "./firebaseConfig";
+import DeleteIcon from '@mui/icons-material/Delete';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 
 const Alert = React.forwardRef(function Alert(props, ref) {
     return <MuiAlert elevation={6} ref={ref} variant="filled" {...props} />;
@@ -53,7 +51,6 @@ const ContainerRequest = () => {
     const [openDialog, setOpenDialog] = useState(false);
     const [openSnackbar, setOpenSnackbar] = useState(false);
     const [carriers, setCarriers] = useState([]);
-    const [sizes, setSizes] = useState([]);
     const initialFormData = {
         carrierName: "",
         voyageNumber: "",
@@ -69,9 +66,36 @@ const ContainerRequest = () => {
         contactEmail: "",
         contactPhone: "",
         agreeToTerms: false,
+        Weight: '',
+        SizeTypeCode: '',
+        operator: '',
     };
 
+    const [goods, setGoods] = useState([{
+        id: 1,
+        name: '',
+        description: '',
+        quantity: '',
+        weightPerUnit: '',
+        cargoType: '',
+    }]);
+
+    const cargoTypes = [
+        "General Cargo",
+        "Hazardous Materials",
+        "Perishable Goods",
+        "Electronics",
+        "Textiles",
+        "Machinery",
+        "Automotive Parts",
+        "Chemical Products",
+        "Food Products",
+        "Raw Materials"
+    ];
+
+
     const [formData, setFormData] = useState(initialFormData);
+    const [containers, setContainers] = useState([]);
 
 
 
@@ -101,13 +125,10 @@ const ContainerRequest = () => {
         try {
             const querySnapshot = await getDocs(collection(db, 'carrier_container_prices'));
             querySnapshot.forEach((doc) => {
-                const data = doc.data();
-                if (data.company) {
-                    uniqueCompanies.add(data.company);
-                }
+                // Use document ID as the carrier name
+                uniqueCompanies.add(doc.id);
             });
 
-            // Convert the Set to an array
             return Array.from(uniqueCompanies);
         } catch (error) {
             console.error('Error getting documents:', error);
@@ -115,26 +136,38 @@ const ContainerRequest = () => {
         }
     }
 
-    async function getSizes(carrierName) {
-        const uniqueSizes = new Set();
-
+    async function getSizesWithPrices(carrierName) {
         try {
-            const querySnapshot = await getDocs(collection(db, 'carrier_container_prices'));
-            querySnapshot.forEach((doc) => {
-                const data = doc.data();
-                if (data.company == carrierName) {
-                    uniqueSizes.add(data.size);
-                }
-            });
+            const docRef = doc(db, 'carrier_container_prices', carrierName);
+            const docSnap = await getDoc(docRef);
 
-            // Convert the Set to an array
-            setSizes(Array.from(uniqueSizes));
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                const containerData = data.containers || [];
+
+                const uniqueContainers = [];
+                const seen = new Set();
+
+                containerData.forEach(container => {
+                    const key = `${container.size}-${container.price}`;
+                    if (!seen.has(key)) {
+                        seen.add(key);
+                        uniqueContainers.push(container);
+                    }
+                });
+
+                // Set the containers state with the fetched data
+                setContainers(uniqueContainers);
+                console.log(uniqueContainers, "WHYYYY");
+            } else {
+                console.log("No such document!");
+                setContainers([]);
+            }
         } catch (error) {
-            console.error('Error getting documents:', error);
-            return [];
+            console.error('Error getting document:', error);
+            setContainers([]);
         }
     }
-
     const handleOpenDialog = () => {
         setOpenDialog(true);
     };
@@ -142,7 +175,7 @@ const ContainerRequest = () => {
     const handleCloseDialog = () => {
         setOpenDialog(false);
         setFormData(initialFormData);
-        setSizes([]);
+        setContainers([]);
     };
 
     const handleChange = (e) => {
@@ -152,8 +185,8 @@ const ContainerRequest = () => {
 
     const handleCarrierNameChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-        getSizes(value);
+        setFormData(prev => ({ ...prev, [name]: value, containerSize: "" }));
+        getSizesWithPrices(value);
     };
 
     const handleDateChange = (name, newDate) => {
@@ -181,14 +214,18 @@ const ContainerRequest = () => {
         }
 
         try {
+            const totalWeight = calculateTotalWeight();
             const dataToSubmit = {
                 ...formData,
                 eta: formData.eta ? Timestamp.fromDate(formData.eta) : null,
                 etd: formData.etd ? Timestamp.fromDate(formData.etd) : null,
+                SizeTypeCode: formData.containerSize.split(' ')[0],
+                goods: goods,
+                Weight: totalWeight.toString()
             };
 
             const docRef = await addDoc(collection(db, "container_requests"), dataToSubmit);
-            setContainerRequests(prev => [...prev, { id: docRef.id, ...formData }]);
+            setContainerRequests(prev => [...prev, { id: docRef.id, ...formData, goods, totalWeight }]);
             handleCloseDialog();
             setOpenSnackbar(true);
         } catch (error) {
@@ -202,6 +239,43 @@ const ContainerRequest = () => {
         }
         setOpenSnackbar(false);
     };
+
+    const calculateTotalWeight = () => {
+        return goods.reduce((total, item) => {
+            const itemWeight = parseFloat(item.weightPerUnit) * parseFloat(item.quantity) || 0;
+            return total + itemWeight;
+        }, 0);
+    };
+
+    // Add new good
+    const handleAddGood = () => {
+        setGoods(prevGoods => [...prevGoods, {
+            id: Date.now(), // Use timestamp instead of length+1 to ensure unique IDs
+            name: '',
+            description: '',
+            quantity: '',
+            weightPerUnit: '',
+            cargoType: '',
+        }]);
+    };
+
+    // Remove good
+    const handleRemoveGood = (id) => {
+        if (goods.length > 1) {
+            setGoods(goods.filter(good => good.id !== id));
+        }
+    };
+
+    // Update good
+    const handleGoodChange = (id, field, value) => {
+        setGoods(prevGoods => prevGoods.map(good => {
+            if (good.id === id) {
+                return { ...good, [field]: value };
+            }
+            return good;
+        }));
+    };
+
 
     return (
         <Box sx={{ p: 3 }}>
@@ -220,7 +294,6 @@ const ContainerRequest = () => {
                     </Button>
                 </Box>
             </Box>
-
 
             <TableContainer component={Paper}>
                 <Table>
@@ -243,10 +316,6 @@ const ContainerRequest = () => {
                                 <TableCell>
                                     {request.eta ? request.eta.toLocaleString() : 'N/A'}
                                 </TableCell>
-                                <TableCell>{request.destinationPort}</TableCell>
-
-                                <TableCell>{request.destinationPort}</TableCell>
-
                                 <TableCell>{request.destinationPort}</TableCell>
                                 <TableCell>
                                     {request.consolidationService ? 'Consolidation' : 'Full Container'}
@@ -290,7 +359,7 @@ const ContainerRequest = () => {
                                     fullWidth
                                     label="Voyage Number"
                                     name="voyageNumber"
-                                    value={formData.imoNumber}
+                                    value={formData.voyageNumber}
                                     onChange={handleChange}
                                     required
                                 />
@@ -321,6 +390,17 @@ const ContainerRequest = () => {
                                     label="Destination Port"
                                     name="destinationPort"
                                     value={formData.destinationPort}
+                                    onChange={handleChange}
+                                    required
+                                />
+                            </Grid>
+
+                            <Grid item xs={12}>
+                                <TextField
+                                    fullWidth
+                                    label="Operator"
+                                    name="operator"
+                                    value={formData.operator}
                                     onChange={handleChange}
                                     required
                                 />
@@ -362,10 +442,10 @@ const ContainerRequest = () => {
                                                 onChange={handleChange}
                                                 required
                                             >
-                                                {sizes.length > 0 ? (
-                                                    sizes.map((size) => (
-                                                        <MenuItem key={size} value={size}>
-                                                            {size}
+                                                {containers.length > 0 ? (
+                                                    containers.map((container) => (
+                                                        <MenuItem key={`${container.size}-${container.price}`} value={`${container.size}FT ($${container.price})`}>
+                                                            {container.size}FT (${container.price})
                                                         </MenuItem>
                                                     ))
                                                 ) : (
@@ -389,6 +469,118 @@ const ContainerRequest = () => {
                                     </Grid>
                                 </>
                             )}
+
+                            <Grid item xs={12}>
+                                <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
+                                    Goods Details
+                                </Typography>
+                            </Grid>
+
+                            {goods.map((good, index) => (
+                                <Grid item xs={12} key={good.id}>
+                                    <Paper sx={{ p: 2, position: 'relative' }}>
+                                        <Grid container spacing={2}>
+                                            <Grid item xs={12}>
+                                                <Box display="flex" justifyContent="space-between" alignItems="center">
+                                                    <Typography variant="subtitle1">
+                                                        Item {index + 1}
+                                                    </Typography>
+                                                    {goods.length > 1 && (
+                                                        <IconButton
+                                                            onClick={() => handleRemoveGood(good.id)}
+                                                            size="small"
+                                                            color="error"
+                                                        >
+                                                            <DeleteIcon />
+                                                        </IconButton>
+                                                    )}
+                                                </Box>
+                                            </Grid>
+
+                                            <Grid item xs={12} sm={12}>
+                                                <TextField
+                                                    fullWidth
+                                                    label="Good Name"
+                                                    value={good.name}
+                                                    onChange={(e) => handleGoodChange(good.id, 'name', e.target.value)}
+                                                    required
+                                                />
+                                            </Grid>
+
+                                            <Grid item xs={12}>
+                                                <TextField
+                                                    fullWidth
+                                                    label="Description"
+                                                    multiline
+                                                    rows={4}
+                                                    value={good.description}
+                                                    onChange={(e) => handleGoodChange(good.id, 'description', e.target.value)}
+                                                    required
+                                                />
+                                            </Grid>
+
+                                            <Grid item xs={12} sm={4}>
+                                                <TextField
+                                                    fullWidth
+                                                    label="Quantity"
+                                                    type="number"
+                                                    value={good.quantity}
+                                                    onChange={(e) => handleGoodChange(good.id, 'quantity', e.target.value)}
+                                                    required
+                                                />
+                                            </Grid>
+
+                                            <Grid item xs={12} sm={4}>
+                                                <TextField
+                                                    fullWidth
+                                                    label="Weight per Unit (kg)"
+                                                    type="number"
+                                                    value={good.weightPerUnit}
+                                                    onChange={(e) => handleGoodChange(good.id, 'weightPerUnit', e.target.value)}
+                                                    required
+                                                />
+                                            </Grid>
+
+                                            <Grid item xs={12} sm={4}>
+                                                <FormControl fullWidth>
+                                                    <InputLabel>Cargo Type</InputLabel>
+                                                    <Select
+                                                        value={good.cargoType}
+                                                        onChange={(e) => handleGoodChange(good.id, 'cargoType', e.target.value)}
+                                                        label="Cargo Type"
+                                                        required
+                                                    >
+                                                        {cargoTypes.map((type) => (
+                                                            <MenuItem key={type} value={type}>
+                                                                {type}
+                                                            </MenuItem>
+                                                        ))}
+                                                    </Select>
+                                                </FormControl>
+                                            </Grid>
+                                        </Grid>
+                                    </Paper>
+                                </Grid>
+                            ))}
+
+                            <Grid item xs={12}>
+                                <Button
+                                    startIcon={<AddCircleOutlineIcon />}
+                                    onClick={handleAddGood}
+                                    variant="outlined"
+                                    fullWidth
+                                >
+                                    Add Another Item
+                                </Button>
+                            </Grid>
+
+                            <Grid item xs={12}>
+                                <Paper sx={{ p: 2, bgcolor: 'primary.light', color: 'primary.contrastText' }}>
+                                    <Typography variant="h6">
+                                        Total Weight: {calculateTotalWeight().toFixed(2)} kg
+                                    </Typography>
+                                </Paper>
+                            </Grid>
 
                             <Grid item xs={12} sm={6}>
                                 <TextField
@@ -455,7 +647,7 @@ const ContainerRequest = () => {
                 </DialogActions>
             </Dialog>
 
-            <Snackbar open={openSnackbar} autoHideDuration={6000} onClose={handleCloseSnackbar}>
+            <Snackbar open={openSnackbar} autoHideDuration={6000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
                 <Alert onClose={handleCloseSnackbar} severity="success" sx={{ width: '100%' }}>
                     Container request submitted successfully!
                 </Alert>

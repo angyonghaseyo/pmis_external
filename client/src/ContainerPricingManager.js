@@ -18,23 +18,28 @@ import {
     Box,
     ToggleButton,
     ToggleButtonGroup,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Snackbar,
+    Alert
 } from '@mui/material';
 import {
     doc,
-    addDoc,
     setDoc,
     getDoc,
-    getDocs,
-    deleteDoc,
-    collection,
+    updateDoc,
+    arrayRemove,
+    onSnapshot,
     query,
-    where,
-    onSnapshot
+    getDocs,
+    collection
 } from "firebase/firestore";
 import { Add, GridView, ViewList, Delete } from '@mui/icons-material';
 import { db, auth } from "./firebaseConfig";
 
-const ContainerPricingManager = (user) => {
+const ContainerPricingManager = () => {
     const [containerImageURL, setContainerImageURL] = useState([
         { id: 1, imageUrl: 'https://firebasestorage.googleapis.com/v0/b/pmis-47493.appspot.com/o/container_images%2F20ft.webp?alt=media' },
         { id: 2, imageUrl: 'https://firebasestorage.googleapis.com/v0/b/pmis-47493.appspot.com/o/container_images%2F5-Portable-Space-40FT.STD-final.webp?alt=media' },
@@ -44,37 +49,26 @@ const ContainerPricingManager = (user) => {
     const [newPrice, setNewPrice] = useState('');
     const [company, setCompany] = useState('');
     const [view, setView] = useState('grid');
-
-    // Simulated Firebase functions
-    const addContainer = async () => {
-        try {
-            const newContainer = {
-                size: newSize,
-                price: parseFloat(newPrice),
-                company: company
-            };
-
-            const docRef = await addDoc(collection(db, "carrier_container_prices"), newContainer);
-            console.log("Container added with ID: ", docRef.id);
-
-            // Clear input fields
-            setNewSize('');
-            setNewPrice('');
-        } catch (error) {
-            console.error("Error adding container: ", error);
-        }
-    };
+    const [numberOfContainers, setNumberOfContainers] = useState(1);
+    const [equipmentIds, setEquipmentIds] = useState([]);
+    const [openDialog, setOpenDialog] = useState(false);
+    const [currentEquipmentId, setCurrentEquipmentId] = useState('');
+    const [snackbar, setSnackbar] = useState({
+        open: false,
+        message: '',
+        severity: 'info'
+    });
 
     const getCompany = async () => {
         try {
-            const userDocRef = doc(db, "users", auth.currentUser.uid); // Use `doc()` to reference a single document
-            const userDoc = await getDoc(userDocRef); // Get the document
+            const userDocRef = doc(db, "users", auth.currentUser.uid);
+            const userDoc = await getDoc(userDocRef);
 
             if (userDoc.exists()) {
-                const userData = userDoc.data(); // Access document data
-                setCompany(userData.company); // Set the company state
-                console.log(userData.company); // Log the company
-                return userData.company; // Return the company
+                const userData = userDoc.data();
+                setCompany(userData.company);
+                console.log(userData.company);
+                return userData.company;
             } else {
                 console.log("No such document!");
                 return null;
@@ -85,17 +79,88 @@ const ContainerPricingManager = (user) => {
         }
     };
 
-    const deleteContainer = async (containerId) => {
+    const handleAddContainers = async () => {
+        if (equipmentIds.length !== numberOfContainers) {
+            setSnackbar({
+                open: true,
+                message: "Please enter all Equipment IDs before adding containers.",
+                severity: 'warning'
+            });
+            return;
+        }
+
         try {
-            if (typeof containerId !== 'string') {
-                console.error("Invalid containerId:", containerId);
+            const companyDocRef = doc(db, "carrier_container_prices", company);
+            const companyDoc = await getDoc(companyDocRef);
+
+            let existingContainers = companyDoc.exists() ? companyDoc.data().containers : [];
+
+            // Check if the size already exists
+            const sizeExists = existingContainers.some(container => container.size === parseInt(newSize));
+            if (sizeExists) {
+                setSnackbar({
+                    open: true,
+                    message: `Container size ${newSize}ft already exists. Please choose a different size.`,
+                    severity: 'error'
+                });
+                setNewSize('');
+                setNewPrice('');
+                setNumberOfContainers(1);
+                setEquipmentIds([]);
                 return;
             }
 
-            await deleteDoc(doc(db, "carrier_container_prices", containerId));
-            console.log("Container deleted with ID: ", containerId);
+            // Check for unique Equipment IDs across all companies
+            const allContainersQuery = query(collection(db, "carrier_container_prices"));
+            const allContainersSnapshot = await getDocs(allContainersQuery);
+            const allContainers = allContainersSnapshot.docs.flatMap(doc => doc.data().containers || []);
+
+            for (let equipmentId of equipmentIds) {
+                if (allContainers.some(container => container.equipmentId === equipmentId)) {
+                    setSnackbar({
+                        open: true,
+                        message: `Equipment ID ${equipmentId} already exists. Please use unique IDs.`,
+                        severity: 'error'
+                    });
+                    setNewSize('');
+                    setNewPrice('');
+                    setNumberOfContainers(1);
+                    setEquipmentIds([]);
+                    return;
+                }
+            }
+
+            let updatedContainers = [...existingContainers];
+
+            for (let i = 0; i < numberOfContainers; i++) {
+                const newContainer = {
+                    size: parseInt(newSize),
+                    price: parseFloat(newPrice),
+                    equipmentId: equipmentIds[i]
+                };
+                updatedContainers.push(newContainer);
+            }
+
+            await setDoc(companyDocRef, { containers: updatedContainers }, { merge: true });
+
+            setSnackbar({
+                open: true,
+                message: `${numberOfContainers} containers added successfully.`,
+                severity: 'success'
+            });
+
+            // Clear input fields
+            setNewSize('');
+            setNewPrice('');
+            setNumberOfContainers(1);
+            setEquipmentIds([]);
         } catch (error) {
-            console.error("Error deleting container: ", error);
+            console.error("Error adding containers: ", error);
+            setSnackbar({
+                open: true,
+                message: "Error adding containers. Please try again.",
+                severity: 'error'
+            });
         }
     };
 
@@ -104,13 +169,13 @@ const ContainerPricingManager = (user) => {
             try {
                 const userCompany = await getCompany();
                 if (userCompany) {
-                    const q = query(collection(db, "carrier_container_prices"), where("company", "==", userCompany));
-                    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-                        const containerData = querySnapshot.docs.map(doc => ({
-                            id: doc.id,
-                            ...doc.data()
-                        }));
-                        setContainers(containerData);
+                    const companyDocRef = doc(db, "carrier_container_prices", userCompany);
+                    const unsubscribe = onSnapshot(companyDocRef, (docSnapshot) => {
+                        if (docSnapshot.exists()) {
+                            setContainers(docSnapshot.data().containers || []);
+                        } else {
+                            setContainers([]);
+                        }
                     });
 
                     // Cleanup function to unsubscribe from the listener when the component unmounts
@@ -124,7 +189,30 @@ const ContainerPricingManager = (user) => {
         fetchData();
     }, []);
 
+    const handleOpenDialog = () => {
+        setOpenDialog(true);
+    };
 
+    const handleCloseDialog = () => {
+        setOpenDialog(false);
+    };
+
+    const handleCloseSnackbar = (event, reason) => {
+        if (reason === 'clickaway') {
+            return;
+        }
+        setSnackbar({ ...snackbar, open: false });
+    };
+
+    const handleAddEquipmentId = () => {
+        if (currentEquipmentId.trim() !== '') {
+            setEquipmentIds([...equipmentIds, currentEquipmentId.trim()]);
+            setCurrentEquipmentId('');
+            if (equipmentIds.length + 1 === numberOfContainers) {
+                handleCloseDialog();
+            }
+        }
+    };
 
     const handleViewChange = (event, newView) => {
         if (newView !== null) {
@@ -132,8 +220,36 @@ const ContainerPricingManager = (user) => {
         }
     };
 
+    // Function to get unique container sizes and prices
+    const getUniqueContainers = () => {
+        const uniqueContainers = [];
+        const seen = new Set();
+
+        containers.forEach(container => {
+            const key = `${container.size}-${container.price}`;
+            if (!seen.has(key)) {
+                seen.add(key);
+                uniqueContainers.push(container);
+            }
+        });
+
+        return uniqueContainers;
+    };
+
+    const uniqueContainers = getUniqueContainers();
+
     return (
         <Container maxWidth="lg" sx={{ py: 4 }}>
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={6000}
+                onClose={handleCloseSnackbar}
+                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            >
+                <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
             <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
                 <Typography variant="h4" gutterBottom>
                     Container Pricing Management
@@ -154,18 +270,32 @@ const ContainerPricingManager = (user) => {
                         onChange={(e) => setNewPrice(e.target.value)}
                         size="small"
                     />
+                    <TextField
+                        label="Number of Containers"
+                        type="number"
+                        value={numberOfContainers}
+                        onChange={(e) => setNumberOfContainers(parseInt(e.target.value) || 1)}
+                        size="small"
+                    />
+                    <Button
+                        variant="contained"
+                        onClick={handleOpenDialog}
+                        disabled={!newSize || !newPrice || numberOfContainers < 1}
+                    >
+                        Enter Equipment IDs
+                    </Button>
                     <Button
                         variant="contained"
                         startIcon={<Add />}
-                        onClick={addContainer}
-                        disabled={!newSize || !newPrice}
+                        onClick={handleAddContainers}
+                        disabled={!newSize || !newPrice || numberOfContainers < 1 || equipmentIds.length !== numberOfContainers}
                     >
-                        Add Container
+                        Add Containers
                     </Button>
                 </Box>
 
                 <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="h6">Container Listings</Typography>
+                    <Typography variant="h6">Unique Container Sizes and Prices</Typography>
                     <ToggleButtonGroup
                         value={view}
                         exclusive
@@ -183,13 +313,13 @@ const ContainerPricingManager = (user) => {
 
                 {view === 'grid' ? (
                     <Grid container spacing={3}>
-                        {containers.map((container) => (
-                            <Grid item xs={12} sm={6} md={4} key={container.id}>
+                        {uniqueContainers.map((container, index) => (
+                            <Grid item xs={12} sm={6} md={4} key={index}>
                                 <Card>
                                     <CardMedia
                                         component="img"
                                         height="200"
-                                        image={parseInt(container.size) < 30 ? containerImageURL[0].imageUrl : containerImageURL[1].imageUrl}
+                                        image={container.size < 30 ? containerImageURL[0].imageUrl : containerImageURL[1].imageUrl}
                                         alt={`${container.size}ft Container`}
                                         sx={{
                                             objectFit: 'cover',
@@ -208,17 +338,9 @@ const ContainerPricingManager = (user) => {
                                             <Typography variant="h5" color="primary">
                                                 ${container.price.toLocaleString()}
                                             </Typography>
-                                            <Button
-                                                color="error"
-                                                startIcon={<Delete />}
-                                                onClick={() => deleteContainer(container.id)}
-                                            >
-                                                Delete
-                                            </Button>
                                         </Box>
                                     </CardContent>
                                 </Card>
-
                             </Grid>
                         ))}
                     </Grid>
@@ -229,29 +351,44 @@ const ContainerPricingManager = (user) => {
                                 <TableRow>
                                     <TableCell>Container Size (ft)</TableCell>
                                     <TableCell>Price (USD)</TableCell>
-                                    <TableCell>Actions</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {containers.map((container) => (
-                                    <TableRow key={container.id}>
+                                {uniqueContainers.map((container, index) => (
+                                    <TableRow key={index}>
                                         <TableCell>{container.size}ft</TableCell>
                                         <TableCell>${container.price.toLocaleString()}</TableCell>
-                                        <TableCell>
-                                            <Button
-                                                color="error"
-                                                startIcon={<Delete />}
-                                                onClick={() => deleteContainer(container.id)}
-                                            >
-                                                Delete
-                                            </Button>
-                                        </TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
                         </Table>
                     </TableContainer>
                 )}
+
+                <Dialog
+                    open={openDialog}
+                    onClose={handleCloseDialog}
+                    fullWidth      // Added to ensure dialog takes full width of maxWidth
+                >
+                    <DialogTitle>Enter Equipment IDs</DialogTitle>
+                    <DialogContent sx={{ minWidth: '400px' }}> {/* Added minimum width */}
+                        <TextField
+                            autoFocus
+                            margin="dense"
+                            label="Equipment ID"
+                            fullWidth
+                            value={currentEquipmentId}
+                            onChange={(e) => setCurrentEquipmentId(e.target.value)}
+                        />
+                        <Typography variant="body2" sx={{ mt: 2 }}>
+                            Equipment IDs entered: {equipmentIds.length} / {numberOfContainers}
+                        </Typography>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={handleCloseDialog}>Cancel</Button>
+                        <Button onClick={handleAddEquipmentId}>Add</Button>
+                    </DialogActions>
+                </Dialog>
             </Paper>
         </Container>
     );
