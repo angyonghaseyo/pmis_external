@@ -103,6 +103,7 @@ app.post('/login', async (req, res) => {
     if (!isPasswordValid) {
         return res.status(401).send('Invalid credentials');
     }
+    console.log(userData)
 
     // Generate JWT with accessRights
 
@@ -707,7 +708,6 @@ app.post('/inquiries-feedback', upload.single('file'), async (req, res) => {
 // Endpoint to fetch user profile by email
 app.get('/user-profile', async (req, res) => {
     const { email } = req.query;
-
     if (!email) {
         return res.status(400).send('Email is required');
     }
@@ -721,6 +721,7 @@ app.get('/user-profile', async (req, res) => {
 
         const userDoc = userQuery.docs[0];
         const userData = userDoc.data();
+        console.log(userData)
 
         res.status(200).json(userData);
     } catch (error) {
@@ -751,8 +752,11 @@ app.put('/update-profile', upload.single('photoFile'), async (req, res) => {
         const userId = userDoc.id;
 
         if (photoFile) {
+
             const fileExtension = photoFile.originalname.split('.').pop();
-            const fileName = `${userId}.${fileExtension}`;
+            const currentDateTime = new Date().toISOString().replace(/[:.]/g, '-'); // Get current date and time, replace colons and dots with hyphens
+            const fileName = `${currentDateTime}.${fileExtension}`; // Use the current date and time for the file name
+
             const fileRef = bucket.file(`profile_photos/${fileName}`);
             await fileRef.save(photoFile.buffer, {
                 metadata: { contentType: photoFile.mimetype },
@@ -769,6 +773,7 @@ app.put('/update-profile', upload.single('photoFile'), async (req, res) => {
             photoURL: photoURL,
         };
 
+        
         // Update Firestore document
         const userDocRef = db.collection('users').doc(userId);
         await userDocRef.update({

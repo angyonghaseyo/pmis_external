@@ -15,7 +15,7 @@ export const AuthProvider = ({ children }) => {
             const decodedToken = jwtDecode(token);
         
             setUser({
-                email: decodedToken.email, accessRights: decodedToken.accessRights, enrolledPrograms: decodedToken?.enrolledPrograms, company: decodedToken?.company, photo: decodedToken?.photo,
+                email: decodedToken.email, accessRights: decodedToken.accessRights, enrolledPrograms: decodedToken?.enrolledPrograms, company: decodedToken?.company, photoURL: decodedToken?.photo,
                 firstName: decodedToken.firstName, token
             });
         }
@@ -24,8 +24,10 @@ export const AuthProvider = ({ children }) => {
     const login = (token) => {
         const decodedToken = jwtDecode(token);
         localStorage.setItem('authToken', token);
-        setUser({ email: decodedToken.email, accessRights: decodedToken.accessRights, token });
-        navigate('/home');
+        setUser({
+            email: decodedToken.email, accessRights: decodedToken.accessRights, enrolledPrograms: decodedToken?.enrolledPrograms, company: decodedToken?.company, photoURL: decodedToken?.photo,
+            firstName: decodedToken.firstName, token
+        }); navigate('/home');
     };
 
     const logout = () => {
@@ -33,9 +35,28 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
         navigate('/login');
     };
+    const fetchUserProfile = async () => {
+        try {
+            const response = await fetch(`http://localhost:3001/user-profile?email=${user.email}`);
+            if (!response.ok) {
+                throw new Error('Error fetching user profile');
+            }
+            const userProfile = await response.json();
+
+            // Update the user state with additional profile data
+            setUser(prevUser => ({
+                ...prevUser,
+                ...userProfile
+            }));
+
+        } catch (error) {
+            console.error('Error fetching user profile:', error);
+            throw error;
+        }
+    };
 
     return (
-        <AuthContext.Provider value={{ user, login, logout }}>
+        <AuthContext.Provider value={{ user, login, logout, fetchUserProfile }}>
             {children}
         </AuthContext.Provider>
     );

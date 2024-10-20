@@ -294,6 +294,7 @@ export const deleteInquiryFeedback = async (id) => {
 // Company operations
 export const getCompanyInfo = async (companyName) => {
   try {
+    console.log("Company Name", companyName)
     const response = await fetch(`http://localhost:3001/company-data?companyName=${encodeURIComponent(companyName)}`);
     if (!response.ok) {
       throw new Error('Error fetching company data');

@@ -20,7 +20,7 @@ const teams = [
 
 function EditProfile() {
 
-  const { user } = useAuth();
+  const { user, fetchUserProfile } = useAuth();
 
   const [profile, setProfile] = useState({
     email: '',
@@ -38,7 +38,7 @@ function EditProfile() {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
 
   useEffect(() => {
-    fetchUserProfile(user.email);
+    fetchCurrentUserProfile(user.email);
   }, []);
 
   const fetchProfile = async (email) => {
@@ -47,7 +47,9 @@ function EditProfile() {
       if (!response.ok) {
         throw new Error('Error fetching user profile');
       }
+
       const userData = await response.json();
+      
       return userData;
     } catch (error) {
       console.error('Error fetching user profile:', error);
@@ -56,7 +58,7 @@ function EditProfile() {
   };
 
 
-  const fetchUserProfile = async () => {
+  const fetchCurrentUserProfile = async () => {
     try {
       setLoading(true);
       if (user) {
@@ -130,6 +132,7 @@ function EditProfile() {
       console.error('Error updating profile:', err);
       setSnackbar({ open: true, message: 'Failed to update profile: ' + err.message, severity: 'error' });
     } finally {
+      fetchUserProfile();
       setLoading(false);
     }
   };

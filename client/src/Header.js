@@ -100,8 +100,8 @@ function Header() {
 
               {/* User Avatar and Profile Menu */}
               <IconButton onClick={handleProfileMenuClick} color="inherit">
-                {user.photo ? (
-                  <Avatar src={user.photo} />
+                {user.photoURL ? (
+                  <Avatar src={user.photoURL} />
                 ) : (
                   <Avatar>
                     <Person />
