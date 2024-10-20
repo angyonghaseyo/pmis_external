@@ -105,7 +105,8 @@ app.post('/login', async (req, res) => {
     }
 
     // Generate JWT with accessRights
-    const token = jwt.sign({ email, accessRights: userData.accessRights, enrolledPrograms: userData?.enrolledPrograms, company: userData.company }, JWT_SECRET, { expiresIn: '24h' });
+
+    const token = jwt.sign({ email, accessRights: userData.accessRights, enrolledPrograms: userData?.enrolledPrograms, company: userData.company, firstName: userData?.firstName, photo: userData?.photoURL }, JWT_SECRET, { expiresIn: '24h' });
     res.send({ token });
 });
 
@@ -757,7 +758,10 @@ app.put('/update-profile', upload.single('photoFile'), async (req, res) => {
                 metadata: { contentType: photoFile.mimetype },
             });
             photoURL = `https://storage.googleapis.com/${bucket.name}/profile_photos/${fileName}`;
+            await fileRef.makePublic();
+            []
         }
+
 
         const fullName = `${salutation} ${firstName} ${lastName}`.trim();
         const updatedProfile = {

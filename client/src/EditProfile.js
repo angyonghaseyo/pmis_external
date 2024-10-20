@@ -71,7 +71,7 @@ function EditProfile() {
           teams: userData.teams || [],
           accessRights: userData.accessRights || [],
         });
-        setSelectedImage(user.photoURL);
+        setSelectedImage(userData.photoURL);
       }
     } catch (err) {
       console.error("Error fetching user profile:", err);

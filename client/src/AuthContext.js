@@ -13,7 +13,11 @@ export const AuthProvider = ({ children }) => {
         const token = localStorage.getItem('authToken');
         if (token) {
             const decodedToken = jwtDecode(token);
-            setUser({ email: decodedToken.email, accessRights: decodedToken.accessRights, enrolledPrograms: decodedToken?.enrolledPrograms, company: decodedToken?.company, token });
+        
+            setUser({
+                email: decodedToken.email, accessRights: decodedToken.accessRights, enrolledPrograms: decodedToken?.enrolledPrograms, company: decodedToken?.company, photo: decodedToken?.photo,
+                firstName: decodedToken.firstName, token
+            });
         }
     }, []);
 
