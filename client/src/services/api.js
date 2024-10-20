@@ -170,11 +170,15 @@ export const deleteUser = async (email) => {
     handleApiError(error);
   }
 };
-export const deleteUserAccount = async () => {
+
+export const deleteUserAccount = async (email) => {
   try {
     const response = await fetch('http://localhost:3001/user-account', {
       method: 'DELETE',
-      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User-Email': email,
+      },
     });
     if (!response.ok) {
       throw new Error('Error deleting user account');

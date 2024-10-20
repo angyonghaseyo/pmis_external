@@ -5,6 +5,8 @@ import { auth, db, storage } from './firebaseConfig';
 import { updateProfile } from 'firebase/auth';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { useAuth } from './AuthContext';
+
 
 const teams = [
   'Assets and Facilities',
@@ -17,6 +19,9 @@ const teams = [
 ];
 
 function EditProfile() {
+
+  const { user } = useAuth();
+
   const [profile, setProfile] = useState({
     email: '',
     salutation: '',
@@ -33,30 +38,40 @@ function EditProfile() {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
 
   useEffect(() => {
-    fetchUserProfile();
+    fetchUserProfile(user.email);
   }, []);
+
+  const fetchProfile = async (email) => {
+    try {
+      const response = await fetch(`http://localhost:3001/user-profile?email=${encodeURIComponent(email)}`);
+      if (!response.ok) {
+        throw new Error('Error fetching user profile');
+      }
+      const userData = await response.json();
+      return userData;
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      throw error;
+    }
+  };
+
 
   const fetchUserProfile = async () => {
     try {
       setLoading(true);
-      const user = auth.currentUser;
       if (user) {
-        const userDocRef = doc(db, 'users', user.uid);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          setProfile({
-            email: user.email || '',
-            salutation: userData.salutation || '',
-            firstName: userData.firstName || '',
-            lastName: userData.lastName || '',
-            company: userData.company || 'Oceania Port',
-            userType: userData.userType || 'Normal',
-            teams: userData.teams || [],
-            accessRights: userData.accessRights || [],
-          });
-          setSelectedImage(user.photoURL);
-        }
+        const userData = await fetchProfile(user.email);
+        setProfile({
+          email: user.email || '',
+          salutation: userData.salutation || '',
+          firstName: userData.firstName || '',
+          lastName: userData.lastName || '',
+          company: userData.company || 'Oceania Port',
+          userType: userData.userType || 'Normal',
+          teams: userData.teams || [],
+          accessRights: userData.accessRights || [],
+        });
+        setSelectedImage(user.photoURL);
       }
     } catch (err) {
       console.error("Error fetching user profile:", err);
@@ -65,7 +80,6 @@ function EditProfile() {
       setLoading(false);
     }
   };
-
   const handleChange = (e) => {
     const { name, value } = e.target;
     setProfile(prevProfile => ({
@@ -87,35 +101,29 @@ function EditProfile() {
       setLoading(true);
       let photoURL = selectedImage;
 
+      const formData = new FormData();
+      formData.append('email', user.email);
+      formData.append('salutation', profile.salutation);
+      formData.append('firstName', profile.firstName);
+      formData.append('lastName', profile.lastName);
+      formData.append('company', profile.company);
+      formData.append('userType', profile.userType);
+      formData.append('photoURL', photoURL);
+
       if (selectedImage && selectedImage.startsWith('blob:')) {
-        const imageRef = ref(storage, `profile_photos/${auth.currentUser.uid}`);
         const response = await fetch(selectedImage);
         const blob = await response.blob();
-        await uploadBytes(imageRef, blob);
-        photoURL = await getDownloadURL(imageRef);
+        formData.append('photoFile', blob, 'profile_photo.png');
       }
 
-      const fullName = `${profile.salutation} ${profile.firstName} ${profile.lastName}`.trim();
-      const updatedProfile = {
-        displayName: fullName,
-        photoURL: photoURL,
-      };
-
-      // Update Firebase Auth user profile
-      await updateProfile(auth.currentUser, updatedProfile);
-
-      // Update Firestore document
-      const userDocRef = doc(db, 'users', auth.currentUser.uid);
-      await updateDoc(userDocRef, {
-        salutation: profile.salutation,
-        firstName: profile.firstName,
-        lastName: profile.lastName,
-        displayName: fullName,
-        photoURL: photoURL,
-        company: profile.company,
-        userType: profile.userType,
-        // Note: We're not updating 'teams' here as it should be managed elsewhere
+      const response = await fetch('http://localhost:3001/update-profile', {
+        method: 'PUT',
+        body: formData,
       });
+
+      if (!response.ok) {
+        throw new Error('Failed to update profile');
+      }
 
       setSnackbar({ open: true, message: 'Profile updated successfully', severity: 'success' });
     } catch (err) {
@@ -125,7 +133,6 @@ function EditProfile() {
       setLoading(false);
     }
   };
-
   const handlePasswordReset = async () => {
     try {
       await sendPasswordResetEmailToUser(profile.email);
@@ -139,7 +146,7 @@ function EditProfile() {
   const handleDeleteAccount = async () => {
     if (window.confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
       try {
-        await deleteUserAccount();
+        await deleteUserAccount(user.email);
         setSnackbar({ open: true, message: 'Your account has been deleted successfully.', severity: 'success' });
         // Redirect to login page or show a goodbye message
       } catch (err) {

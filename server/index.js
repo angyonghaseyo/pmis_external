@@ -8,6 +8,7 @@ const cors = require('cors');
 const { Storage } = require('@google-cloud/storage');
 const path = require('path');
 const multer = require('multer');
+const { captureRejectionSymbol } = require('events');
 const upload = multer({ storage: multer.memoryStorage() });
 
 const storage = new Storage({
@@ -702,6 +703,87 @@ app.post('/inquiries-feedback', upload.single('file'), async (req, res) => {
     }
 });
 
+// Endpoint to fetch user profile by email
+app.get('/user-profile', async (req, res) => {
+    const { email } = req.query;
+
+    if (!email) {
+        return res.status(400).send('Email is required');
+    }
+
+    try {
+        // Find user by email
+        const userQuery = await db.collection('users').where('email', '==', email).get();
+        if (userQuery.empty) {
+            return res.status(404).send('User not found');
+        }
+
+        const userDoc = userQuery.docs[0];
+        const userData = userDoc.data();
+
+        res.status(200).json(userData);
+    } catch (error) {
+        console.error('Error fetching user profile:', error);
+        res.status(500).send('Error fetching user profile');
+    }
+});
+
+// Endpoint to handle profile update
+app.put('/update-profile', upload.single('photoFile'), async (req, res) => {
+    const { email, salutation, firstName, lastName, company, userType } = req.body;
+    const photoFile = req.file;
+
+    if (!email) {
+        return res.status(400).send('Email is required');
+    }
+
+    try {
+        let photoURL = req.body.photoURL;
+
+        // Find user by email
+        const userQuery = await db.collection('users').where('email', '==', email).get();
+        if (userQuery.empty) {
+            return res.status(404).send('User not found');
+        }
+
+        const userDoc = userQuery.docs[0];
+        const userId = userDoc.id;
+
+        if (photoFile) {
+            const fileExtension = photoFile.originalname.split('.').pop();
+            const fileName = `${userId}.${fileExtension}`;
+            const fileRef = bucket.file(`profile_photos/${fileName}`);
+            await fileRef.save(photoFile.buffer, {
+                metadata: { contentType: photoFile.mimetype },
+            });
+            photoURL = `https://storage.googleapis.com/${bucket.name}/profile_photos/${fileName}`;
+        }
+
+        const fullName = `${salutation} ${firstName} ${lastName}`.trim();
+        const updatedProfile = {
+            displayName: fullName,
+            photoURL: photoURL,
+        };
+
+        // Update Firestore document
+        const userDocRef = db.collection('users').doc(userId);
+        await userDocRef.update({
+            salutation: salutation,
+            firstName: firstName,
+            lastName: lastName,
+            displayName: fullName,
+            photoURL: photoURL,
+            company: company,
+            userType: userType,
+        });
+
+        res.status(200).send('Profile updated successfully');
+    } catch (error) {
+        console.error('Error updating profile:', error);
+        res.status(500).send('Failed to update profile: ' + error.message);
+    }
+});
+
 // Endpoint to fetch training programs
 app.get('/training-programs', async (req, res) => {
     try {
@@ -827,11 +909,14 @@ app.delete('/users', async (req, res) => {
 });
 // Endpoint to delete the current user's account
 app.delete('/user-account', async (req, res) => {
-    const user = req.email;
+    const email = req.headers['x-user-email'];
 
-    if (!user) {
+
+    if (!email) {
+
         return res.status(401).send('No authenticated user');
     }
+    console.log(email)
 
     try {
         const usersRef = db.collection('users');
@@ -879,7 +964,8 @@ app.delete('/invitations/:invitationId', async (req, res) => {
 // Endpoint to fetch company data
 app.get('/company-data', async (req, res) => {
     const { companyName } = req.query; // Assuming companyName is passed as a query parameter
-
+    console.log("Attempting to.")
+    console.log("HEY")
     if (!companyName) {
         return res.status(400).send('Company name is required');
     }
