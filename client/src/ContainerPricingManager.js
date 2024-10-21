@@ -95,21 +95,6 @@ const ContainerPricingManager = () => {
 
             let existingContainers = companyDoc.exists() ? companyDoc.data().containers : [];
 
-            // Check if the size already exists
-            const sizeExists = existingContainers.some(container => container.size === parseInt(newSize));
-            if (sizeExists) {
-                setSnackbar({
-                    open: true,
-                    message: `Container size ${newSize}ft already exists. Please choose a different size.`,
-                    severity: 'error'
-                });
-                setNewSize('');
-                setNewPrice('');
-                setNumberOfContainers(1);
-                setEquipmentIds([]);
-                return;
-            }
-
             // Check for unique Equipment IDs across all companies
             const allContainersQuery = query(collection(db, "carrier_container_prices"));
             const allContainersSnapshot = await getDocs(allContainersQuery);
@@ -136,7 +121,13 @@ const ContainerPricingManager = () => {
                 const newContainer = {
                     size: parseInt(newSize),
                     price: parseFloat(newPrice),
-                    equipmentId: equipmentIds[i]
+                    EquipmentID: equipmentIds[i],
+                    bookingStatus: "available",
+                    spaceUsed: 0,
+                    containerConsolidationsID: [],
+                    locations: [],
+                    statuses: []
+
                 };
                 updatedContainers.push(newContainer);
             }
@@ -386,11 +377,13 @@ const ContainerPricingManager = () => {
                     </DialogContent>
                     <DialogActions>
                         <Button onClick={handleCloseDialog}>Cancel</Button>
-                        <Button onClick={handleAddEquipmentId}>Add</Button>
+                        {equipmentIds.length !== numberOfContainers && (
+                            < Button onClick={handleAddEquipmentId}>Add</Button>
+                        )}
                     </DialogActions>
                 </Dialog>
             </Paper>
-        </Container>
+        </Container >
     );
 };
 

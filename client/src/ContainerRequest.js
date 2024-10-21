@@ -56,6 +56,7 @@ const ContainerRequest = () => {
         voyageNumber: "",
         eta: null,
         etd: null,
+        loadingPort: "",
         destinationPort: "",
         containerSize: "",
         containerCount: 0,
@@ -384,10 +385,20 @@ const ContainerRequest = () => {
                                     />
                                 </LocalizationProvider>
                             </Grid>
-                            <Grid item xs={12}>
+                            <Grid item xs={6}>
                                 <TextField
                                     fullWidth
-                                    label="Destination Port"
+                                    label="Port Of Loading"
+                                    name="loadingPort"
+                                    value={formData.loadingPort}
+                                    onChange={handleChange}
+                                    required
+                                />
+                            </Grid>
+                            <Grid item xs={6}>
+                                <TextField
+                                    fullWidth
+                                    label="Port of Destination"
                                     name="destinationPort"
                                     value={formData.destinationPort}
                                     onChange={handleChange}
