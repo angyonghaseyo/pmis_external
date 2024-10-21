@@ -37,7 +37,7 @@ export const AuthProvider = ({ children }) => {
     };
     const fetchUserProfile = async () => {
         try {
-            const response = await fetch(`http://localhost:3001/user-profile?email=${user.email}`);
+            const response = await fetch(`http://localhost:3003/user-profile?email=${user.email}`);
             if (!response.ok) {
                 throw new Error('Error fetching user profile');
             }

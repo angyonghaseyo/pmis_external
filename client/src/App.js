@@ -33,7 +33,7 @@ function App() {
     console.log("Starting simulations...");
 
     try {
-      const berthResponse = await fetch('http://localhost:3001/simulate-berth-test-data', {
+      const berthResponse = await fetch('http://localhost:3003/simulate-berth-test-data', {
         method: 'POST',
       });
 
@@ -42,7 +42,7 @@ function App() {
       }
       // console.log("FacilityList data simulation completed.");
 
-      const manpowerResponse = await fetch('http://localhost:3001/simulate-manpower-test-data', {
+      const manpowerResponse = await fetch('http://localhost:3003/simulate-manpower-test-data', {
         method: 'POST',
       });
 
@@ -51,7 +51,7 @@ function App() {
       }
       // console.log("Manpower data simulation completed.");
 
-      const assetResponse = await fetch('http://localhost:3001/simulate-asset-test-data', {
+      const assetResponse = await fetch('http://localhost:3003/simulate-asset-test-data', {
         method: 'POST',
       });
 
