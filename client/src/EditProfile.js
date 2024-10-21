@@ -132,7 +132,7 @@ function EditProfile() {
       console.error('Error updating profile:', err);
       setSnackbar({ open: true, message: 'Failed to update profile: ' + err.message, severity: 'error' });
     } finally {
-      fetchUserProfile();
+      await fetchUserProfile();
       setLoading(false);
     }
   };
