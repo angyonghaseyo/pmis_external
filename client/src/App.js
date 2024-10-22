@@ -24,6 +24,7 @@ import { Box, CssBaseline, CircularProgress } from '@mui/material';
 import { simulateBerthTestData } from './SimulateBerthTestData'; 
 import { simulateManpowerTestData } from './SimulateManpowerTestData';
 import { simulateAssetTestData } from './SimulateAssetTestData';
+import AdHocResourceRequest from './AdHocResourceRequest';
 
 const drawerWidth = 240;
 
@@ -148,6 +149,7 @@ function App() {
                 {hasAccessRights(['View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest']) && (
                   <Route path="/cargos/cargo-manifest" element={<CargoManifest user={user} />} />
                 )}
+                <Route path="/resources/adhoc-request" element={<AdHocResourceRequest />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </>
             ) : (
