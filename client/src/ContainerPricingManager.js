@@ -8,56 +8,58 @@ import {
     TextField,
     Button,
     Grid,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     Paper,
     Box,
-    ToggleButton,
-    ToggleButtonGroup,
     Dialog,
     DialogTitle,
     DialogContent,
     DialogActions,
     Snackbar,
-    Alert
+    Alert,
+    CardActionArea,
+    Stepper,
+    Step,
+    StepLabel,
+    Chip,
+    IconButton,
+    Divider,
+    Table,
+    TableCell,
+    TableRow,
+    TableHead,
+    TableBody,
+    TableContainer
 } from '@mui/material';
+import { List } from '@mui/icons-material';
 import {
     doc,
     setDoc,
     getDoc,
-    updateDoc,
-    arrayRemove,
     onSnapshot,
     query,
     getDocs,
     collection
 } from "firebase/firestore";
-import { Add, GridView, ViewList, Delete } from '@mui/icons-material';
+import { Add, Close, ArrowBack, ArrowForward } from '@mui/icons-material';
 import { db, auth } from "./firebaseConfig";
 
 const ContainerPricingManager = () => {
-    const [containerImageURL, setContainerImageURL] = useState([
-        { id: 1, imageUrl: 'https://firebasestorage.googleapis.com/v0/b/pmis-47493.appspot.com/o/container_images%2F20ft.webp?alt=media' },
-        { id: 2, imageUrl: 'https://firebasestorage.googleapis.com/v0/b/pmis-47493.appspot.com/o/container_images%2F5-Portable-Space-40FT.STD-final.webp?alt=media' },
-    ]);
-    const [containers, setContainers] = useState([]);
-    const [newSize, setNewSize] = useState('');
-    const [newPrice, setNewPrice] = useState('');
+    const [menuContainers, setMenuContainers] = useState([]);
+    const [selectedContainer, setSelectedContainer] = useState(null);
     const [company, setCompany] = useState('');
-    const [view, setView] = useState('grid');
     const [numberOfContainers, setNumberOfContainers] = useState(1);
     const [equipmentIds, setEquipmentIds] = useState([]);
-    const [openDialog, setOpenDialog] = useState(false);
     const [currentEquipmentId, setCurrentEquipmentId] = useState('');
+    const [openDialog, setOpenDialog] = useState(false);
+    const [activeStep, setActiveStep] = useState(0);
     const [snackbar, setSnackbar] = useState({
         open: false,
         message: '',
         severity: 'info'
     });
+    const [openList, setOpenList] = useState(false);
+    const [containers, setContainers] = useState([]);
+    const steps = ['Select Number of Containers', 'Enter Equipment IDs'];
 
     const getCompany = async () => {
         try {
@@ -67,12 +69,9 @@ const ContainerPricingManager = () => {
             if (userDoc.exists()) {
                 const userData = userDoc.data();
                 setCompany(userData.company);
-                console.log(userData.company);
                 return userData.company;
-            } else {
-                console.log("No such document!");
-                return null;
             }
+            return null;
         } catch (error) {
             console.error("Error fetching user data:", error);
             return null;
@@ -89,28 +88,37 @@ const ContainerPricingManager = () => {
             return;
         }
 
+        for (let i = 0; i < equipmentIds.length; i++) {
+            for (let j = i + 1; j < equipmentIds.length; j++) {
+                if (equipmentIds[i] === equipmentIds[j]) {
+                    setSnackbar({
+                        open: true,
+                        message: "Please enter unique equipment ids.",
+                        severity: 'error'
+                    });
+                    return;
+                }
+            }
+        }
+
         try {
             const companyDocRef = doc(db, "carrier_container_prices", company);
             const companyDoc = await getDoc(companyDocRef);
 
             let existingContainers = companyDoc.exists() ? companyDoc.data().containers : [];
 
-            // Check for unique Equipment IDs across all companies
+            // Check for unique Equipment IDs
             const allContainersQuery = query(collection(db, "carrier_container_prices"));
             const allContainersSnapshot = await getDocs(allContainersQuery);
             const allContainers = allContainersSnapshot.docs.flatMap(doc => doc.data().containers || []);
 
             for (let equipmentId of equipmentIds) {
-                if (allContainers.some(container => container.equipmentId === equipmentId)) {
+                if (allContainers.some(container => container.EquipmentID === equipmentId)) {
                     setSnackbar({
                         open: true,
                         message: `Equipment ID ${equipmentId} already exists. Please use unique IDs.`,
                         severity: 'error'
                     });
-                    setNewSize('');
-                    setNewPrice('');
-                    setNumberOfContainers(1);
-                    setEquipmentIds([]);
                     return;
                 }
             }
@@ -119,15 +127,12 @@ const ContainerPricingManager = () => {
 
             for (let i = 0; i < numberOfContainers; i++) {
                 const newContainer = {
-                    size: parseInt(newSize),
-                    price: parseFloat(newPrice),
+                    size: selectedContainer.size,
+                    price: selectedContainer.price,
                     EquipmentID: equipmentIds[i],
                     bookingStatus: "available",
                     spaceUsed: 0,
                     containerConsolidationsID: [],
-                    locations: [],
-                    statuses: []
-
                 };
                 updatedContainers.push(newContainer);
             }
@@ -140,11 +145,7 @@ const ContainerPricingManager = () => {
                 severity: 'success'
             });
 
-            // Clear input fields
-            setNewSize('');
-            setNewPrice('');
-            setNumberOfContainers(1);
-            setEquipmentIds([]);
+            handleCloseDialog();
         } catch (error) {
             console.error("Error adding containers: ", error);
             setSnackbar({
@@ -160,16 +161,14 @@ const ContainerPricingManager = () => {
             try {
                 const userCompany = await getCompany();
                 if (userCompany) {
-                    const companyDocRef = doc(db, "carrier_container_prices", userCompany);
-                    const unsubscribe = onSnapshot(companyDocRef, (docSnapshot) => {
+                    const menuDocRef = doc(db, "container_menu", userCompany);
+                    const unsubscribe = onSnapshot(menuDocRef, (docSnapshot) => {
                         if (docSnapshot.exists()) {
-                            setContainers(docSnapshot.data().containers || []);
+                            setMenuContainers(docSnapshot.data().container_types || []);
                         } else {
-                            setContainers([]);
+                            setMenuContainers([]);
                         }
                     });
-
-                    // Cleanup function to unsubscribe from the listener when the component unmounts
                     return () => unsubscribe();
                 }
             } catch (error) {
@@ -180,12 +179,13 @@ const ContainerPricingManager = () => {
         fetchData();
     }, []);
 
-    const handleOpenDialog = () => {
-        setOpenDialog(true);
-    };
-
     const handleCloseDialog = () => {
         setOpenDialog(false);
+        setSelectedContainer(null);
+        setNumberOfContainers(1);
+        setEquipmentIds([]);
+        setCurrentEquipmentId('');
+        setActiveStep(0);
     };
 
     const handleCloseSnackbar = (event, reason) => {
@@ -195,195 +195,329 @@ const ContainerPricingManager = () => {
         setSnackbar({ ...snackbar, open: false });
     };
 
-    const handleAddEquipmentId = () => {
+    const handleAddEquipmentId = (e) => {
+        e.preventDefault();
         if (currentEquipmentId.trim() !== '') {
             setEquipmentIds([...equipmentIds, currentEquipmentId.trim()]);
             setCurrentEquipmentId('');
-            if (equipmentIds.length + 1 === numberOfContainers) {
-                handleCloseDialog();
-            }
         }
     };
 
-    const handleViewChange = (event, newView) => {
-        if (newView !== null) {
-            setView(newView);
+    const handleRemoveEquipmentId = (indexToRemove) => {
+        setEquipmentIds(equipmentIds.filter((_, index) => index !== indexToRemove));
+    };
+
+    const handleContainerSelect = (container) => {
+        setSelectedContainer(container);
+        setOpenDialog(true);
+    };
+
+    const handleNext = () => {
+        setActiveStep((prevStep) => prevStep + 1);
+    };
+
+    const handleBack = () => {
+        setActiveStep((prevStep) => prevStep - 1);
+    };
+
+    const getStepContent = (step) => {
+        switch (step) {
+            case 0:
+                return (
+                    <Box sx={{ p: 2 }}>
+                        <Box sx={{ mb: 3 }}>
+                            <Typography variant="subtitle1" gutterBottom>
+                                Selected Container:
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                                <img
+                                    src={selectedContainer?.imageUrl || '/api/placeholder/400/320'}
+                                    alt={selectedContainer?.name}
+                                    style={{
+                                        width: 100,
+                                        height: 100,
+                                        objectFit: 'cover',
+                                        borderRadius: '8px'
+                                    }}
+                                />
+                                <Box>
+                                    <Typography variant="h6">{selectedContainer?.name}</Typography>
+                                    <Typography>Size: {selectedContainer?.size}ft</Typography>
+                                    <Typography>Price: ${selectedContainer?.price.toLocaleString()}</Typography>
+                                </Box>
+                            </Box>
+                        </Box>
+                        <Divider sx={{ my: 2 }} />
+                        <TextField
+                            label="Number of Containers"
+                            type="number"
+                            fullWidth
+                            value={numberOfContainers}
+                            onChange={(e) => setNumberOfContainers(parseInt(e.target.value))}
+                            sx={{ mt: 2 }}
+                        />
+                    </Box>
+                );
+            case 1:
+                return (
+                    <Box sx={{ p: 2 }}>
+                        <form onSubmit={handleAddEquipmentId}>
+                            <Box sx={{ display: 'flex', gap: 1 }}>
+                                <TextField
+                                    label="Equipment ID"
+                                    fullWidth
+                                    value={currentEquipmentId}
+                                    onChange={(e) => setCurrentEquipmentId(e.target.value)}
+                                />
+                                <Button
+                                    variant="contained"
+                                    onClick={handleAddEquipmentId}
+                                    disabled={!currentEquipmentId.trim()}
+                                >
+                                    Add
+                                </Button>
+                            </Box>
+                        </form>
+                        <Box sx={{ mt: 3 }}>
+                            <Typography variant="subtitle2" gutterBottom>
+                                Equipment IDs ({equipmentIds.length} / {numberOfContainers})
+                            </Typography>
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                {equipmentIds.map((id, index) => (
+                                    <Chip
+                                        key={index}
+                                        label={id}
+                                        onDelete={() => handleRemoveEquipmentId(index)}
+                                        color="primary"
+                                        variant="outlined"
+                                    />
+                                ))}
+                            </Box>
+                        </Box>
+                    </Box>
+                );
+            default:
+                return 'Unknown step';
         }
     };
+    const handleOpenList = () => setOpenList(true);
+    const handleCloseList = () => setOpenList(false);
 
-    // Function to get unique container sizes and prices
-    const getUniqueContainers = () => {
-        const uniqueContainers = [];
-        const seen = new Set();
+    useEffect(() => {
+        if (openList && company) {
+            // Set up real-time listener for containers
+            const unsubscribe = onSnapshot(
+                doc(db, "carrier_container_prices", company),
+                (doc) => {
+                    if (doc.exists()) {
+                        setContainers(doc.data().containers || []);
+                    } else {
+                        setContainers([]);
+                    }
+                },
+                (error) => {
+                    console.error("Error fetching containers:", error);
+                }
+            );
 
-        containers.forEach(container => {
-            const key = `${container.size}-${container.price}`;
-            if (!seen.has(key)) {
-                seen.add(key);
-                uniqueContainers.push(container);
-            }
-        });
+            return () => unsubscribe();
+        }
+    }, [openList, company]);
 
-        return uniqueContainers;
-    };
-
-    const uniqueContainers = getUniqueContainers();
 
     return (
-        <Container maxWidth="lg" sx={{ py: 4 }}>
-            <Snackbar
-                open={snackbar.open}
-                autoHideDuration={6000}
-                onClose={handleCloseSnackbar}
-                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        <>
+            <Dialog
+                open={openList}
+                onClose={handleCloseList}
+                maxWidth="md"
+                fullWidth
             >
-                <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
-                    {snackbar.message}
-                </Alert>
-            </Snackbar>
-            <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
-                <Typography variant="h4" gutterBottom>
-                    Container Pricing Management
-                </Typography>
+                <DialogTitle>
+                    <Box display="flex" alignItems="center" justifyContent="space-between">
+                        <Typography variant="h5">Container List</Typography>
+                        <IconButton onClick={handleCloseList} size="small">
+                            <Close />
+                        </IconButton>
+                    </Box>
+                </DialogTitle>
+                <DialogContent>
+                    <TableContainer component={Paper} sx={{ mt: 2 }}>
+                        <Table>
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell>Equipment ID</TableCell>
+                                    <TableCell>Size</TableCell>
+                                    <TableCell>Price</TableCell>
+                                    <TableCell>Status</TableCell>
+                                    <TableCell>Space Used</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {containers.map((container, index) => (
+                                    <TableRow key={index}>
+                                        <TableCell>{container.EquipmentID}</TableCell>
+                                        <TableCell>{container.size}ft</TableCell>
+                                        <TableCell>${container.price.toLocaleString()}</TableCell>
+                                        <TableCell>{container.bookingStatus}</TableCell>
+                                        <TableCell>{container.spaceUsed}%</TableCell>
+                                    </TableRow>
+                                ))}
+                                {containers.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={5} align="center">
+                                            No containers found
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCloseList}>Close</Button>
+                </DialogActions>
+            </Dialog>
+            <Container maxWidth="lg" sx={{ py: 4 }}>
+                <Snackbar
+                    open={snackbar.open}
+                    autoHideDuration={6000}
+                    onClose={handleCloseSnackbar}
+                    anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+                >
+                    <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+                        {snackbar.message}
+                    </Alert>
+                </Snackbar>
 
-                <Box sx={{ mb: 4, display: 'flex', gap: 2, alignItems: 'flex-end' }}>
-                    <TextField
-                        label="Container Size (ft)"
-                        type="number"
-                        value={newSize}
-                        onChange={(e) => setNewSize(e.target.value)}
-                        size="small"
-                    />
-                    <TextField
-                        label="Price (USD)"
-                        type="number"
-                        value={newPrice}
-                        onChange={(e) => setNewPrice(e.target.value)}
-                        size="small"
-                    />
-                    <TextField
-                        label="Number of Containers"
-                        type="number"
-                        value={numberOfContainers}
-                        onChange={(e) => setNumberOfContainers(parseInt(e.target.value) || 1)}
-                        size="small"
-                    />
-                    <Button
-                        variant="contained"
-                        onClick={handleOpenDialog}
-                        disabled={!newSize || !newPrice || numberOfContainers < 1}
+                <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
+                    <Box
+                        display="flex"
+                        justifyContent="space-between"
+                        alignItems="center"
+                        mb={3}
                     >
-                        Enter Equipment IDs
-                    </Button>
-                    <Button
-                        variant="contained"
-                        startIcon={<Add />}
-                        onClick={handleAddContainers}
-                        disabled={!newSize || !newPrice || numberOfContainers < 1 || equipmentIds.length !== numberOfContainers}
-                    >
-                        Add Containers
-                    </Button>
-                </Box>
 
-                <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="h6">Unique Container Sizes and Prices</Typography>
-                    <ToggleButtonGroup
-                        value={view}
-                        exclusive
-                        onChange={handleViewChange}
-                        size="small"
-                    >
-                        <ToggleButton value="grid" aria-label="grid view">
-                            <GridView />
-                        </ToggleButton>
-                        <ToggleButton value="table" aria-label="list view">
-                            <ViewList />
-                        </ToggleButton>
-                    </ToggleButtonGroup>
-                </Box>
+                        <Typography variant="h4" gutterBottom>
+                            Container Pricing Management
+                        </Typography>
+                        <Button
+                            variant="contained"
+                            startIcon={<List />}
+                            onClick={handleOpenList}
+                            sx={{ mt: 2 }}
+                        >
+                            View Container List
+                        </Button>
+                    </Box>
 
-                {view === 'grid' ? (
+                    <Typography variant="h6" sx={{ mb: 3 }}>
+                        Select Container Type
+                    </Typography>
+
                     <Grid container spacing={3}>
-                        {uniqueContainers.map((container, index) => (
+                        {menuContainers.map((container, index) => (
                             <Grid item xs={12} sm={6} md={4} key={index}>
-                                <Card>
-                                    <CardMedia
-                                        component="img"
-                                        height="200"
-                                        image={container.size < 30 ? containerImageURL[0].imageUrl : containerImageURL[1].imageUrl}
-                                        alt={`${container.size}ft Container`}
-                                        sx={{
-                                            objectFit: 'cover',
-                                            bgcolor: '#f5f5f5',
-                                            '&:hover': {
-                                                transform: 'scale(1.02)',
-                                                transition: 'transform 0.3s ease-in-out'
-                                            }
-                                        }}
-                                    />
-                                    <CardContent>
-                                        <Typography variant="h6" gutterBottom>
-                                            {container.size}ft Container
-                                        </Typography>
-                                        <Box display="flex" justifyContent="space-between" alignItems="center">
-                                            <Typography variant="h5" color="primary">
+                                <Card
+                                    sx={{
+                                        height: '100%',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        transition: 'transform 0.2s ease-in-out',
+                                        '&:hover': {
+                                            transform: 'translateY(-4px)',
+                                        }
+                                    }}
+                                >
+                                    <CardActionArea
+                                        onClick={() => handleContainerSelect(container)}
+                                        sx={{ flexGrow: 1 }}
+                                    >
+                                        <CardMedia
+                                            component="img"
+                                            height="200"
+                                            image={container.imageUrl || '/api/placeholder/400/320'}
+                                            alt={container.name}
+                                            sx={{
+                                                objectFit: 'cover',
+                                                bgcolor: '#f5f5f5'
+                                            }}
+                                        />
+                                        <CardContent>
+                                            <Typography variant="h6" gutterBottom>
+                                                {container.name}
+                                            </Typography>
+                                            <Typography variant="subtitle1">
+                                                Size: {container.size}ft
+                                            </Typography>
+                                            <Typography variant="h6" color="primary">
                                                 ${container.price.toLocaleString()}
                                             </Typography>
-                                        </Box>
-                                    </CardContent>
+                                        </CardContent>
+                                    </CardActionArea>
                                 </Card>
                             </Grid>
                         ))}
                     </Grid>
-                ) : (
-                    <TableContainer component={Paper}>
-                        <Table>
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell>Container Size (ft)</TableCell>
-                                    <TableCell>Price (USD)</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {uniqueContainers.map((container, index) => (
-                                    <TableRow key={index}>
-                                        <TableCell>{container.size}ft</TableCell>
-                                        <TableCell>${container.price.toLocaleString()}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                )}
 
-                <Dialog
-                    open={openDialog}
-                    onClose={handleCloseDialog}
-                    fullWidth      // Added to ensure dialog takes full width of maxWidth
-                >
-                    <DialogTitle>Enter Equipment IDs</DialogTitle>
-                    <DialogContent sx={{ minWidth: '400px' }}> {/* Added minimum width */}
-                        <TextField
-                            autoFocus
-                            margin="dense"
-                            label="Equipment ID"
-                            fullWidth
-                            value={currentEquipmentId}
-                            onChange={(e) => setCurrentEquipmentId(e.target.value)}
-                        />
-                        <Typography variant="body2" sx={{ mt: 2 }}>
-                            Equipment IDs entered: {equipmentIds.length} / {numberOfContainers}
-                        </Typography>
-                    </DialogContent>
-                    <DialogActions>
-                        <Button onClick={handleCloseDialog}>Cancel</Button>
-                        {equipmentIds.length !== numberOfContainers && (
-                            < Button onClick={handleAddEquipmentId}>Add</Button>
-                        )}
-                    </DialogActions>
-                </Dialog>
-            </Paper>
-        </Container >
+                    <Dialog
+                        open={openDialog}
+                        onClose={handleCloseDialog}
+                        fullWidth
+                        maxWidth="sm"
+                    >
+                        <DialogTitle sx={{ pb: 1 }}>
+                            <Box display="flex" alignItems="center" justifyContent="space-between">
+                                <Typography variant="h6">Add Containers</Typography>
+                                <IconButton onClick={handleCloseDialog} size="small">
+                                    <Close />
+                                </IconButton>
+                            </Box>
+                        </DialogTitle>
+                        <DialogContent sx={{ pt: 2 }}>
+                            <Stepper activeStep={activeStep} sx={{ mb: 3 }}>
+                                {steps.map((label) => (
+                                    <Step key={label}>
+                                        <StepLabel>{label}</StepLabel>
+                                    </Step>
+                                ))}
+                            </Stepper>
+                            {getStepContent(activeStep)}
+                        </DialogContent>
+                        <DialogActions sx={{ px: 3, pb: 2 }}>
+                            <Button onClick={handleCloseDialog}>Cancel</Button>
+                            <Box sx={{ flex: '1 1 auto' }} />
+                            <Button
+                                disabled={activeStep === 0}
+                                onClick={handleBack}
+                                startIcon={<ArrowBack />}
+                            >
+                                Back
+                            </Button>
+                            {activeStep === steps.length - 1 ? (
+                                <Button
+                                    variant="contained"
+                                    onClick={handleAddContainers}
+                                    disabled={equipmentIds.length !== numberOfContainers}
+                                    startIcon={<Add />}
+                                >
+                                    Create Containers
+                                </Button>
+                            ) : (
+                                <Button
+                                    variant="contained"
+                                    onClick={handleNext}
+                                    disabled={numberOfContainers < 1}
+                                    endIcon={<ArrowForward />}
+                                >
+                                    Next
+                                </Button>
+                            )}
+                        </DialogActions>
+                    </Dialog>
+                </Paper>
+            </Container>
+        </>
     );
 };
 

@@ -26,6 +26,7 @@ import { simulateManpowerTestData } from './SimulateManpowerTestData';
 import { simulateAssetTestData } from './SimulateAssetTestData';
 import ContainerRequest from './ContainerRequest';
 import ContainerPricingManager from './ContainerPricingManager';
+import ContainerMenu from './ContainerMenu';
 
 const drawerWidth = 240;
 
@@ -152,6 +153,9 @@ function App() {
                 )}
                 {hasAccessRights(['Create Container Pricings', 'View Container Pricings']) && (
                   <Route path="/cargos/container-pricing-manager" element={<ContainerPricingManager user={user} />} />
+                )}
+                {hasAccessRights(['Create Container Menu', 'View Container Menu']) && (
+                  <Route path="/cargos/container-menu" element={<ContainerMenu user={user} />} />
                 )}
                 {hasAccessRights(['View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest']) && (
                   <Route path="/cargos/cargo-manifest" element={<CargoManifest user={user} />} />
