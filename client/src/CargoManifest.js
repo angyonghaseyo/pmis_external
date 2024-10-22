@@ -29,7 +29,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
 import { getCargoManifests, submitCargoManifest, updateCargoManifest, deleteCargoManifest } from './services/api';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 
 const CargoManifest = () => {
@@ -82,18 +82,33 @@ const CargoManifest = () => {
 
   const fetchVesselVisits = async () => {
     try {
-      const vesselVisitsRef = collection(db, 'vesselVisitRequests');
-      const vesselVisitsSnapshot = await getDocs(vesselVisitsRef);
-      const vesselVisitsData = vesselVisitsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      // First, get all cargo manifests to check which vessels already have manifests
+      const manifestsRef = collection(db, "cargo_manifests");
+      const manifestsSnapshot = await getDocs(manifestsRef);
+      const existingManifestIMOs = new Set(
+        manifestsSnapshot.docs.map(doc => doc.data().imoNumber)
+      );
+  
+      // Then fetch confirmed vessel visits
+      const vesselVisitRequestsRef = collection(db, "vesselVisitRequests");
+      const q = query(vesselVisitRequestsRef, where("status", "==", "confirmed"));
+      const querySnapshot = await getDocs(q);
+      
+      // Filter out vessels that already have manifests
+      const vesselVisitsData = querySnapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+        .filter(visit => !existingManifestIMOs.has(visit.imoNumber));
+  
       setVesselVisits(vesselVisitsData);
     } catch (err) {
-      console.error('Error fetching vessel visits:', err);
-      setError('Failed to fetch vessel visits');
+      console.error('Error fetching confirmed vessel visits:', err);
+      setError('Failed to fetch confirmed vessel visits');
     }
   };
+  
 
   const handleInputChange = (event) => {
     const { name, value, checked, type } = event.target;
@@ -166,6 +181,7 @@ const CargoManifest = () => {
       }
       setOpenDialog(false);
       fetchManifests();
+      await fetchVesselVisits(); 
     } catch (err) {
       setSnackbar({ open: true, message: 'Error processing cargo manifest', severity: 'error' });
     }
