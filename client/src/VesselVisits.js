@@ -28,13 +28,10 @@ import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { db } from "./firebaseConfig";
-import { getUserData } from "./services/api";
-import { auth } from "./firebaseConfig";
 import { CircularProgress } from "@mui/material";
 import Papa from "papaparse";
 import {
   doc,
-  addDoc,
   setDoc,
   getDoc,
   getDocs,

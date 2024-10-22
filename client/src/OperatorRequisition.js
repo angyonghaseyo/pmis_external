@@ -27,7 +27,7 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import { Close } from '@mui/icons-material';
-import { getOperatorRequisitions, createOperatorRequisition, updateOperatorRequisition, deleteOperatorRequisition, getUserData } from './services/api';
+import { getOperatorRequisitions, createOperatorRequisition, updateOperatorRequisition, deleteOperatorRequisition} from './services/api';
 import { useAuth } from './AuthContext';
 
 const operatorSkills = ['Crane Operator', 'Forklift Operator', 'Equipment Technician'];

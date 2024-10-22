@@ -29,8 +29,6 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
 import { submitCargoManifest, updateCargoManifest, deleteCargoManifest } from './services/api';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from './firebaseConfig';
 
 const CargoManifest = () => {
   const [manifests, setManifests] = useState([]);

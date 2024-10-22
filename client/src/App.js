@@ -10,16 +10,12 @@ import ForgotPassword from './ForgotPassword';
 import ResetPassword from './ResetPassword';
 import EditProfile from './EditProfile';
 import InquiryFeedback from './InquiryFeedback';
-import InquiryFeedbackDetail from './InquiryFeedbackDetail';
 import TrainingProgram from './TrainingProgram';
 import CompanyInfo from './CompanyInfo';
 import OperatorRequisition from './OperatorRequisition';
 import VesselVisits from './VesselVisits';
 import CargoManifest from './CargoManifest'; // Add this import
 import { Box, CssBaseline, CircularProgress } from '@mui/material';
-import { simulateBerthTestData } from './SimulateBerthTestData';
-import { simulateManpowerTestData } from './SimulateManpowerTestData';
-import { simulateAssetTestData } from './SimulateAssetTestData';
 import { useAuth } from './AuthContext';
 import { jwtDecode } from "jwt-decode";
 

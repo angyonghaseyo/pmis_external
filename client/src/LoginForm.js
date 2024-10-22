@@ -1,8 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth, db } from './firebaseConfig';
-import { doc, getDoc } from 'firebase/firestore';
+import { Link } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 
 import {
@@ -23,7 +20,6 @@ function LoginForm() {
     const [loading, setLoading] = useState(false);
     const { login } = useAuth();
 
-    const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
