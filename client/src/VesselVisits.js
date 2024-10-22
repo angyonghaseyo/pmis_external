@@ -132,7 +132,7 @@ const VesselVisits = () => {
   };
 
   async function checkAssetAvailability(vesselVisitRequest) {
-    const { eta, etd, containersOffloaded, containersOnloaded } =
+    const { imoNumber, eta, etd, containersOffloaded, containersOnloaded } =
       vesselVisitRequest;
     // Initialize required assets count
     let requiredCranes = 0;
@@ -193,6 +193,7 @@ const VesselVisits = () => {
     // 1. Check cranes availability
     let craneCapacityPerHour = 0;
     let craneCount = 0;
+    let craneArray = [];
     for (const crane of cranes) {
       if (isAssetAvailable(crane, eta, etd)) {
         console.log(
@@ -200,8 +201,8 @@ const VesselVisits = () => {
             crane.name +
             " is available time-wise and is being demand checked"
         );
+        craneArray.push(crane);
         craneCapacityPerHour += crane.numberOfContainers;
-        craneCount += 1;
         requiredCranes += 1; // Add to required cranes
         const requiredHoursForCranes = totalContainers / craneCapacityPerHour;
         // If required hours exceed the available time window, return false
@@ -220,6 +221,23 @@ const VesselVisits = () => {
           console.log(
             "there is enough cranes with a quantity of " + requiredCranes
           );
+        //I need to update the crane's bookedPeriod map. key: vessel's IMO number value: [eta, etd]
+        craneArray.forEach(crane => { 
+          crane.bookedPeriod[imoNumber] = [eta.toISOString(), etd.toISOString()];
+          });
+        //Next I need to setDoc
+        const toBeUpdatedDocRef = doc(
+          db,
+          "assets",
+          crane.name
+        );
+        await setDoc(toBeUpdatedDocRef, crane)
+          .then(() => {
+            console.log("Document successfully replaced");
+          })
+          .catch((error) => {
+            console.error("Error replacing document: ", error);
+          });
           cranePass = true;
           break;
         }
@@ -250,6 +268,7 @@ const VesselVisits = () => {
           console.log(
             "there is enough trucks with a quantity of " + requiredTrucks
           );
+          truck.bookedPeriod[imoNumber] = [eta.toISOString(), etd.toISOString()];
           truckPass = true;
           break;
         }
@@ -280,6 +299,7 @@ const VesselVisits = () => {
             "there is enough reach stackers with a quantity of " +
               requiredReachStackers
           );
+          stacker.bookedPeriod[imoNumber] = [eta.toISOString(), etd.toISOString()];
           reachStackerPass = true;
           break;
         }
@@ -661,6 +681,7 @@ const VesselVisits = () => {
 
       // Step 2: Check asset availability
       const assetsDemandCheckBooleanAndQuantity = await checkAssetAvailability({
+        imoNumber: formData.imoNumber,
         eta: formData.eta,
         etd: formData.etd,
         containersOffloaded: formData.containersOffloaded,
