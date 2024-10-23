@@ -21,9 +21,12 @@ import OperatorRequisition from './OperatorRequisition';
 import VesselVisits from './VesselVisits';
 import CargoManifest from './CargoManifest'; // Add this import
 import { Box, CssBaseline, CircularProgress } from '@mui/material';
-import { simulateBerthTestData } from './SimulateBerthTestData'; 
+import { simulateBerthTestData } from './SimulateBerthTestData';
 import { simulateManpowerTestData } from './SimulateManpowerTestData';
 import { simulateAssetTestData } from './SimulateAssetTestData';
+import ContainerRequest from './ContainerRequest';
+import ContainerPricingManager from './ContainerPricingManager';
+import BookingForm from './BookingForm';
 import AdHocResourceRequest from './AdHocResourceRequest';
 
 const drawerWidth = 240;
@@ -60,7 +63,7 @@ function App() {
             ...userData,
             accessRights: userData.accessRights || []
           });
-          
+
           // Run simulations after user data is fetched
           await runSimulations();
         } else {
@@ -146,8 +149,17 @@ function App() {
                 {hasAccessRights(['View Vessel Visit Requests', 'Create Vessel Visit Request', 'Edit Vessel Visit Requests', 'Delete Vessel Visit Requests']) && (
                   <Route path="/vessels/vessel-visit-request" element={<VesselVisits user={user} />} />
                 )}
+                {hasAccessRights(['Create Container Request', 'View Container Request']) && (
+                  <Route path="/cargos/container-request" element={<ContainerRequest user={user} />} />
+                )}
+                {hasAccessRights(['Create Container Pricings', 'View Container Pricings']) && (
+                  <Route path="/cargos/container-pricing-manager" element={<ContainerPricingManager user={user} />} />
+                )}
                 {hasAccessRights(['View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest']) && (
                   <Route path="/cargos/cargo-manifest" element={<CargoManifest user={user} />} />
+                )}
+                {hasAccessRights(['abc']) && (
+                  <Route path="/cargos/booking-form" element={<BookingForm user={user} />} />
                 )}
                 <Route path="/resources/adhoc-request" element={<AdHocResourceRequest />} />
                 <Route path="*" element={<Navigate to="/" replace />} />

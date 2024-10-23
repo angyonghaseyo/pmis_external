@@ -97,6 +97,7 @@ const SettingsUsers = () => {
     "View Invitations List",
     "View Company Information",
     "Edit Company Information",
+    "abc",
   ];
 
   useEffect(() => {
