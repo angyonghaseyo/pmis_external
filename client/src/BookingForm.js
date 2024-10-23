@@ -269,9 +269,9 @@ const BookingForm = () => {
                         <Button
                           variant="outlined"
                           component="span"
-                          startIcon={getStatusIcon(uploadStatus[cargoId]?.[type])}
+                          startIcon={formData.cargo[cargoId]?.documents?.[type] ? <CheckCircleIcon fontSize="small" /> : <UploadFileIcon fontSize="small" />}
                           fullWidth
-                          color={getStatusColor(uploadStatus[cargoId]?.[type])}
+                          color={formData.cargo[cargoId]?.documents?.[type] ? 'success' : 'primary'}
                           size="small"
                           sx={{
                             borderRadius: '8px',
@@ -287,9 +287,9 @@ const BookingForm = () => {
                       {uploadStatus[cargoId]?.[type] && (
                         <Chip
                           size="small"
-                          label={uploadStatus[cargoId][type]}
-                          color={getStatusColor(uploadStatus[cargoId][type])}
-                          icon={getStatusIcon(uploadStatus[cargoId][type])}
+                          label={uploadStatus[cargoId]?.[type] || (formData.cargo[cargoId]?.documents?.[type] ? 'success' : null)}
+                          color={uploadStatus[cargoId]?.[type] ? getStatusColor(uploadStatus[cargoId][type]) : 'success'}
+                          icon={uploadStatus[cargoId]?.[type] ? getStatusIcon(uploadStatus[cargoId][type]) : <CheckCircleIcon fontSize="small" />}
                         />
                       )}
                     </Stack>
