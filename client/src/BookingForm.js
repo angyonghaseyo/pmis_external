@@ -25,9 +25,14 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Alert,
+  Stack,
+  Chip,
+  LinearProgress
 } from "@mui/material";
 import { ExpandMore } from "@mui/icons-material";
-import { db } from "./firebaseConfig";
+import { db, storage } from "./firebaseConfig";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
   doc,
   addDoc,
@@ -40,6 +45,10 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import BookingSteps from "./BookingSteps"; // Adjust the path based on where BookingSteps is located
+import AttachFileIcon from "@mui/icons-material/AttachFile";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import ErrorIcon from "@mui/icons-material/Error";
+import UploadFileIcon from '@mui/icons-material/UploadFile';
 
 const BookingForm = () => {
   const [openDialog, setOpenDialog] = useState(false);
@@ -56,6 +65,7 @@ const BookingForm = () => {
     bookingId: "",
   });
   const [bookingData, setBookingData] = useState([]);
+  const [uploadStatus, setUploadStatus] = useState({});
 
   const cargoTypes = [
     "General Cargo",
@@ -172,6 +182,11 @@ const BookingForm = () => {
           isTruckBooked: false, // New field for step 2
           isCustomsCleared: false, // New field for step 3
           isDocumentsChecked: false, // New field for step 4
+          documents: {
+            vgm: null,
+            advancedDeclaration: null,
+            exportDocument: null,
+          },
         },
       },
     }));
@@ -195,6 +210,209 @@ const BookingForm = () => {
     }));
   };
 
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'success':
+        return 'success';
+      case 'uploading':
+        return 'primary';
+      case 'error':
+        return 'error';
+      default:
+        return 'default';
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'success':
+        return <CheckCircleIcon fontSize="small" />;
+      case 'error':
+        return <ErrorIcon fontSize="small" />;
+      default:
+        return <UploadFileIcon fontSize="small" />;
+    }
+  };
+
+  const renderDocumentUpload = (cargoId) => {
+    const documents = [
+      { type: 'vgm', label: 'Verified Gross Mass (VGM)' },
+      { type: 'advancedDeclaration', label: 'Advanced Declaration' },
+      { type: 'exportDocument', label: 'Export Document' }
+    ];
+
+    return (
+      <Grid item xs={12}>
+        <Paper sx={{ p: 2, mt: 2, bgcolor: 'background.default' }}>
+          <Typography variant="subtitle1" gutterBottom fontWeight="medium">
+            Required Documents
+          </Typography>
+          <Stack spacing={2}>
+            {documents.map(({ type, label }) => (
+              <Box key={type}>
+                <Grid container spacing={2} alignItems="center">
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" color="text.secondary">
+                      {label}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <input
+                        accept="application/pdf"
+                        style={{ display: 'none' }}
+                        id={`${type}-upload-${cargoId}`}
+                        type="file"
+                        onChange={(e) => handleDocumentUpload(cargoId, type, e.target.files[0])}
+                      />
+                      <label htmlFor={`${type}-upload-${cargoId}`} style={{ width: '100%' }}>
+                        <Button
+                          variant="outlined"
+                          component="span"
+                          startIcon={getStatusIcon(uploadStatus[cargoId]?.[type])}
+                          fullWidth
+                          color={getStatusColor(uploadStatus[cargoId]?.[type])}
+                          size="small"
+                          sx={{
+                            borderRadius: '8px',
+                            textTransform: 'none',
+                            minHeight: '36px'
+                          }}
+                        >
+                          {uploadStatus[cargoId]?.[type] === 'success'
+                            ? 'Replace Document'
+                            : 'Upload Document'}
+                        </Button>
+                      </label>
+                      {uploadStatus[cargoId]?.[type] && (
+                        <Chip
+                          size="small"
+                          label={uploadStatus[cargoId][type]}
+                          color={getStatusColor(uploadStatus[cargoId][type])}
+                          icon={getStatusIcon(uploadStatus[cargoId][type])}
+                        />
+                      )}
+                    </Stack>
+                    {uploadStatus[cargoId]?.[type] === 'uploading' && (
+                      <LinearProgress sx={{ mt: 1 }} />
+                    )}
+                  </Grid>
+                </Grid>
+              </Box>
+            ))}
+          </Stack>
+          {formData.cargo[cargoId].isDocumentsChecked && (
+            <Alert
+              severity="success"
+              sx={{ mt: 2, borderRadius: '8px' }}
+              icon={<CheckCircleIcon fontSize="small" />}
+            >
+              All required documents have been uploaded and verified
+            </Alert>
+          )}
+        </Paper>
+      </Grid>
+    );
+  };
+
+  const renderDocumentStatus = (cargoItem) => (
+    <Grid item xs={12}>
+      <Paper sx={{ p: 2, mt: 2, bgcolor: 'background.default' }}>
+        <Typography variant="subtitle2" gutterBottom fontWeight="medium">
+          Document Status
+        </Typography>
+        <Stack spacing={1}>
+          {[
+            { type: 'vgm', label: 'Verified Gross Mass (VGM)' },
+            { type: 'advancedDeclaration', label: 'Advanced Declaration' },
+            { type: 'exportDocument', label: 'Export Document' }
+          ].map(({ type, label }) => (
+            <Box key={type} display="flex" justifyContent="space-between" alignItems="center">
+              <Typography variant="body2" color="text.secondary">
+                {label}
+              </Typography>
+              <Chip
+                size="small"
+                label={cargoItem.documents?.[type] ? 'Uploaded' : 'Missing'}
+                color={cargoItem.documents?.[type] ? 'success' : 'default'}
+                icon={cargoItem.documents?.[type] ? <CheckCircleIcon fontSize="small" /> : <ErrorIcon fontSize="small" />}
+              />
+            </Box>
+          ))}
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="body2" color="text.secondary">
+              Verification Status
+            </Typography>
+            <Chip
+              size="small"
+              label={cargoItem.isDocumentsChecked ? 'Verified' : 'Pending'}
+              color={cargoItem.isDocumentsChecked ? 'success' : 'warning'}
+              icon={cargoItem.isDocumentsChecked ? <CheckCircleIcon fontSize="small" /> : <ErrorIcon fontSize="small" />}
+            />
+          </Box>
+        </Stack>
+      </Paper>
+    </Grid>
+  );
+
+  const handleDocumentUpload = async (cargoId, documentType, file) => {
+    if (!file) return;
+
+    try {
+      setUploadStatus((prev) => ({
+        ...prev,
+        [cargoId]: { ...prev[cargoId], [documentType]: 'uploading' }
+      }));
+
+      const storageRef = ref(storage, `documents/${cargoId}/${documentType}_${file.name}`);
+      await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(storageRef);
+
+      const updatedFormData = {
+        ...formData,
+        cargo: {
+          ...formData.cargo,
+          [cargoId]: {
+            ...formData.cargo[cargoId],
+            documents: {
+              ...formData.cargo[cargoId].documents,
+              [documentType]: downloadURL,
+            },
+          },
+        },
+      };
+
+      const allDocsUploaded =
+        updatedFormData.cargo[cargoId].documents.vgm &&
+        updatedFormData.cargo[cargoId].documents.advancedDeclaration &&
+        updatedFormData.cargo[cargoId].documents.exportDocument;
+
+      updatedFormData.cargo[cargoId].isDocumentsChecked = allDocsUploaded ? true : false;
+
+      setFormData(updatedFormData);
+
+      if (editingId) {
+        setBookingData(prevBookingData =>
+          prevBookingData.map(booking =>
+            booking.bookingId === editingId
+              ? { ...booking, cargo: updatedFormData.cargo }
+              : booking
+          )
+        );
+      }
+
+      setUploadStatus((prev) => ({
+        ...prev,
+        [cargoId]: { ...prev[cargoId], [documentType]: 'success' }
+      }));
+    } catch (error) {
+      console.error("Error uploading document:", error);
+      setUploadStatus((prev) => ({
+        ...prev,
+        [cargoId]: { ...prev[cargoId], [documentType]: 'error' }
+      }));
+    }
+  };
   return (
     <Container maxWidth="lg" sx={{ mt: 4 }}>
       <Box
@@ -359,25 +577,17 @@ const BookingForm = () => {
                                       Cargo Type: {cargoItem.cargoType}
                                     </Typography>
                                     <BookingSteps
-                                      containerRented={
-                                        booking.isContainerRented
-                                          ? "complete"
-                                          : "incomplete"
+                                      isContainerRented={
+                                        cargoItem.isContainerRented
                                       }
-                                      truckBooked={
-                                        booking.isTruckBooked
-                                          ? "complete"
-                                          : "incomplete"
+                                      isTruckBooked={
+                                        cargoItem.isTruckBooked
                                       }
-                                      customsCleared={
-                                        booking.isCustomsCleared
-                                          ? "complete"
-                                          : "failed"
+                                      isCustomsCleared={
+                                        cargoItem.isCustomsCleared
                                       }
-                                      documentsChecked={
-                                        booking.isDocumentsChecked
-                                          ? "complete"
-                                          : "incomplete"
+                                      isDocumentsChecked={
+                                        cargoItem.isDocumentsChecked
                                       }
                                     />
                                   </Paper>
@@ -614,8 +824,10 @@ const BookingForm = () => {
                           ))}
                         </Select>
                       </FormControl>
+
                     </Grid>
                   </Grid>
+                  {renderDocumentUpload(cargoId)}
                 </Paper>
               </Grid>
             ))}
