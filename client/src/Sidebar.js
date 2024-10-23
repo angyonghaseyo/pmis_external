@@ -76,12 +76,13 @@ const Sidebar = ({ user }) => {
       icon: <Package />,
       path: "/cargos",
       children: [
-        { name: 'Cargo Manifest', accessRights: ['View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest'] },
-        { name: 'Container Request', accessRights: ['Create Container Request', 'View Container Request'] },
-        { name: 'Container Pricing Manager', accessRights: ['Create Container Pricings', 'View Container Pricings'] },
         { name: 'Booking Form', accessRights: ['abc'] },
+        { name: 'Container Request', accessRights: ['Create Container Request', 'View Container Request'] },
+        { name: 'Truck Registration', accessRights: ['Register Truck', 'View Truck Registrations'] },
+        { name: 'Cargo Manifest', accessRights: ['View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest'] },
+        { name: 'Container Pricing Manager', accessRights: ['Create Container Pricings', 'View Container Pricings'] },
         { name: 'Container Menu', accessRights: ['Create Container Menu', 'View Container Menu'] },
-        { name: 'Truck Registration', accessRights: ['Register Truck', 'View Truck Registrations'] }
+
       ],
       accessRights: ['abc', 'View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest',
         'Create Container Request', 'View Container Request', 'Create Container Pricings', 'View Container Pricings',

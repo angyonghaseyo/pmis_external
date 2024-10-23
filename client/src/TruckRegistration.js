@@ -50,7 +50,7 @@ const TruckRegistration = () => {
                 // Check if booking has cargo map and the specific cargo ID
                 if (bookingData.cargo && bookingData.cargo[cargoId]) {
                     if (bookingData.cargo[cargoId].isTruckBooked) {
-                        throw new Error('This cargo already has a truck assigned');
+                        throw new Error(`This cargo already has a truck assigned with truck license: ${bookingData.cargo[cargoId].truckLicense}`);
                     }
                     foundBookingId = bookingDoc.id;
                     foundBookingDoc = bookingData;
