@@ -49,14 +49,14 @@ const ContainerRequest = () => {
     const [cargos, setCargos] = useState([]);
     const [isBookingValid, setIsBookingValid] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [currentCargoId, setCurrentCargoId] = useState(null);
 
     const steps = ['Enter Booking ID', 'Select Carrier & Container', 'Select Cargo'];
 
     const initialFormData = {
         carrierName: "",
         voyageNumber: "",
-        bookingId: "",
-        containerSize: "",
+        bookingId: ""
     };
 
     const [formData, setFormData] = useState(initialFormData);
@@ -165,18 +165,54 @@ const ContainerRequest = () => {
     };
 
     const handleCargoSelectionChange = (cargoId, field) => {
+        setCurrentCargoId(cargoId);
         setCargos(prevCargos => prevCargos.map(cargo => {
             if (cargo.id === cargoId) {
                 if (field === 'isConsolidated') {
-                    return { ...cargo, isConsolidated: !cargo.isConsolidated, isSelected: false };
+                    return {
+                        ...cargo,
+                        isConsolidated: !cargo.isConsolidated,  // Toggle isConsolidated
+                        isSelected: false  // Reset other option
+                    };
                 } else {
-                    return { ...cargo, isSelected: !cargo.isSelected, isConsolidated: false };
+                    return {
+                        ...cargo,
+                        isSelected: !cargo.isSelected,  // Toggle isSelected
+                        isConsolidated: false  // Reset other option
+                    };
                 }
             }
             return cargo;
         }));
     };
 
+    const handleContainerSize = (e) => {
+        const { value } = e.target;
+        setCargos(prevCargos => prevCargos.map(cargo => {
+            if (cargo.id === currentCargoId) {
+                return {
+                    ...cargo,
+                    containerSize: value,
+                    consolidationSpace: null // Reset consolidation space when container size is selected
+                };
+            }
+            return cargo;
+        }));
+    };
+
+    const handleConsolidationSpace = (e) => {
+        const { value } = e.target;
+        setCargos(prevCargos => prevCargos.map(cargo => {
+            if (cargo.id === currentCargoId) {
+                return {
+                    ...cargo,
+                    consolidationSpace: value,
+                    containerSize: null // Reset container size when consolidation space is selected
+                };
+            }
+            return cargo;
+        }));
+    };
     const getStepContent = (step) => {
         switch (step) {
             case 0:
@@ -272,11 +308,14 @@ const ContainerRequest = () => {
                                                         <Select
                                                             name="containerSize"
                                                             value={formData.containerSize}
-                                                            onChange={handleChange}
+                                                            onChange={handleContainerSize}
                                                             required
                                                         >
                                                             {containers.map((container) => (
-                                                                <MenuItem key={`${container.size}-${container.price}`} value={`${container.size}FT ($${container.price})`}>
+                                                                <MenuItem
+                                                                    key={`${container.size}-${container.price}`}
+                                                                    value={container.size}
+                                                                >
                                                                     {container.size}FT (${container.price})
                                                                 </MenuItem>
                                                             ))}
@@ -290,7 +329,7 @@ const ContainerRequest = () => {
                                                         fullWidth
                                                         name="consolidationSpace"
                                                         value={formData.consolidationSpace}
-                                                        onChange={handleChange}
+                                                        onChange={handleConsolidationSpace}
                                                         required
                                                         label="Consolidation Space"
                                                     />
@@ -321,24 +360,38 @@ const ContainerRequest = () => {
                 return;
             }
 
-            const dataToSubmit = {
-                ...formData,
-                selectedCargos: selectedCargos.map(cargo => ({
-                    id: cargo.id,
-                    name: cargo.name,
-                    cargoType: cargo.cargoType,
-                    quantity: cargo.quantity,
-                    weightPerUnit: cargo.weightPerUnit,
-                    consolidationType: cargo.isConsolidated ? 'consolidated' : 'full-container'
-                }))
-            };
+            // Submit a request for each cargo
+            for (const cargo of selectedCargos) {
+                const dataToSubmit = {
+                    carrierName: formData.carrierName,
+                    voyageNumber: formData.voyageNumber,
+                    bookingId: formData.bookingId,
+                    consolidationService: cargo.isConsolidated,
+                    bookingStatus: 'Pending', // Initial status
+                    // If consolidation service, use consolidationSpace, otherwise use containerSize
+                    ...(cargo.isConsolidated
+                        ? { consolidationSpace: cargo.consolidationSpace }
+                        : { containerSize: cargo.containerSize }
+                    ),
+                    // Include cargo details
+                    cargoId: cargo.id,
+                    cargoDetails: {
+                        name: cargo.name,
+                        quantity: cargo.quantity,
+                        weightPerUnit: cargo.weightPerUnit
+                    },
+                    eta: bookingData.eta,
+                    etd: bookingData.etd
+                };
 
-            await addDoc(collection(db, "container_requests"), dataToSubmit);
-            setContainerRequests(prev => [...prev, dataToSubmit]);
+                await addDoc(collection(db, "container_requests"), dataToSubmit);
+            }
+
+            setContainerRequests(prev => [...prev]); // Trigger refresh
             handleCloseDialog();
             setOpenSnackbar({
                 open: true,
-                message: "Container request submitted successfully!",
+                message: "Container requests submitted successfully!",
                 severity: "success"
             });
         } catch (error) {
@@ -392,7 +445,9 @@ const ContainerRequest = () => {
                                 <TableCell>{request.bookingId}</TableCell>
                                 <TableCell>{request.carrierName}</TableCell>
                                 <TableCell>{request.voyageNumber}</TableCell>
-                                <TableCell>{request.containerSize}</TableCell>
+                                <TableCell>
+                                    {request.containerSize ? `${request.containerSize}ft` : request.consolidationSpace ? `${request.consolidationSpace}ft³` : '-'}
+                                </TableCell>
                             </TableRow>
                         ))}
                     </TableBody>

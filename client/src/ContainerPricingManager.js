@@ -129,6 +129,7 @@ const ContainerPricingManager = () => {
                 const newContainer = {
                     size: selectedContainer.size,
                     price: selectedContainer.price,
+                    name: selectedContainer.name,
                     EquipmentID: equipmentIds[i],
                     bookingStatus: "available",
                     spaceUsed: 0,
