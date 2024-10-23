@@ -30,8 +30,8 @@ import { Close } from '@mui/icons-material';
 import { getOperatorRequisitions, createOperatorRequisition, updateOperatorRequisition, deleteOperatorRequisition, getUserData } from './services/api';
 import { auth } from './firebaseConfig';
 
-const operatorSkills = ['Crane Operator', 'Forklift Operator', 'Equipment Technician'];
-const durations = ['1 Hour', '2 Hours', '3 Hours', '4 Hours']; // Fixed duration options
+const operatorSkills = ['Tugboat Operator', 'Pilot Operator'];
+const durations = ['1 Hour', '2 Hours', '3 Hours', '4 Hours'];
 
 const OperatorRequisition = () => {
   const [pendingRequests, setPendingRequests] = useState([]);
@@ -43,6 +43,7 @@ const OperatorRequisition = () => {
     date: '',
     time: '',
     duration: '',
+    quantity: 1, // Add quantity field with default value of 1
   });
 
   const [open, setOpen] = useState(false);
@@ -161,13 +162,29 @@ const OperatorRequisition = () => {
       }
 
       if (isEditing !== null) {
+        // For editing, just update the single request
         await updateOperatorRequisition(isEditing, { ...formData, userId: user.uid });
       } else {
-        await createOperatorRequisition({ ...formData, userId: user.uid, status: 'Pending' });
+        // For new requests, create multiple based on quantity
+        const quantity = parseInt(formData.quantity, 10);
+        const createPromises = Array(quantity).fill().map(() => 
+          createOperatorRequisition({
+            ...formData,
+            userId: user.uid,
+            status: 'Pending',
+            quantity: 1 // Each individual request has quantity 1
+          })
+        );
+        await Promise.all(createPromises);
       }
+
       handleCloseDialog();
       await fetchRequisitions();
-      setSnackbar({ open: true, message: 'Requisition saved successfully', severity: 'success' });
+      setSnackbar({ 
+        open: true, 
+        message: isEditing ? 'Requisition updated successfully' : `${formData.quantity} requisition(s) created successfully`, 
+        severity: 'success' 
+      });
     } catch (err) {
       setSnackbar({ open: true, message: 'Failed to save requisition', severity: 'error' });
     }
@@ -347,6 +364,24 @@ const OperatorRequisition = () => {
               </MenuItem>
             ))}
           </TextField>
+          {!isEditing && ( // Only show quantity field for new requests
+            <TextField
+              label="Quantity"
+              type="number"
+              name="quantity"
+              value={formData.quantity}
+              onChange={handleInputChange}
+              fullWidth
+              margin="normal"
+              InputProps={{ 
+                inputProps: { 
+                  min: 1,
+                  max: 10 // Add a reasonable maximum
+                } 
+              }}
+              helperText="Number of identical requests to create (1-10)"
+            />
+          )}
           <TextField
             label="Date"
             type="date"
