@@ -279,9 +279,7 @@ const BookingForm = () => {
                             minHeight: '36px'
                           }}
                         >
-                          {uploadStatus[cargoId]?.[type] === 'success'
-                            ? 'Replace Document'
-                            : 'Upload Document'}
+                          {formData.cargo[cargoId]?.documents?.[type] ? 'Replace Document' : 'Upload Document'}
                         </Button>
                       </label>
                       {uploadStatus[cargoId]?.[type] && (
