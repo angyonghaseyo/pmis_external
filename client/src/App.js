@@ -27,7 +27,7 @@ import { simulateAssetTestData } from './SimulateAssetTestData';
 import ContainerRequest from './ContainerRequest';
 import ContainerPricingManager from './ContainerPricingManager';
 import BookingForm from './BookingForm';
-
+import AdHocResourceRequest from './AdHocResourceRequest';
 
 const drawerWidth = 240;
 
@@ -161,6 +161,7 @@ function App() {
                 {hasAccessRights(['abc']) && (
                   <Route path="/cargos/booking-form" element={<BookingForm user={user} />} />
                 )}
+                <Route path="/resources/adhoc-request" element={<AdHocResourceRequest />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </>
             ) : (
