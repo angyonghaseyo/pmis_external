@@ -26,6 +26,8 @@ import { simulateManpowerTestData } from './SimulateManpowerTestData';
 import { simulateAssetTestData } from './SimulateAssetTestData';
 import ContainerRequest from './ContainerRequest';
 import ContainerPricingManager from './ContainerPricingManager';
+import BookingForm from './BookingForm';
+
 
 const drawerWidth = 240;
 
@@ -155,6 +157,9 @@ function App() {
                 )}
                 {hasAccessRights(['View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest']) && (
                   <Route path="/cargos/cargo-manifest" element={<CargoManifest user={user} />} />
+                )}
+                {hasAccessRights(['abc']) && (
+                  <Route path="/cargos/booking-form" element={<BookingForm user={user} />} />
                 )}
                 <Route path="*" element={<Navigate to="/" replace />} />
               </>
