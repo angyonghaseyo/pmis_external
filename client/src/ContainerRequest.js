@@ -128,12 +128,12 @@ const ContainerRequest = () => {
 
     async function getSizesWithPrices(carrierName) {
         try {
-            const docRef = doc(db, 'carrier_container_prices', carrierName);
+            const docRef = doc(db, 'container_menu', carrierName);
             const docSnap = await getDoc(docRef);
 
             if (docSnap.exists()) {
                 const data = docSnap.data();
-                setContainers(data.containers || []);
+                setContainers(data.container_types || []);
             } else {
                 setContainers([]);
             }

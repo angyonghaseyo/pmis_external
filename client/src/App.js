@@ -27,6 +27,7 @@ import { simulateAssetTestData } from './SimulateAssetTestData';
 import ContainerRequest from './ContainerRequest';
 import ContainerPricingManager from './ContainerPricingManager';
 import ContainerMenu from './ContainerMenu';
+import TruckRegistration from './TruckRegistration';
 
 const drawerWidth = 240;
 
@@ -159,6 +160,9 @@ function App() {
                 )}
                 {hasAccessRights(['View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest']) && (
                   <Route path="/cargos/cargo-manifest" element={<CargoManifest user={user} />} />
+                )}
+                {hasAccessRights(['Register Truck', 'View Truck Registrations']) && (
+                  <Route path="/cargos/truck-registration" element={<TruckRegistration user={user} />} />
                 )}
                 <Route path="*" element={<Navigate to="/" replace />} />
               </>
