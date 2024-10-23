@@ -79,10 +79,13 @@ const Sidebar = ({ user }) => {
         { name: 'Cargo Manifest', accessRights: ['View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest'] },
         { name: 'Container Request', accessRights: ['Create Container Request', 'View Container Request'] },
         { name: 'Container Pricing Manager', accessRights: ['Create Container Pricings', 'View Container Pricings'] },
-        { name: 'Booking Form', accessRights: ['abc'] }
-
+        { name: 'Booking Form', accessRights: ['abc'] },
+        { name: 'Container Menu', accessRights: ['Create Container Menu', 'View Container Menu'] },
+        { name: 'Truck Registration', accessRights: ['Register Truck', 'View Truck Registrations'] }
       ],
-      accessRights: ['abc', 'View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest', 'Create Container Request', 'View Container Request', 'Create Container Pricings', 'View Container Pricings']
+      accessRights: ['abc', 'View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest',
+        'Create Container Request', 'View Container Request', 'Create Container Pricings', 'View Container Pricings',
+        'Create Container Menu', 'View Container Menu', 'Register Truck', 'View Truck Registrations']
     },
     {
       name: "Customs and Trade Documents",
@@ -91,7 +94,6 @@ const Sidebar = ({ user }) => {
       children: ['Subitem 1', 'Subitem 2'],
       accessRights: ['View Documents', 'Manage Documents']
     },
-
     {
       name: "Settings",
       icon: <Settings />,
@@ -101,9 +103,8 @@ const Sidebar = ({ user }) => {
         { name: 'Company', accessRights: ['View Company Information', 'Edit Company Information'] }
       ],
       accessRights: ['View Company Information', 'Edit Company Information', 'View Users List', 'Delete User', 'Invite User', 'Delete User Invitations', 'View Invitations List']
-    },
+    }
   ];
-
 
   const toggleExpand = (index) => {
     setExpandedItems(prev => ({ ...prev, [index]: !prev[index] }));

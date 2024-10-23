@@ -28,6 +28,8 @@ import ContainerRequest from './ContainerRequest';
 import ContainerPricingManager from './ContainerPricingManager';
 import BookingForm from './BookingForm';
 import AdHocResourceRequest from './AdHocResourceRequest';
+import ContainerMenu from './ContainerMenu';
+import TruckRegistration from './TruckRegistration';
 
 const drawerWidth = 240;
 
@@ -155,6 +157,9 @@ function App() {
                 {hasAccessRights(['Create Container Pricings', 'View Container Pricings']) && (
                   <Route path="/cargos/container-pricing-manager" element={<ContainerPricingManager user={user} />} />
                 )}
+                {hasAccessRights(['Create Container Menu', 'View Container Menu']) && (
+                  <Route path="/cargos/container-menu" element={<ContainerMenu user={user} />} />
+                )}
                 {hasAccessRights(['View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest']) && (
                   <Route path="/cargos/cargo-manifest" element={<CargoManifest user={user} />} />
                 )}
@@ -162,6 +167,9 @@ function App() {
                   <Route path="/cargos/booking-form" element={<BookingForm user={user} />} />
                 )}
                 <Route path="/resources/adhoc-request" element={<AdHocResourceRequest />} />
+                {hasAccessRights(['Register Truck', 'View Truck Registrations']) && (
+                  <Route path="/cargos/truck-registration" element={<TruckRegistration user={user} />} />
+                )}
                 <Route path="*" element={<Navigate to="/" replace />} />
               </>
             ) : (
