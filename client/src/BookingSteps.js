@@ -2,55 +2,60 @@ import React from "react";
 import { Stepper, Step, StepLabel, Typography, Box } from "@mui/material";
 import { CheckCircle, Error, HourglassEmpty } from "@mui/icons-material";
 
-// Function to determine the color based on status
-const getColor = (status) => {
+const getStepIcon = (status) => {
   switch (status) {
-    case "complete":
-      return "green";
-    case "failed":
-      return "red";
-    case "incomplete":
+    case true:
+      return <CheckCircle sx={{ color: 'success.main' }} />;
+    case false:
+      return <Error sx={{ color: 'error.main' }} />;
     default:
-      return "grey";
+      return <HourglassEmpty sx={{ color: 'grey.500' }} />;
   }
 };
 
-// Function to determine the icon based on status
-const getIcon = (status) => {
-  switch (status) {
-    case "complete":
-      return <CheckCircle />;
-    case "failed":
-      return <Error />;
-    case "incomplete":
-    default:
-      return <HourglassEmpty />;
-  }
-};
-
-const BookingSteps = ({ containerRented, truckBooked, customsCleared, documentsChecked }) => {
-  const stepStatuses = [
-    { label: "Rent Containers", status: containerRented },
-    { label: "Book Truck", status: truckBooked },
-    { label: "Customs Clearance", status: customsCleared },
-    { label: "Document Check", status: documentsChecked },
+const BookingSteps = ({
+  isContainerRented,
+  isTruckBooked,
+  isCustomsCleared,
+  isDocumentsChecked
+}) => {
+  const steps = [
+    {
+      label: "Rent Containers",
+      status: isContainerRented,
+    },
+    {
+      label: "Book Truck",
+      status: isTruckBooked,
+    },
+    {
+      label: "Customs Clearance",
+      status: isCustomsCleared,
+    },
+    {
+      label: "Document Check",
+      status: isDocumentsChecked,
+    },
   ];
 
   return (
-    <Box sx={{ width: "100%", mt: 4 }}>
+    <Box sx={{ width: "100%", p: 4 }}>
       <Typography variant="h4" gutterBottom>
         Booking Process Status
       </Typography>
-      <Stepper alternativeLabel>
-        {stepStatuses.map((step, index) => (
-          <Step key={index} active>
+      <Stepper activeStep={-1} alternativeLabel>
+        {steps.map((step, index) => (
+          <Step key={index} completed={step.status === true}>
             <StepLabel
-              icon={getIcon(step.status)}
-              StepIconProps={{
-                sx: {
-                  color: getColor(step.status), // Custom color for the icon
-                },
-              }}
+              error={step.status === false}
+              icon={getStepIcon(step.status)}
+              optional={
+                step.status === false ? (
+                  <Typography variant="caption" color="error">
+                    Not Complete
+                  </Typography>
+                ) : null
+              }
             >
               {step.label}
             </StepLabel>
