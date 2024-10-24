@@ -26,7 +26,8 @@ import {
     Stepper,
     Step,
     StepLabel,
-    Alert
+    Alert,
+    Chip
 } from "@mui/material";
 import MuiAlert from '@mui/material/Alert';
 import {
@@ -307,7 +308,7 @@ const ContainerRequest = () => {
                                                         <InputLabel>Container Size</InputLabel>
                                                         <Select
                                                             name="containerSize"
-                                                            value={formData.containerSize}
+                                                            value={cargo.containerSize || ''}  // FIXED: Use cargo's containerSize
                                                             onChange={handleContainerSize}
                                                             required
                                                         >
@@ -360,6 +361,27 @@ const ContainerRequest = () => {
                 return;
             }
 
+            // Validate each selected cargo before submission
+            for (const cargo of selectedCargos) {
+                if (cargo.isSelected && !cargo.containerSize) {
+                    setOpenSnackbar({
+                        open: true,
+                        message: `Please select a container size for cargo: ${cargo.name}`,
+                        severity: "error"
+                    });
+                    return;
+                }
+
+                if (cargo.isConsolidated && !cargo.consolidationSpace) {
+                    setOpenSnackbar({
+                        open: true,
+                        message: `Please enter consolidation space for cargo: ${cargo.name}`,
+                        severity: "error"
+                    });
+                    return;
+                }
+            }
+
             // Submit a request for each cargo
             for (const cargo of selectedCargos) {
                 const dataToSubmit = {
@@ -367,12 +389,20 @@ const ContainerRequest = () => {
                     voyageNumber: formData.voyageNumber,
                     bookingId: formData.bookingId,
                     consolidationService: cargo.isConsolidated,
-                    bookingStatus: 'Pending', // Initial status
-                    // If consolidation service, use consolidationSpace, otherwise use containerSize
+                    status: 'Pending', // Initial status
+
+                    // Only include containerSize or consolidationSpace based on the service type
                     ...(cargo.isConsolidated
-                        ? { consolidationSpace: cargo.consolidationSpace }
-                        : { containerSize: cargo.containerSize }
+                        ? {
+                            consolidationSpace: cargo.consolidationSpace,
+                            containerSize: null  // Explicitly set to null for consolidation service
+                        }
+                        : {
+                            containerSize: cargo.containerSize,
+                            consolidationSpace: null  // Explicitly set to null for container service
+                        }
                     ),
+
                     // Include cargo details
                     cargoId: cargo.id,
                     cargoDetails: {
@@ -380,25 +410,34 @@ const ContainerRequest = () => {
                         quantity: cargo.quantity,
                         weightPerUnit: cargo.weightPerUnit
                     },
-                    eta: bookingData.eta,
-                    etd: bookingData.etd
+
+                    // Include booking details
+                    eta: bookingData?.eta || null,
+                    etd: bookingData?.etd || null,
+
+                    // Add timestamp for tracking
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
                 };
 
                 await addDoc(collection(db, "container_requests"), dataToSubmit);
             }
 
+            // Update local state and close dialog
             setContainerRequests(prev => [...prev]); // Trigger refresh
             handleCloseDialog();
+
             setOpenSnackbar({
                 open: true,
-                message: "Container requests submitted successfully!",
+                message: `Successfully submitted ${selectedCargos.length} container request${selectedCargos.length > 1 ? 's' : ''}!`,
                 severity: "success"
             });
+
         } catch (error) {
-            console.error("Error adding document: ", error);
+            console.error("Error submitting container request: ", error);
             setOpenSnackbar({
                 open: true,
-                message: "Error submitting request",
+                message: `Error submitting request: ${error.message}`,
                 severity: "error"
             });
         }
@@ -437,6 +476,8 @@ const ContainerRequest = () => {
                             <TableCell>Carrier Name</TableCell>
                             <TableCell>Voyage Number</TableCell>
                             <TableCell>Container Size</TableCell>
+                            <TableCell>Status</TableCell>
+                            <TableCell>Assigned Container ID</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
@@ -447,6 +488,22 @@ const ContainerRequest = () => {
                                 <TableCell>{request.voyageNumber}</TableCell>
                                 <TableCell>
                                     {request.containerSize ? `${request.containerSize}ft` : request.consolidationSpace ? `${request.consolidationSpace}ft³` : '-'}
+                                </TableCell>
+                                <TableCell>
+                                    <Chip
+                                        label={request.status || 'Pending'}
+                                        color={
+                                            request.status === 'Assigned' ? 'success' :
+                                                request.status === 'Rejected' ? 'error' : 'default'
+                                        }
+                                        size="small"
+                                    />
+                                </TableCell>
+
+                                <TableCell>
+                                    {request.status === "Assigned"
+                                        ? request.assignedContainerId
+                                        : "Not Assigned Yet"}
                                 </TableCell>
                             </TableRow>
                         ))}
