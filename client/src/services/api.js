@@ -8,16 +8,16 @@ import {
   updateProfile,
   deleteUser as firebaseDeleteUser
 } from '../firebaseConfig';
-import { 
-  collection, 
-  query, 
-  where, 
-  getDocs, 
-  doc, 
-  getDoc, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
   addDoc,
   serverTimestamp,
   increment,
@@ -61,7 +61,7 @@ export const registerUser = async (email, password, userData) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
     await setDoc(doc(db, 'users', user.uid), { ...userData, uid: user.uid });
-    
+
     // Update or create company document
     const companyRef = doc(db, 'companies', userData.company);
     const companyDoc = await getDoc(companyRef);
@@ -70,7 +70,7 @@ export const registerUser = async (email, password, userData) => {
     } else {
       await setDoc(companyRef, { name: userData.company, userCount: 1 });
     }
-    
+
     return userCredential;
   } catch (error) {
     return handleApiError(error);
@@ -130,7 +130,7 @@ export const getUsers = async () => {
     const invitationsQuery = query(
       collection(db, 'invitations'),
       where('company', '==', currentUserData.company),
-      where('status', 'in', ['Pending', 'Approved', 'Rejected']) 
+      where('status', 'in', ['Pending', 'Approved', 'Rejected'])
     );
     const invitationsSnapshot = await getDocs(invitationsQuery);
     const invitationUsers = invitationsSnapshot.docs.map(doc => ({
@@ -169,7 +169,7 @@ export const getAllUsersInCompany = async () => {
 
     const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-    return users; 
+    return users;
   } catch (error) {
     console.error('Error fetching users in company:', error);
     throw error;
@@ -190,9 +190,9 @@ export const updateUser = async (userId, userData, isPending = false) => {
   try {
     const dataToUpdate = {
       ...userData,
-      userType: 'Normal' 
+      userType: 'Normal'
     };
-    
+
     if (isPending) {
       await updateDoc(doc(db, 'invitations', userId), dataToUpdate);
     } else {
@@ -225,7 +225,7 @@ export const inviteUser = async (userData) => {
   try {
     const invitationRef = await addDoc(collection(db, 'invitations'), {
       ...userData,
-      userType: 'Normal', 
+      userType: 'Normal',
       createdAt: new Date(),
       status: 'Pending'
     });
@@ -285,11 +285,11 @@ export const createInquiryFeedback = async (data) => {
     const { file, ...dataWithoutFile } = data;
     const inquiriesRef = collection(db, 'inquiries_feedback');
     const snapshot = await getDocs(inquiriesRef);
-    const newIncrementalId = snapshot.size + 1; 
+    const newIncrementalId = snapshot.size + 1;
 
     const docData = {
       ...dataWithoutFile,
-      incrementalId: newIncrementalId, 
+      incrementalId: newIncrementalId,
       userId: user.uid,
       createdAt: serverTimestamp(),
       status: 'Pending',
@@ -321,7 +321,7 @@ export const updateInquiryFeedback = async (incrementalId, data) => {
     querySnapshot.forEach((doc) => {
       const inquiryData = doc.data();
       if (inquiryData.incrementalId === incrementalId) {
-        docId = doc.id; 
+        docId = doc.id;
       }
     });
 
@@ -330,7 +330,7 @@ export const updateInquiryFeedback = async (incrementalId, data) => {
     }
 
     // Process file upload if there is a new file
-    let fileURL = data.fileURL || null;  
+    let fileURL = data.fileURL || null;
     if (data.file && data.file instanceof File) {
       try {
         const fileExtension = data.file.name.split('.').pop();
@@ -421,7 +421,7 @@ export const createOperatorRequisition = async (requisitionData) => {
     const docRef = await addDoc(collection(db, 'operator_requisitions'), {
       ...requisitionData,
       createdAt: serverTimestamp(),
-      status: 'Pending'  
+      status: 'Pending'
     });
     console.log('Created new requisition with ID:', docRef.id);
     return docRef.id;
