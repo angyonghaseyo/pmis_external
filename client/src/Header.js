@@ -61,28 +61,57 @@ function Header() {
   }
 
   return (
-    <AppBar position="fixed" sx={{ backgroundColor: '#ffffff', boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)', zIndex: 1300 }}>
+    <AppBar
+      position="fixed"
+      sx={{
+        backgroundColor: '#ffffff',
+        background: 'linear-gradient(135deg, #0061a8 0%, #003b6f 100%)',
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+        zIndex: 1300
+      }}
+    >
       <Toolbar sx={{ justifyContent: 'space-between' }}>
-        {/* Left Section - Boat Icon and Oceania PMIS */}
+        {/* Left Section */}
         <Box display="flex" alignItems="center">
-          <DirectionsBoat sx={{ color: '#25316D', fontSize: 30, marginRight: 1 }} />
+          <DirectionsBoat sx={{
+            color: '#ffffff',
+            fontSize: 30,
+            marginRight: 1,
+            filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))'
+          }} />
           <Typography
             variant="h6"
             component={Link}
             to="/"
-            sx={{ textDecoration: 'none', color: '#25316D', fontWeight: 'bold' }}
+            sx={{
+              textDecoration: 'none',
+              color: '#ffffff',
+              fontWeight: 'bold',
+              letterSpacing: '0.5px',
+              textShadow: '0 2px 4px rgba(0,0,0,0.2)'
+            }}
           >
             Oceania PMIS
           </Typography>
         </Box>
 
         {/* Right Section - Language Select, Notifications, and User Profile/Login */}
-        <Box display="flex" alignItems="center">
-          <FormControl>
+        <Box display="flex" alignItems="center" gap={2}>
+          <FormControl size="small">
             <Select
               value={language}
               onChange={handleLanguageChange}
-              sx={{ marginRight: 2 }}
+              sx={{
+                backgroundColor: 'rgba(255,255,255,0.1)',
+                color: '#ffffff',
+                '& .MuiSelect-icon': { color: '#ffffff' },
+                '& .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'rgba(255,255,255,0.2)'
+                },
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'rgba(255,255,255,0.3)'
+                }
+              }}
               displayEmpty
               inputProps={{ 'aria-label': 'Language Select' }}
             >
@@ -94,52 +123,168 @@ function Header() {
 
           {user ? (
             <>
-              <IconButton onClick={handleNotificationClick} color="inherit" sx={{ marginRight: 2 }}>
-                <Notifications sx={{ color: '#25316D' }} />
+              {/* Notifications Button */}
+              <IconButton
+                onClick={handleNotificationClick}
+                sx={{
+                  color: '#ffffff',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255,255,255,0.1)'
+                  }
+                }}
+              >
+                <Notifications />
               </IconButton>
 
-              {/* Notification Menu */}
+              {/* Notifications Menu */}
               <Menu
                 anchorEl={notificationAnchorEl}
                 open={Boolean(notificationAnchorEl)}
                 onClose={handleNotificationClose}
                 keepMounted
+                transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+                anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+                PaperProps={{
+                  sx: {
+                    mt: 1.5,
+                    minWidth: 280,
+                    maxHeight: 400,
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                    border: '1px solid rgba(0,97,168,0.1)',
+                    '& .MuiMenuItem-root': {
+                      px: 2,
+                      py: 1.5,
+                      borderBottom: '1px solid rgba(0,0,0,0.06)',
+                      '&:last-child': {
+                        borderBottom: 'none',
+                      },
+                      '&:hover': {
+                        backgroundColor: 'rgba(0,97,168,0.08)',
+                      },
+                    },
+                  },
+                }}
               >
-                <MenuItem onClick={handleNotificationClose}>No new notifications</MenuItem>
+                <Box sx={{
+                  p: 2,
+                  borderBottom: '1px solid rgba(0,0,0,0.06)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#2c3e50' }}>
+                    Notifications
+                  </Typography>
+                </Box>
+                <MenuItem onClick={handleNotificationClose}>
+                  <Box sx={{ width: '100%' }}>
+                    <Typography variant="body2" sx={{ color: '#2c3e50' }}>
+                      No new notifications
+                    </Typography>
+                  </Box>
+                </MenuItem>
               </Menu>
 
-              {/* User Avatar and Profile Menu */}
-              <IconButton onClick={handleProfileMenuClick} color="inherit">
+              {/* Profile Button */}
+              <IconButton
+                onClick={handleProfileMenuClick}
+                sx={{
+                  padding: 0.5,
+                  border: '2px solid rgba(255,255,255,0.2)',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255,255,255,0.1)'
+                  }
+                }}
+              >
                 {user.photoURL ? (
-                  <Avatar src={user.photoURL} />
+                  <Avatar
+                    src={user.photoURL}
+                    sx={{
+                      width: 36,
+                      height: 36,
+                      backgroundColor: '#ffffff'
+                    }}
+                  />
                 ) : (
-                  <Avatar>
+                  <Avatar sx={{
+                    width: 36,
+                    height: 36,
+                    backgroundColor: '#ffffff',
+                    color: '#0061a8'
+                  }}>
                     <Person />
                   </Avatar>
                 )}
               </IconButton>
 
+              {/* Profile Menu */}
               <Menu
                 anchorEl={anchorEl}
                 open={Boolean(anchorEl)}
                 onClose={handleProfileMenuClose}
                 keepMounted
+                transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+                anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+                PaperProps={{
+                  sx: {
+                    mt: 1.5,
+                    minWidth: 200,
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                    border: '1px solid rgba(0,97,168,0.1)',
+                    '& .MuiMenuItem-root': {
+                      px: 2,
+                      py: 1.5,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 2,
+                      color: '#2c3e50',
+                      '&:hover': {
+                        backgroundColor: 'rgba(0,97,168,0.08)',
+                      },
+                    },
+                  },
+                }}
               >
-                <MenuItem onClick={() => { navigate('/settings/profile'); handleProfileMenuClose(); }}>
-                  <Person sx={{ marginRight: 1 }} /> Edit Profile
+                <MenuItem onClick={() => {
+                  navigate('/settings/profile');
+                  handleProfileMenuClose();
+                }}>
+                  <Person sx={{ color: '#0061a8' }} />
+                  <span>Edit Profile</span>
                 </MenuItem>
-                <MenuItem onClick={() => { handleLogout(); handleProfileMenuClose(); }}>
-                  <Logout sx={{ marginRight: 1 }} /> Logout
+                <MenuItem
+                  onClick={() => {
+                    handleLogout();
+                    handleProfileMenuClose();
+                  }}
+                  sx={{
+                    color: '#dc3545 !important',
+                    '&:hover': {
+                      backgroundColor: 'rgba(220,53,69,0.08) !important',
+                    },
+                  }}
+                >
+                  <Logout sx={{ color: '#dc3545' }} />
+                  <span>Logout</span>
                 </MenuItem>
               </Menu>
             </>
           ) : (
             <Button
               variant="contained"
-              color="primary"
               component={Link}
               to="/login"
-              sx={{ textTransform: 'none' }}
+              sx={{
+                backgroundColor: '#ffffff',
+                color: '#0061a8',
+                textTransform: 'none',
+                fontWeight: 500,
+                '&:hover': {
+                  backgroundColor: 'rgba(255,255,255,0.9)'
+                }
+              }}
             >
               Login
             </Button>
