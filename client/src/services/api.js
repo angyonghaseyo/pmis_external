@@ -611,6 +611,32 @@ export const deleteCargoManifest = async (id) => {
   }
 };
 
+// Function to get vessel visit requests with specific statuses
+export const getVesselVisitRequestsAdHocRequest = async () => {
+  try {
+    // Define the statuses to filter by
+    const statuses = ['confirmed', 'arriving', 'under tow', 'berthed'];
+
+    // Create a Firestore query to get vessel visits with the defined statuses
+    const vesselVisitRequestsRef = collection(db, 'vesselVisitRequests');
+    const q = query(vesselVisitRequestsRef, where('status', 'in', statuses));
+
+    // Execute the query and fetch the documents
+    const querySnapshot = await getDocs(q);
+
+    // Map the results into an array of objects
+    const vesselVisits = querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    return vesselVisits;
+  } catch (error) {
+    console.error('Error fetching vessel visit requests:', error);
+    throw new Error('Failed to fetch vessel visit requests');
+  }
+};
+
 // Dashboard data
 export const getLeaveStatistics = () => authAxios.get('/leave-statistics').catch(handleApiError);
 
@@ -721,7 +747,8 @@ const api = {
   getCargoManifests,
   submitCargoManifest,
   updateCargoManifest,
-  deleteCargoManifest
+  deleteCargoManifest,
+  getVesselVisitRequestsAdHocRequest
 };
 
 export default api;

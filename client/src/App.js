@@ -149,7 +149,10 @@ function App() {
                 {hasAccessRights(['View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest']) && (
                   <Route path="/cargos/cargo-manifest" element={<CargoManifest user={user} />} />
                 )}
-                <Route path="/resources/adhoc-request" element={<AdHocResourceRequest />} />
+                {hasAccessRights(['View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest']) && (
+                  <Route path="/cargos/cargo-manifest" element={<CargoManifest user={user} />} />
+                )}
+                <Route path="/vessels/ad-hoc-resource-request" element={<AdHocResourceRequest />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </>
             ) : (

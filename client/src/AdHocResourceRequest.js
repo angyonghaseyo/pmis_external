@@ -2,13 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { TextField, MenuItem, Button, Typography, Container, Box, Dialog, DialogActions, DialogContent, DialogTitle, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Tabs, Tab, IconButton } from '@mui/material';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { db } from './firebaseConfig'; // Import your Firebase configuration
-import { collection, addDoc, getDocs, updateDoc, doc } from 'firebase/firestore'; // Firestore functions
-import EditIcon from '@mui/icons-material/Edit'; // Pencil icon for editing
+import { getVesselVisitRequestsAdHocRequest } from './services/api';
+import { db } from './firebaseConfig'; 
+import { collection, addDoc, getDocs, updateDoc, doc } from 'firebase/firestore'; 
+import EditIcon from '@mui/icons-material/Edit';
+import VisibilityIcon from '@mui/icons-material/Visibility'; 
 
 const AdHocResourceRequest = () => {
   const [open, setOpen] = useState(false);
+  const [vesselVisits, setVesselVisits] = useState([]); // New state for storing vessel visits
   const [formData, setFormData] = useState({
+    vesselVisit: '', // New field for vessel visit
     resourceType: '',
     description: '',
     waterLiters: '',
@@ -22,16 +26,32 @@ const AdHocResourceRequest = () => {
     endTime: new Date(),
   });
   const [formErrors, setFormErrors] = useState({});
-  const [tabValue, setTabValue] = useState(0); // For tabs
+  const [tabValue, setTabValue] = useState(0); 
   const [requests, setRequests] = useState([]);
-  const [editMode, setEditMode] = useState(false); // Control whether we're editing an existing request
-  const [editRequestId, setEditRequestId] = useState(null); // Store the ID of the request being edited
+  const [editMode, setEditMode] = useState(false); 
+  const [viewMode, setViewMode] = useState(false); 
+  const [editRequestId, setEditRequestId] = useState(null); 
+
+  // Fetch vessel visits from Firestore
+  const fetchVesselVisits = async () => {
+    try {
+      const fetchedVesselVisits = await getVesselVisitRequestsAdHocRequest(); 
+      setVesselVisits(fetchedVesselVisits);
+    } catch (error) {
+      console.error('Error fetching vessel visits:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchVesselVisits(); 
+  }, []);
 
   // Open and close dialog
   const handleClickOpen = () => setOpen(true);
   const handleClose = () => {
     setOpen(false);
     setFormData({
+      vesselVisit: '', // Reset vessel visit field
       resourceType: '',
       description: '',
       waterLiters: '',
@@ -46,11 +66,13 @@ const AdHocResourceRequest = () => {
     });
     setFormErrors({});
     setEditMode(false);
+    setViewMode(false); // Reset viewMode when closing dialog
     setEditRequestId(null);
   };
 
   const handleEditClick = (request) => {
     setFormData({
+      vesselVisit: request.vesselVisit || '', // Keep the vessel visit in the edit mode
       resourceType: request.resourceType,
       description: request.description,
       waterLiters: request.waterLiters || '',
@@ -65,6 +87,26 @@ const AdHocResourceRequest = () => {
     });
     setEditMode(true);
     setEditRequestId(request.id);
+    setOpen(true);
+  };
+
+  // Handle view-only dialog
+  const handleViewClick = (request) => {
+    setFormData({
+      vesselVisit: request.vesselVisit || '', 
+      resourceType: request.resourceType,
+      description: request.description,
+      waterLiters: request.waterLiters || '',
+      fuelAmount: request.fuelAmount || '',
+      fuelType: request.fuelType || '',
+      powerKw: request.powerKw || '',
+      wasteVolume: request.wasteVolume || '',
+      wasteType: request.wasteType || '',
+      preferredTime: new Date(request.preferredTime.seconds * 1000),
+      startTime: request.startTime ? new Date(request.startTime.seconds * 1000) : new Date(),
+      endTime: request.endTime ? new Date(request.endTime.seconds * 1000) : new Date(),
+    });
+    setViewMode(true); 
     setOpen(true);
   };
 
@@ -156,6 +198,7 @@ const AdHocResourceRequest = () => {
 
     try {
       let requestData = {
+        vesselVisit: formData.vesselVisit, // New vessel visit field in the request
         resourceType: formData.resourceType,
         description: formData.description || null,
         preferredTime: formData.preferredTime,
@@ -222,6 +265,7 @@ const AdHocResourceRequest = () => {
             <Table>
               <TableHead>
                 <TableRow>
+                  <TableCell>Vessel Visit</TableCell>
                   <TableCell>Resource Type</TableCell>
                   <TableCell>Description</TableCell>
                   <TableCell>Preferred Time</TableCell>
@@ -229,13 +273,14 @@ const AdHocResourceRequest = () => {
                   {tabValue === 3 && <TableCell>Rejected At</TableCell>}
                   {tabValue === 3 && <TableCell>Rejection Reason</TableCell>}
                   {tabValue !== 2 && tabValue !== 3 && <TableCell>Status</TableCell>}
-                  {tabValue === 0 && <TableCell>Actions</TableCell>}
+                  <TableCell>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {filteredRequests.length > 0 ? (
                   filteredRequests.map((request) => (
                     <TableRow key={request.id}>
+                      <TableCell>{request.vesselVisit || 'N/A'}</TableCell>
                       <TableCell>{request.resourceType}</TableCell>
                       <TableCell>{request.description || '-'}</TableCell>
                       <TableCell>{new Date(request.preferredTime.seconds * 1000).toLocaleString()}</TableCell>
@@ -243,18 +288,23 @@ const AdHocResourceRequest = () => {
                       {tabValue === 3 && <TableCell>{new Date(request.rejectedAt.seconds * 1000).toLocaleString()}</TableCell>}
                       {tabValue === 3 && <TableCell>{request.rejectionReason}</TableCell>}
                       {tabValue !== 2 && tabValue !== 3 && <TableCell>{request.status}</TableCell>}
-                      {tabValue === 0 && (
-                        <TableCell>
+                      <TableCell>
+                        {tabValue === 0 && (
                           <IconButton color="primary" onClick={() => handleEditClick(request)}>
                             <EditIcon />
                           </IconButton>
-                        </TableCell>
-                      )}
+                        )}
+                        {tabValue === 1 || tabValue === 2 || tabValue === 3 ? (
+                          <IconButton color="primary" onClick={() => handleViewClick(request)}>
+                            <VisibilityIcon />
+                          </IconButton>
+                        ) : null}
+                      </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={tabValue === 2 || tabValue === 3 ? 5 : 6} align="center">
+                    <TableCell colSpan={6} align="center">
                       No requests found
                     </TableCell>
                   </TableRow>
@@ -264,8 +314,32 @@ const AdHocResourceRequest = () => {
           </TableContainer>
 
           <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-            <DialogTitle>{editMode ? 'Edit Ad Hoc Resource Request' : 'Create New Ad Hoc Resource Request'}</DialogTitle>
+            <DialogTitle>
+              {editMode ? 'Edit Ad Hoc Resource Request' : viewMode ? 'View Ad Hoc Resource Request' : 'Create New Ad Hoc Resource Request'}
+            </DialogTitle>
             <DialogContent>
+              {/* New Vessel Visit Dropdown */}
+              <TextField
+                select
+                label="Vessel Visit Request"
+                name="vesselVisit"
+                value={formData.vesselVisit}
+                onChange={handleInputChange}
+                fullWidth
+                variant="outlined"
+                margin="normal"
+                required
+                error={!!formErrors.vesselVisit}
+                helperText={formErrors.vesselVisit}
+                disabled={viewMode} 
+              >
+                {vesselVisits.map((visit) => (
+                  <MenuItem key={visit.id} value={visit.id}>
+                    {`${visit.vesselName} - ${visit.status}`}
+                  </MenuItem>
+                ))}
+              </TextField>
+
               <TextField
                 select
                 label="Resource Type"
@@ -278,6 +352,7 @@ const AdHocResourceRequest = () => {
                 error={!!formErrors.resourceType}
                 helperText={formErrors.resourceType}
                 required
+                disabled={viewMode} 
               >
                 <MenuItem value="Water Supply Trucks">Water Supply Trucks</MenuItem>
                 <MenuItem value="Fuel (Bunkering)">Fuel (Bunkering)</MenuItem>
@@ -285,7 +360,7 @@ const AdHocResourceRequest = () => {
                 <MenuItem value="Waste Removal">Waste Removal</MenuItem>
               </TextField>
 
-              {/* Conditionally render the rest of the fields based on Resource Type */}
+              {/* Conditionally render fields based on Resource Type */}
               {formData.resourceType === 'Water Supply Trucks' && (
                 <>
                   <TextField
@@ -300,6 +375,7 @@ const AdHocResourceRequest = () => {
                     error={!!formErrors.waterLiters}
                     helperText={formErrors.waterLiters}
                     required
+                    disabled={viewMode} 
                   />
                   <DateTimePicker
                     label="Preferred Delivery Time"
@@ -309,6 +385,7 @@ const AdHocResourceRequest = () => {
                     required
                     error={!!formErrors.preferredTime}
                     helperText={formErrors.preferredTime}
+                    disabled={viewMode} 
                   />
                 </>
               )}
@@ -327,6 +404,7 @@ const AdHocResourceRequest = () => {
                     required
                     error={!!formErrors.fuelType}
                     helperText={formErrors.fuelType}
+                    disabled={viewMode} 
                   >
                     <MenuItem value="Marine Diesel">Marine Diesel</MenuItem>
                     <MenuItem value="Heavy Fuel Oil">Heavy Fuel Oil</MenuItem>
@@ -345,6 +423,7 @@ const AdHocResourceRequest = () => {
                     required
                     error={!!formErrors.fuelAmount}
                     helperText={formErrors.fuelAmount}
+                    disabled={viewMode} 
                   />
 
                   <DateTimePicker
@@ -355,6 +434,7 @@ const AdHocResourceRequest = () => {
                     required
                     error={!!formErrors.preferredTime}
                     helperText={formErrors.preferredTime}
+                    disabled={viewMode} 
                   />
                 </>
               )}
@@ -373,6 +453,7 @@ const AdHocResourceRequest = () => {
                     required
                     error={!!formErrors.powerKw}
                     helperText={formErrors.powerKw}
+                    disabled={viewMode} 
                   />
                   <Box display="flex" gap={2}>
                     <DateTimePicker
@@ -383,6 +464,7 @@ const AdHocResourceRequest = () => {
                       required
                       error={!!formErrors.startTime}
                       helperText={formErrors.startTime}
+                      disabled={viewMode} 
                     />
                     <DateTimePicker
                       label="End Date and Time"
@@ -392,6 +474,7 @@ const AdHocResourceRequest = () => {
                       required
                       error={!!formErrors.endTime}
                       helperText={formErrors.endTime}
+                      disabled={viewMode} 
                     />
                   </Box>
                 </>
@@ -411,6 +494,7 @@ const AdHocResourceRequest = () => {
                     required
                     error={!!formErrors.wasteType}
                     helperText={formErrors.wasteType}
+                    disabled={viewMode} 
                   >
                     <MenuItem value="Hazardous">Hazardous</MenuItem>
                     <MenuItem value="Non-Hazardous">Non-Hazardous</MenuItem>
@@ -428,6 +512,7 @@ const AdHocResourceRequest = () => {
                     required
                     error={!!formErrors.wasteVolume}
                     helperText={formErrors.wasteVolume}
+                    disabled={viewMode} 
                   />
                   <DateTimePicker
                     label="Preferred Pickup Time"
@@ -437,6 +522,7 @@ const AdHocResourceRequest = () => {
                     required
                     error={!!formErrors.preferredTime}
                     helperText={formErrors.preferredTime}
+                    disabled={viewMode} 
                   />
                 </>
               )}
@@ -452,14 +538,17 @@ const AdHocResourceRequest = () => {
                 multiline
                 rows={4}
                 placeholder="Please provide additional details or instructions."
+                disabled={viewMode} 
               />
             </DialogContent>
-            <DialogActions>
-              <Button onClick={handleClose} color="secondary">Cancel</Button>
-              <Button onClick={handleSubmit} color="primary" variant="contained">
-                {editMode ? 'Update Request' : 'Submit Request'}
-              </Button>
-            </DialogActions>
+            {!viewMode && ( 
+              <DialogActions>
+                <Button onClick={handleClose} color="secondary">Cancel</Button>
+                <Button onClick={handleSubmit} color="primary" variant="contained">
+                  {editMode ? 'Update Request' : 'Submit Request'}
+                </Button>
+              </DialogActions>
+            )}
           </Dialog>
         </Box>
       </Container>

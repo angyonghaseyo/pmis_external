@@ -7,8 +7,7 @@ import {
   ListItemIcon,
   ListItemText,
   Collapse,
-  Box,
-  Typography
+  Box
 } from '@mui/material';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
@@ -60,9 +59,10 @@ const Sidebar = ({ user }) => {
       icon: <Anchor />,
       path: "/vessels",
       children: [
-        { name: 'Vessel Visit Request', accessRights: ['View Vessel Visit Requests', 'Create Vessel Visit Request', 'Edit Vessel Visit Requests', 'Delete Vessel Visit Requests'] }
+        { name: 'Vessel Visit Request', accessRights: ['View Vessel Visit Requests', 'Create Vessel Visit Request', 'Edit Vessel Visit Requests', 'Delete Vessel Visit Requests'] },
+        { name: 'Ad Hoc Resource Request', accessRights: ['View Ad Hoc Resource Requests', 'Create Ad Hoc Resource Request'] },
       ],
-      accessRights: ['View Vessel Visit Requests', 'Create Vessel Visit Request', 'Edit Vessel Visit Requests', 'Delete Vessel Visit Requests']
+      accessRights: ['View Vessel Visit Requests', 'Create Vessel Visit Request', 'Edit Vessel Visit Requests', 'Delete Vessel Visit Requests', 'View Ad Hoc Resource Requests', 'Create Ad Hoc Resource Request']
     },
     {
       name: "Port Operations and Resources",
@@ -87,7 +87,6 @@ const Sidebar = ({ user }) => {
       children: ['Subitem 1', 'Subitem 2'],
       accessRights: ['View Documents', 'Manage Documents']
     },
-
     {
       name: "Settings",
       icon: <Settings />,
@@ -99,7 +98,6 @@ const Sidebar = ({ user }) => {
       accessRights: ['View Company Information', 'Edit Company Information', 'View Users List', 'Delete User', 'Invite User', 'Delete User Invitations', 'View Invitations List']
     },
   ];
-
 
   const toggleExpand = (index) => {
     setExpandedItems(prev => ({ ...prev, [index]: !prev[index] }));
