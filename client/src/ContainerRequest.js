@@ -39,7 +39,7 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebaseConfig";
 
-const ContainerRequest = () => {
+const ContainerRequest = ({ user }) => {
     const [activeStep, setActiveStep] = useState(0);
     const [containerRequests, setContainerRequests] = useState([]);
     const [openDialog, setOpenDialog] = useState(false);
@@ -51,6 +51,7 @@ const ContainerRequest = () => {
     const [isBookingValid, setIsBookingValid] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [currentCargoId, setCurrentCargoId] = useState(null);
+    const [bookings, setBookings] = useState([]);
 
     const steps = ['Enter Booking ID', 'Select Carrier & Container', 'Select Cargo'];
 
@@ -72,6 +73,16 @@ const ContainerRequest = () => {
             setContainerRequests(data);
             const companies = await getUniqueCompaniesArray();
             setCarriers(companies);
+
+            const bookingsSnapshot = await getDocs(collection(db, "bookings"));
+            const bookingData = bookingsSnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+            }));
+            const userBookings = bookingData.filter(booking => booking.userEmail === user.email);
+            setBookings(userBookings);
+            console.log(userBookings, "HERE");
+
         };
         fetchData();
     }, []);
@@ -219,15 +230,22 @@ const ContainerRequest = () => {
             case 0:
                 return (
                     <Box sx={{ p: 2 }}>
-                        <TextField
-                            fullWidth
-                            label="Booking ID"
-                            name="bookingId"
-                            value={formData.bookingId}
-                            onChange={handleChange}
-                            required
-                            disabled={isLoading}
-                        />
+
+                        <FormControl fullWidth>
+                            <InputLabel>Select Booking</InputLabel>
+                            <Select
+                                name="bookingId"
+                                value={formData.bookingId}
+                                onChange={handleChange}
+                                required
+                            >
+                                {bookings.map((booking) => (
+                                    <MenuItem key={booking.bookingId} value={booking.bookingId}>
+                                        {booking.bookingId}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
                     </Box>
                 );
             case 1:

@@ -50,7 +50,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorIcon from "@mui/icons-material/Error";
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 
-const BookingForm = () => {
+const BookingForm = ({ user }) => {
   const [openDialog, setOpenDialog] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
@@ -131,6 +131,7 @@ const BookingForm = () => {
     console.log("Submitting formData: ", formData); //debugging
     const newBooking = {
       ...formData, // Contains cargo as a map
+      userEmail: user.email
     };
 
     try {
