@@ -49,9 +49,15 @@ function TrainingProgram() {
       const available = [];
       const completed = [];
       console.log(allPrograms)
+      console.log("Enrolled programs: ", userData?.enrolledPrograms)
+
       allPrograms.forEach((program) => {
-        const startDate = program.startDate
-        const endDate = program.endDate
+        console.log("****")
+        console.log(program.startDate)
+        console.log(program.endDate)
+
+        const startDate = new Date(program.startDate); // Convert string to Date object
+        const endDate = new Date(program.endDate); // Convert string to Date object
         const userEnrollment = userData.enrolledPrograms?.find(ep => ep.programId === program.id);
 
         if (userEnrollment) {
@@ -61,6 +67,7 @@ function TrainingProgram() {
             completed.push({ ...program, enrollmentDate: userEnrollment.enrollmentDate });
           }
         } else if (now < startDate && program.numberOfCurrentRegistrations < program.participantCapacity) {
+          console.log(program);
           available.push(program);
         }
       });
@@ -159,10 +166,10 @@ function TrainingProgram() {
                   <TableRow key={program.id}>
                     <TableCell>{program.name}</TableCell>
                     <TableCell>{program.description}</TableCell>
-                    <TableCell>{program.startDate.toDate().toLocaleDateString()}</TableCell>
-                    <TableCell>{program.endDate.toDate().toLocaleDateString()}</TableCell>
+                    <TableCell>{program.startDate}</TableCell>
+                    <TableCell>{program.endDate}</TableCell>
                     <TableCell>{program.mode}</TableCell>
-                    <TableCell>{program.enrollmentDate.toDate().toLocaleDateString()}</TableCell>
+                    <TableCell>{program.enrollmentDate}</TableCell>
                     <TableCell>
                       <Button
                         variant="contained"
@@ -204,8 +211,8 @@ function TrainingProgram() {
                   <TableRow key={program.id}>
                     <TableCell>{program.name}</TableCell>
                     <TableCell>{program.description}</TableCell>
-                    <TableCell>{program.startDate.toDate().toLocaleDateString()}</TableCell>
-                    <TableCell>{program.endDate.toDate().toLocaleDateString()}</TableCell>
+                    <TableCell>{program.startDate}</TableCell>
+                    <TableCell>{program.endDate}</TableCell>
                     <TableCell>{program.mode}</TableCell>
                     <TableCell>{program.participantCapacity - program.numberOfCurrentRegistrations}</TableCell>
                     <TableCell>
@@ -248,10 +255,10 @@ function TrainingProgram() {
                   <TableRow key={program.id}>
                     <TableCell>{program.name}</TableCell>
                     <TableCell>{program.description}</TableCell>
-                    <TableCell>{program.startDate.toDate().toLocaleDateString()}</TableCell>
-                    <TableCell>{program.endDate.toDate().toLocaleDateString()}</TableCell>
+                    <TableCell>{program.startDate}</TableCell>
+                    <TableCell>{program.endDate}</TableCell>
                     <TableCell>{program.mode}</TableCell>
-                    <TableCell>{program.enrollmentDate.toDate().toLocaleDateString()}</TableCell>
+                    <TableCell>{program.enrollmentDate}</TableCell>
                   </TableRow>
                 ))
               )}

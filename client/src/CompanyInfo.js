@@ -14,9 +14,11 @@ import {
   Container
 } from '@mui/material';
 import PhotoCamera from '@mui/icons-material/PhotoCamera';
+import { doc, getDoc } from 'firebase/firestore';
+import { db, auth } from './firebaseConfig';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from './firebaseConfig';
-import { getCompanyInfo, updateCompanyInfo} from './services/api';
+import { getCompanyInfo, updateCompanyInfo, getUserData } from './services/api';
 import { useAuth } from './AuthContext';
 
 const currencies = [

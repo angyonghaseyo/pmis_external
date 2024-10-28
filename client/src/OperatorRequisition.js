@@ -27,7 +27,7 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import { Close } from '@mui/icons-material';
-import { getOperatorRequisitions, createOperatorRequisition, updateOperatorRequisition, deleteOperatorRequisition} from './services/api';
+import { getOperatorRequisitions, createOperatorRequisition, updateOperatorRequisition, deleteOperatorRequisition, getUserData } from './services/api';
 import { useAuth } from './AuthContext';
 
 const operatorSkills = ['Crane Operator', 'Forklift Operator', 'Equipment Technician'];
@@ -105,7 +105,7 @@ const OperatorRequisition = () => {
 
   const fetchUserProfile = async (uid) => {
     try {
-      const response = await fetch(`http://localhost:3003/user-profile/${uid}`);
+      const response = await fetch(`http://localhost:3001/user-profile/${uid}`);
       if (!response.ok) {
         throw new Error('Failed to fetch user profile');
       }

@@ -28,10 +28,13 @@ import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { db } from "./firebaseConfig";
+import { getUserData } from "./services/api";
+import { auth } from "./firebaseConfig";
 import { CircularProgress } from "@mui/material";
 import Papa from "papaparse";
 import {
   doc,
+  addDoc,
   setDoc,
   getDoc,
   getDocs,
@@ -121,7 +124,7 @@ const VesselVisits = () => {
 
   const fetchVesselVisits = async () => {
     try {
-      const response = await fetch('http://localhost:3003/vessel-visits');
+      const response = await fetch('http://localhost:3001/vessel-visits');
       if (!response.ok) {
         throw new Error('Failed to fetch vessel visits');
       }
@@ -134,7 +137,7 @@ const VesselVisits = () => {
 
   const fetchUserProfile = async (uid) => {
     try {
-      const response = await fetch(`http://localhost:3003/user-profile/${uid}`);
+      const response = await fetch(`http://localhost:3001/user-profile/${uid}`);
       if (!response.ok) {
         throw new Error('Failed to fetch user profile');
       }
@@ -327,7 +330,7 @@ const VesselVisits = () => {
 
   const checkFacilityAvailability = async (vesselVisitRequest) => {
     try {
-      const response = await fetch('http://localhost:3003/check-facility-availability', {
+      const response = await fetch('http://localhost:3001/check-facility-availability', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

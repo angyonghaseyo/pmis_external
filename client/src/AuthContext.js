@@ -13,7 +13,7 @@ export const AuthProvider = ({ children }) => {
         const token = localStorage.getItem('authToken');
         if (token) {
             const decodedToken = jwtDecode(token);
-        
+            console.log("Decoded ", decodedToken)
             setUser({
                 email: decodedToken.email, accessRights: decodedToken.accessRights, enrolledPrograms: decodedToken?.enrolledPrograms, company: decodedToken?.company, photoURL: decodedToken?.photo,
                 firstName: decodedToken.firstName, token
@@ -37,7 +37,7 @@ export const AuthProvider = ({ children }) => {
     };
     const fetchUserProfile = async () => {
         try {
-            const response = await fetch(`http://localhost:3003/user-profile?email=${user.email}`);
+            const response = await fetch(`http://localhost:3001/user-profile?email=${user.email}`);
             if (!response.ok) {
                 throw new Error('Error fetching user profile');
             }
@@ -48,6 +48,8 @@ export const AuthProvider = ({ children }) => {
                 ...prevUser,
                 ...userProfile
             }));
+            console.log("latest")
+            console.log(userProfile.photoURL)
 
         } catch (error) {
             console.error('Error fetching user profile:', error);

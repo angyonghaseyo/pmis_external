@@ -10,12 +10,16 @@ import ForgotPassword from './ForgotPassword';
 import ResetPassword from './ResetPassword';
 import EditProfile from './EditProfile';
 import InquiryFeedback from './InquiryFeedback';
+import InquiryFeedbackDetail from './InquiryFeedbackDetail';
 import TrainingProgram from './TrainingProgram';
 import CompanyInfo from './CompanyInfo';
 import OperatorRequisition from './OperatorRequisition';
 import VesselVisits from './VesselVisits';
 import CargoManifest from './CargoManifest'; // Add this import
 import { Box, CssBaseline, CircularProgress } from '@mui/material';
+import { simulateBerthTestData } from './SimulateBerthTestData';
+import { simulateManpowerTestData } from './SimulateManpowerTestData';
+import { simulateAssetTestData } from './SimulateAssetTestData';
 import { useAuth } from './AuthContext';
 import { jwtDecode } from "jwt-decode";
 
@@ -29,7 +33,7 @@ function App() {
     console.log("Starting simulations...");
 
     try {
-      const berthResponse = await fetch('http://localhost:3003/simulate-berth-test-data', {
+      const berthResponse = await fetch('http://localhost:3001/simulate-berth-test-data', {
         method: 'POST',
       });
 
@@ -38,7 +42,7 @@ function App() {
       }
       // console.log("FacilityList data simulation completed.");
 
-      const manpowerResponse = await fetch('http://localhost:3003/simulate-manpower-test-data', {
+      const manpowerResponse = await fetch('http://localhost:3001/simulate-manpower-test-data', {
         method: 'POST',
       });
 
@@ -47,7 +51,7 @@ function App() {
       }
       // console.log("Manpower data simulation completed.");
 
-      const assetResponse = await fetch('http://localhost:3003/simulate-asset-test-data', {
+      const assetResponse = await fetch('http://localhost:3001/simulate-asset-test-data', {
         method: 'POST',
       });
 

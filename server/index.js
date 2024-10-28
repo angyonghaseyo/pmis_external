@@ -17,8 +17,7 @@ const storage = new Storage({
 });
 
 
-
-const bucket = storage.bucket('pmis-47493.appspot.com'); // Replace with your bucket name
+const bucket = storage.bucket('pmis-47493.appspot.com');
 
 
 admin.initializeApp({
@@ -33,7 +32,6 @@ app.use(cors()); // Enable CORS for all routes
 const usersCollection = db.collection('users');
 const JWT_SECRET = 'your_jwt_secret'; // Replace with a strong secret key
 
-// Endpoint to handle user registration
 // Endpoint to handle user registration
 app.post('/register', upload.single('photoFile'), async (req, res) => {
     const formData = req.body;
@@ -72,6 +70,7 @@ app.post('/register', upload.single('photoFile'), async (req, res) => {
         await db.collection('users').add({
             email: formData.email,
             firstName: formData.firstName,
+            password: formData.password,
             lastName: formData.lastName,
             salutation: formData.salutation,
             photoURL: photoURL,
@@ -99,7 +98,7 @@ app.post('/login', async (req, res) => {
 
     const userDoc = userQuery.docs[0];
     const userData = userDoc.data();
-    const isPasswordValid = await bcrypt.compare(password, userData.password);
+    const isPasswordValid = await userData.password == password
     if (!isPasswordValid) {
         return res.status(401).send('Invalid credentials');
     }
@@ -773,7 +772,7 @@ app.put('/update-profile', upload.single('photoFile'), async (req, res) => {
             photoURL: photoURL,
         };
 
-        
+        console.log(photoURL)
         // Update Firestore document
         const userDocRef = db.collection('users').doc(userId);
         await userDocRef.update({
@@ -1016,7 +1015,7 @@ app.put('/company-data/:companyName', async (req, res) => {
 });
 
 
-app.listen(3003, () => {
-    console.log('Server is running on port 3003');
+app.listen(3001, () => {
+    console.log('Server is running on port 3001');
 });
 

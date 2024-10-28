@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { TextField, Button, Box, Typography, Select, MenuItem, InputLabel, FormControl, Grid, Avatar, Chip, Snackbar, Alert } from '@mui/material';
-import { sendPasswordResetEmailToUser, deleteUserAccount } from './services/api';
+import { getCurrentUser, updateUserProfile, sendPasswordResetEmailToUser, deleteUserAccount } from './services/api';
+import { auth, db, storage } from './firebaseConfig';
+import { updateProfile } from 'firebase/auth';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useAuth } from './AuthContext';
 
 
@@ -39,13 +43,13 @@ function EditProfile() {
 
   const fetchProfile = async (email) => {
     try {
-      const response = await fetch(`http://localhost:3003/user-profile?email=${encodeURIComponent(email)}`);
+      const response = await fetch(`http://localhost:3001/user-profile?email=${encodeURIComponent(email)}`);
       if (!response.ok) {
         throw new Error('Error fetching user profile');
       }
 
       const userData = await response.json();
-      
+      console.log(userData)
       return userData;
     } catch (error) {
       console.error('Error fetching user profile:', error);
@@ -114,7 +118,7 @@ function EditProfile() {
         formData.append('photoFile', blob, 'profile_photo.png');
       }
 
-      const response = await fetch('http://localhost:3003/update-profile', {
+      const response = await fetch('http://localhost:3001/update-profile', {
         method: 'PUT',
         body: formData,
       });

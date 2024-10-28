@@ -105,7 +105,7 @@ export const confirmUserPasswordReset = (oobCode, newPassword) =>
 export const getUsers = async (userId) => {
   try {
 
-    const response = await fetch(`http://localhost:3003/users?email=${userId}`);
+    const response = await fetch(`http://localhost:3001/users?email=${userId}`);
     if (!response.ok) {
       throw new Error('Error fetching users');
     }
@@ -120,7 +120,7 @@ export const getUsers = async (userId) => {
 
 export const getAllUsersInCompany = async (userId) => {
   try {
-    const response = await fetch(`http://localhost:3003/all-users-in-company?email=${userId}`);
+    const response = await fetch(`http://localhost:3001/all-users-in-company?email=${userId}`);
     if (!response.ok) {
       throw new Error('Error fetching users in company');
     }
@@ -160,7 +160,7 @@ export const updateUser = async (userId, userData, isPending = false) => {
 
 export const deleteUser = async (email) => {
   try {
-    const response = await fetch(`http://localhost:3003/users?email=${encodeURIComponent(email)}`, {
+    const response = await fetch(`http://localhost:3001/users?email=${encodeURIComponent(email)}`, {
       method: 'DELETE',
     });
     if (!response.ok) {
@@ -173,7 +173,7 @@ export const deleteUser = async (email) => {
 
 export const deleteUserAccount = async (email) => {
   try {
-    const response = await fetch('http://localhost:3003/user-account', {
+    const response = await fetch('http://localhost:3001/user-account', {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -190,7 +190,7 @@ export const deleteUserAccount = async (email) => {
 
 export const inviteUser = async (userData) => {
   try {
-    const response = await fetch('http://localhost:3003/invitations', {
+    const response = await fetch('http://localhost:3001/invitations', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -209,7 +209,7 @@ export const inviteUser = async (userData) => {
 
 export const cancelInvitation = async (invitationId) => {
   try {
-    const response = await fetch(`http://localhost:3003/invitations/${invitationId}`, {
+    const response = await fetch(`http://localhost:3001/invitations/${invitationId}`, {
       method: 'DELETE',
     });
     if (!response.ok) {
@@ -223,7 +223,7 @@ export const cancelInvitation = async (invitationId) => {
 // Get user's inquiries and feedback
 export const getUserInquiriesFeedback = async (userId) => {
   try {
-    const response = await fetch(`http://localhost:3003/inquiries-feedback/${userId}`);
+    const response = await fetch(`http://localhost:3001/inquiries-feedback/${userId}`);
     if (!response.ok) {
       throw new Error('Error fetching inquiries and feedback');
     }
@@ -243,7 +243,7 @@ export const createInquiryFeedback = async (data) => {
       formData.append(key, data[key]);
     }
 
-    const response = await fetch('http://localhost:3003/inquiries-feedback', {
+    const response = await fetch('http://localhost:3001/inquiries-feedback', {
       method: 'POST',
       body: formData,
     });
@@ -267,7 +267,7 @@ export const updateInquiryFeedback = async (incrementalId, data) => {
       formData.append(key, data[key]);
     }
 
-    const response = await fetch(`http://localhost:3003/inquiries-feedback/${incrementalId}`, {
+    const response = await fetch(`http://localhost:3001/inquiries-feedback/${incrementalId}`, {
       method: 'PUT',
       body: formData,
     });
@@ -295,7 +295,7 @@ export const deleteInquiryFeedback = async (id) => {
 export const getCompanyInfo = async (companyName) => {
   try {
     console.log("Company Name", companyName)
-    const response = await fetch(`http://localhost:3003/company-data?companyName=${encodeURIComponent(companyName)}`);
+    const response = await fetch(`http://localhost:3001/company-data?companyName=${encodeURIComponent(companyName)}`);
     if (!response.ok) {
       throw new Error('Error fetching company data');
     }
@@ -309,7 +309,7 @@ export const getCompanyInfo = async (companyName) => {
 
 export const updateCompanyInfo = async (companyName, data) => {
   try {
-    const response = await fetch(`http://localhost:3003/company-data/${companyName}`, {
+    const response = await fetch(`http://localhost:3001/company-data/${companyName}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -326,7 +326,7 @@ export const updateCompanyInfo = async (companyName, data) => {
 };
 export const getOperatorRequisitions = async (userId) => {
   try {
-    const response = await fetch(`http://localhost:3003/operator-requisitions/${userId}`);
+    const response = await fetch(`http://localhost:3001/operator-requisitions/${userId}`);
     if (!response.ok) {
       throw new Error('Error fetching operator requisitions');
     }
@@ -340,7 +340,7 @@ export const getOperatorRequisitions = async (userId) => {
 
 export const createOperatorRequisition = async (requisitionData) => {
   try {
-    const response = await fetch('http://localhost:3003/operator-requisitions', {
+    const response = await fetch('http://localhost:3001/operator-requisitions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -360,7 +360,7 @@ export const createOperatorRequisition = async (requisitionData) => {
 
 export const updateOperatorRequisition = async (requisitionId, updateData) => {
   try {
-    const response = await fetch(`http://localhost:3003/operator-requisitions/${requisitionId}`, {
+    const response = await fetch(`http://localhost:3001/operator-requisitions/${requisitionId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -378,7 +378,7 @@ export const updateOperatorRequisition = async (requisitionId, updateData) => {
 
 export const deleteOperatorRequisition = async (requisitionId) => {
   try {
-    const response = await fetch(`http://localhost:3003/operator-requisitions/${requisitionId}`, {
+    const response = await fetch(`http://localhost:3001/operator-requisitions/${requisitionId}`, {
       method: 'DELETE',
     });
     if (!response.ok) {
@@ -392,7 +392,7 @@ export const deleteOperatorRequisition = async (requisitionId) => {
 
 export const getTrainingPrograms = async () => {
   try {
-    const response = await fetch('http://localhost:3003/training-programs');
+    const response = await fetch('http://localhost:3001/training-programs');
     if (!response.ok) {
       throw new Error('Error fetching training programs');
     }
@@ -523,7 +523,7 @@ export const getCargoManifests = async () => {
 
 export const submitCargoManifest = async (manifestData) => {
   try {
-    const response = await fetch('http://localhost:3003/cargo-manifests', {
+    const response = await fetch('http://localhost:3001/cargo-manifests', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -543,7 +543,7 @@ export const submitCargoManifest = async (manifestData) => {
 
 export const updateCargoManifest = async (id, manifestData) => {
   try {
-    const response = await fetch(`http://localhost:3003/cargo-manifests/${id}`, {
+    const response = await fetch(`http://localhost:3001/cargo-manifests/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -562,7 +562,7 @@ export const updateCargoManifest = async (id, manifestData) => {
 
 export const deleteCargoManifest = async (id) => {
   try {
-    const response = await fetch(`http://localhost:3003/cargo-manifests/${id}`, {
+    const response = await fetch(`http://localhost:3001/cargo-manifests/${id}`, {
       method: 'DELETE',
     });
     if (!response.ok) {

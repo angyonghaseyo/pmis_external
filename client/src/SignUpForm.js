@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { doc, setDoc, getDoc, updateDoc, increment } from 'firebase/firestore';
+import { auth, storage, db } from './firebaseConfig';
 import './AuthForms.css';
 
 const teams = [
@@ -97,7 +101,7 @@ function SignUpForm() {
                 formDataToSend.append('photoFile', photoFile);
             }
 
-            const response = await fetch('http://localhost:3003/register', {
+            const response = await fetch('http://localhost:3001/register', {
                 method: 'POST',
                 body: formDataToSend,
             });

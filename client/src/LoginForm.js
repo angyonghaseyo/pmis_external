@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth, db } from './firebaseConfig';
+import { doc, getDoc } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
 
 import {
@@ -20,6 +23,7 @@ function LoginForm() {
     const [loading, setLoading] = useState(false);
     const { login } = useAuth();
 
+    const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -27,7 +31,7 @@ function LoginForm() {
         setLoading(true);
 
         try {
-            const response = await fetch('http://localhost:3003/login', {
+            const response = await fetch('http://localhost:3001/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
