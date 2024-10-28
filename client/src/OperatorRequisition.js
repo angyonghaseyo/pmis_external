@@ -105,7 +105,7 @@ const OperatorRequisition = () => {
 
   const fetchUserProfile = async (uid) => {
     try {
-      const response = await fetch(`http://localhost:3001/user-profile/${uid}`);
+      const response = await fetch(`http://localhost:5001/user-profile/${uid}`);
       if (!response.ok) {
         throw new Error('Failed to fetch user profile');
       }

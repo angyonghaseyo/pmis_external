@@ -101,7 +101,7 @@ function SignUpForm() {
                 formDataToSend.append('photoFile', photoFile);
             }
 
-            const response = await fetch('http://localhost:3001/register', {
+            const response = await fetch('http://localhost:5001/register', {
                 method: 'POST',
                 body: formDataToSend,
             });

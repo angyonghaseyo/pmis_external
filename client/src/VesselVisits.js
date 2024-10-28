@@ -124,7 +124,7 @@ const VesselVisits = () => {
 
   const fetchVesselVisits = async () => {
     try {
-      const response = await fetch('http://localhost:3001/vessel-visits');
+      const response = await fetch('http://localhost:5001/vessel-visits');
       if (!response.ok) {
         throw new Error('Failed to fetch vessel visits');
       }
@@ -137,7 +137,7 @@ const VesselVisits = () => {
 
   const fetchUserProfile = async (uid) => {
     try {
-      const response = await fetch(`http://localhost:3001/user-profile/${uid}`);
+      const response = await fetch(`http://localhost:5001/user-profile/${uid}`);
       if (!response.ok) {
         throw new Error('Failed to fetch user profile');
       }
@@ -330,7 +330,7 @@ const VesselVisits = () => {
 
   const checkFacilityAvailability = async (vesselVisitRequest) => {
     try {
-      const response = await fetch('http://localhost:3001/check-facility-availability', {
+      const response = await fetch('http://localhost:5001/check-facility-availability', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

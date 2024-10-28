@@ -43,7 +43,7 @@ function EditProfile() {
 
   const fetchProfile = async (email) => {
     try {
-      const response = await fetch(`http://localhost:3001/user-profile?email=${encodeURIComponent(email)}`);
+      const response = await fetch(`http://localhost:5001/user-profile?email=${encodeURIComponent(email)}`);
       if (!response.ok) {
         throw new Error('Error fetching user profile');
       }
@@ -118,7 +118,7 @@ function EditProfile() {
         formData.append('photoFile', blob, 'profile_photo.png');
       }
 
-      const response = await fetch('http://localhost:3001/update-profile', {
+      const response = await fetch('http://localhost:5001/update-profile', {
         method: 'PUT',
         body: formData,
       });
