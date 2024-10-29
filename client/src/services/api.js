@@ -24,6 +24,7 @@ import {
   arrayUnion,
   Timestamp,
   arrayRemove,
+  runTransaction,
   orderBy
 } from 'firebase/firestore';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -421,57 +422,110 @@ export const getUserData = async (userId) => {
   }
 };
 
-// Register user for a training program
-export const registerForProgram = async (programId, userId) => {
+export const getUserUpdatedData = async (userEmail) => {
   try {
-    const userRef = doc(db, 'users', userId);
-    const programRef = doc(db, 'training_programs', programId);
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('email', '==', userEmail));
+    const querySnapshot = await getDocs(q);
+    
+    if (querySnapshot.empty) {
+      throw new Error('User not found');
+    }
 
-    // Update user document
-    await updateDoc(userRef, {
-      enrolledPrograms: arrayUnion({
-        programId: programId,
-        enrollmentDate: Timestamp.now(),
-        status: 'Enrolled'
-      })
-    });
-
-    // Update program document
-    await updateDoc(programRef, {
-      numberOfCurrentRegistrations: increment(1)
-    });
+    return querySnapshot.docs[0].data();
   } catch (error) {
-    console.error('Error registering for program:', error);
+    console.error('Error fetching updated user data:', error);
     throw error;
   }
 };
 
-// Withdraw user from a training program
-export const withdrawFromProgram = async (programId, userId) => {
+export const registerForProgram = async (programId, userEmail) => {
   try {
-    const userRef = doc(db, 'users', userId);
-    const programRef = doc(db, 'training_programs', programId);
-
-    // Get user data to find the specific enrollment to remove
-    const userDoc = await getDoc(userRef);
-    const userData = userDoc.data();
-    const enrollmentToRemove = userData.enrolledPrograms.find(ep => ep.programId === programId);
-
-    if (!enrollmentToRemove) {
-      throw new Error('User is not enrolled in this program');
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('email', '==', userEmail));
+    const querySnapshot = await getDocs(q);
+    
+    if (querySnapshot.empty) {
+      throw new Error('User not found');
     }
 
-    // Update user document
-    await updateDoc(userRef, {
-      enrolledPrograms: arrayRemove(enrollmentToRemove)
-    });
+    const userDoc = querySnapshot.docs[0];
+    const userData = userDoc.data();
+    const programRef = doc(db, 'training_programs', programId);
+    const programDoc = await getDoc(programRef);
 
-    // Update program document
-    await updateDoc(programRef, {
-      numberOfCurrentRegistrations: increment(-1)
+    if (!programDoc.exists()) {
+      throw new Error('Program not found');
+    }
+
+    const programData = programDoc.data();
+
+    // Check capacity
+    if (programData.numberOfCurrentRegistrations >= programData.participantCapacity) {
+      throw new Error('Program is full');
+    }
+
+    // Check if already enrolled
+    if (userData.enrolledPrograms?.some(program => program.programId === programId)) {
+      throw new Error('Already enrolled in this program');
+    }
+
+    // Use transaction to ensure atomicity
+    await runTransaction(db, async (transaction) => {
+      // Update program registrations
+      transaction.update(programRef, {
+        numberOfCurrentRegistrations: increment(1)
+      });
+
+      // Update user enrollments
+      transaction.update(userDoc.ref, {
+        enrolledPrograms: arrayUnion({
+          programId: programId,
+          enrollmentDate: Timestamp.now(),
+          status: 'Enrolled'
+        })
+      });
     });
   } catch (error) {
-    console.error('Error withdrawing from program:', error);
+    console.error('Error in registerForProgram:', error);
+    throw error;
+  }
+};
+
+export const withdrawFromProgram = async (programId, userEmail) => {
+  try {
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('email', '==', userEmail));
+    const querySnapshot = await getDocs(q);
+    
+    if (querySnapshot.empty) {
+      throw new Error('User not found');
+    }
+
+    const userDoc = querySnapshot.docs[0];
+    const userData = userDoc.data();
+    const programRef = doc(db, 'training_programs', programId);
+    
+    const enrollmentToRemove = userData.enrolledPrograms?.find(ep => ep.programId === programId);
+    
+    if (!enrollmentToRemove) {
+      throw new Error('Not enrolled in this program');
+    }
+
+    // Use transaction to ensure atomicity
+    await runTransaction(db, async (transaction) => {
+      // Update program registrations
+      transaction.update(programRef, {
+        numberOfCurrentRegistrations: increment(-1)
+      });
+
+      // Update user enrollments
+      transaction.update(userDoc.ref, {
+        enrolledPrograms: arrayRemove(enrollmentToRemove)
+      });
+    });
+  } catch (error) {
+    console.error('Error in withdrawFromProgram:', error);
     throw error;
   }
 };
