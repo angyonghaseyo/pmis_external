@@ -30,6 +30,7 @@ import BookingForm from './BookingForm';
 import AdHocResourceRequest from './AdHocResourceRequest';
 import ContainerMenu from './ContainerMenu';
 import TruckRegistration from './TruckRegistration';
+import ContainerRequestsList from './ContainerRequestsList';
 
 const drawerWidth = 240;
 
@@ -172,6 +173,9 @@ function App() {
                 <Route path="/vessels/ad-hoc-resource-request" element={<AdHocResourceRequest />} />
                 {hasAccessRights(['Register Truck', 'View Truck Registrations']) && (
                   <Route path="/cargos/truck-registration" element={<TruckRegistration user={user} />} />
+                )}
+                {hasAccessRights(['View Container Requests', 'Approve Container Requests']) && (
+                  <Route path="/cargos/container-requests-list" element={<ContainerRequestsList user={user} />} />
                 )}
                 <Route path="*" element={<Navigate to="/" replace />} />
               </>
