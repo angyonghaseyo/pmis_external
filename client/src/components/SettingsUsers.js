@@ -97,7 +97,7 @@ const SettingsUsers = () => {
     "View Invitations List",
     "View Company Information",
     "Edit Company Information",
-    "abc",
+    "create cargo booking",
   ];
 
   useEffect(() => {
