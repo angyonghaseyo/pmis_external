@@ -7,8 +7,7 @@ import {
   ListItemIcon,
   ListItemText,
   Collapse,
-  Box,
-  Typography
+  Box
 } from '@mui/material';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
@@ -60,9 +59,10 @@ const Sidebar = ({ user }) => {
       icon: <Anchor />,
       path: "/vessels",
       children: [
-        { name: 'Vessel Visit Request', accessRights: ['View Vessel Visit Requests', 'Create Vessel Visit Request', 'Edit Vessel Visit Requests', 'Delete Vessel Visit Requests'] }
+        { name: 'Vessel Visit Request', accessRights: ['View Vessel Visit Requests', 'Create Vessel Visit Request', 'Edit Vessel Visit Requests', 'Delete Vessel Visit Requests'] },
+        { name: 'Ad Hoc Resource Request', accessRights: ['View Ad Hoc Resource Requests', 'Create Ad Hoc Resource Request'] },
       ],
-      accessRights: ['View Vessel Visit Requests', 'Create Vessel Visit Request', 'Edit Vessel Visit Requests', 'Delete Vessel Visit Requests']
+      accessRights: ['View Vessel Visit Requests', 'Create Vessel Visit Request', 'Edit Vessel Visit Requests', 'Delete Vessel Visit Requests', 'View Ad Hoc Resource Requests', 'Create Ad Hoc Resource Request']
     },
     {
       name: "Port Operations and Resources",
@@ -76,9 +76,18 @@ const Sidebar = ({ user }) => {
       icon: <Package />,
       path: "/cargos",
       children: [
-        { name: 'Cargo Manifest', accessRights: ['View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest'] }
+        { name: 'Booking Form', accessRights: ['abc'] },
+        { name: 'Container Request', accessRights: ['Create Container Request', 'View Container Request'] },
+        { name: 'Truck Registration', accessRights: ['Register Truck', 'View Truck Registrations'] },
+        { name: 'Cargo Manifest', accessRights: ['View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest'] },
+        { name: 'Container Pricing Manager', accessRights: ['Create Container Pricings', 'View Container Pricings'] },
+        { name: 'Container Menu', accessRights: ['Create Container Menu', 'View Container Menu'] },
+        { name: 'Container Requests List', accessRights: ['View Container Requests', 'Approve Container Requests'] },
+
       ],
-      accessRights: ['View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest']
+      accessRights: ['abc', 'View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest',
+        'Create Container Request', 'View Container Request', 'Create Container Pricings', 'View Container Pricings',
+        'Create Container Menu', 'View Container Menu', 'Register Truck', 'View Truck Registrations', 'View Container Requests', 'Approve Container Requests']
     },
     {
       name: "Customs and Trade Documents",
@@ -87,7 +96,6 @@ const Sidebar = ({ user }) => {
       children: ['Subitem 1', 'Subitem 2'],
       accessRights: ['View Documents', 'Manage Documents']
     },
-
     {
       name: "Settings",
       icon: <Settings />,
@@ -97,9 +105,8 @@ const Sidebar = ({ user }) => {
         { name: 'Company', accessRights: ['View Company Information', 'Edit Company Information'] }
       ],
       accessRights: ['View Company Information', 'Edit Company Information', 'View Users List', 'Delete User', 'Invite User', 'Delete User Invitations', 'View Invitations List']
-    },
+    }
   ];
-
 
   const toggleExpand = (index) => {
     setExpandedItems(prev => ({ ...prev, [index]: !prev[index] }));
@@ -141,11 +148,37 @@ const Sidebar = ({ user }) => {
           boxSizing: 'border-box',
           mt: '64px',
           height: 'calc(100% - 64px)',
+          backgroundColor: '#f8f9fa',
+          borderRight: '1px solid rgba(0,0,0,0.1)',
+          '&::-webkit-scrollbar': {
+            width: '6px',
+            background: 'transparent',
+          },
+          '&::-webkit-scrollbar-track': {
+            background: 'rgba(0,0,0,0.03)',
+            borderRadius: '3px',
+            margin: '4px'
+          },
+          '&::-webkit-scrollbar-thumb': {
+            background: 'rgba(0,97,168,0.2)',
+            borderRadius: '3px',
+            '&:hover': {
+              background: 'rgba(0,97,168,0.3)'
+            },
+            '&:active': {
+              background: 'rgba(0,97,168,0.4)'
+            }
+          }
         },
       }}
     >
-      <Box sx={{ overflow: 'auto' }}>
-        <List>
+      <Box sx={{
+        overflow: 'auto',
+        height: '100%',
+        py: 1,
+        scrollBehavior: 'smooth',
+      }}>
+        <List sx={{ px: 1 }}>
           {navItems.map((item, index) => (
             canAccessNavItem(item) && (
               <React.Fragment key={index}>
@@ -153,15 +186,35 @@ const Sidebar = ({ user }) => {
                   button
                   onClick={() => item.children.length > 0 ? toggleExpand(index) : handleNavigation(item.path)}
                   sx={{
-                    bgcolor: isActive(item.path) ? 'action.selected' : 'inherit',
+                    borderRadius: '8px',
+                    mb: 0.5,
+                    color: '#2c3e50',
                     '&:hover': {
-                      bgcolor: 'action.hover',
+                      backgroundColor: 'rgba(0,97,168,0.08)',
                     },
+                    ...(isActive(item.path) && {
+                      backgroundColor: 'rgba(0,97,168,0.12)',
+                      color: '#0061a8',
+                      fontWeight: 500,
+                    })
                   }}
                 >
-                  <ListItemIcon>{item.icon}</ListItemIcon>
-                  <ListItemText primary={item.name} />
-                  {item.children.length > 0 && (expandedItems[index] ? <ExpandLess /> : <ExpandMore />)}
+                  <ListItemIcon sx={{
+                    color: isActive(item.path) ? '#0061a8' : '#2c3e50',
+                    minWidth: '36px'
+                  }}>
+                    {item.icon}
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={item.name}
+                    primaryTypographyProps={{
+                      fontSize: '0.95rem',
+                      fontWeight: isActive(item.path) ? 500 : 400
+                    }}
+                  />
+                  {item.children.length > 0 && (
+                    expandedItems[index] ? <ExpandLess /> : <ExpandMore />
+                  )}
                 </ListItem>
                 {item.children.length > 0 && (
                   <Collapse in={expandedItems[index]} timeout="auto" unmountOnExit>
@@ -173,19 +226,37 @@ const Sidebar = ({ user }) => {
                             key={subIndex}
                             sx={{
                               pl: 4,
-                              bgcolor: isActive(item.path, subitem) ? 'action.selected' : 'inherit',
+                              borderRadius: '8px',
+                              mb: 0.5,
+                              position: 'relative', // Absolute positioning of side bar
+                              color: '#2c3e50',
                               '&:hover': {
-                                bgcolor: 'action.hover',
+                                backgroundColor: 'rgba(0,97,168,0.08)',
                               },
+                              ...(isActive(item.path, subitem) && {
+                                backgroundColor: 'rgba(0,97,168,0.12)',
+                                color: '#0061a8',
+                                '&::before': {  // Blue side bar
+                                  content: '""',
+                                  position: 'absolute',
+                                  left: 0,
+                                  top: '50%',
+                                  transform: 'translateY(-50%)',
+                                  height: '60%',
+                                  width: '3px',
+                                  backgroundColor: '#0061a8',
+                                  borderRadius: '0 3px 3px 0'
+                                }
+                              })
                             }}
                             onClick={() => handleNavigation(item.path, subitem.name)}
                           >
                             <ListItemText
                               primary={subitem.name}
                               primaryTypographyProps={{
-                                style: {
-                                  fontWeight: isActive(item.path, subitem) ? 'bold' : 'normal',
-                                }
+                                fontSize: '0.875rem',
+                                fontWeight: isActive(item.path, subitem) ? 600 : 400, // Bold text when active
+                                color: isActive(item.path, subitem) ? '#0061a8' : 'inherit'
                               }}
                             />
                           </ListItem>
