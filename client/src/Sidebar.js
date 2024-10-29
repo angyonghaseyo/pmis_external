@@ -82,11 +82,12 @@ const Sidebar = ({ user }) => {
         { name: 'Cargo Manifest', accessRights: ['View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest'] },
         { name: 'Container Pricing Manager', accessRights: ['Create Container Pricings', 'View Container Pricings'] },
         { name: 'Container Menu', accessRights: ['Create Container Menu', 'View Container Menu'] },
+        { name: 'Container Requests List', accessRights: ['View Container Requests', 'Approve Container Requests'] },
 
       ],
       accessRights: ['abc', 'View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest',
         'Create Container Request', 'View Container Request', 'Create Container Pricings', 'View Container Pricings',
-        'Create Container Menu', 'View Container Menu', 'Register Truck', 'View Truck Registrations']
+        'Create Container Menu', 'View Container Menu', 'Register Truck', 'View Truck Registrations', 'View Container Requests', 'Approve Container Requests']
     },
     {
       name: "Customs and Trade Documents",
