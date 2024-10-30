@@ -581,17 +581,38 @@ app.get('/inquiries-feedback/:userId', async (req, res) => {
         const querySnapshot = await q.get();
         const results = querySnapshot.docs.map(doc => {
             const data = doc.data();
+            
+            // Handle different timestamp formats and cases
+            let formattedCreatedAt = null;
+            if (data.createdAt) {
+                if (data.createdAt instanceof admin.firestore.Timestamp) {
+                    // Handle Firestore Timestamp
+                    formattedCreatedAt = data.createdAt.toDate();
+                } else if (data.createdAt._seconds || data.createdAt.seconds) {
+                    // Handle timestamp stored as seconds
+                    const seconds = data.createdAt._seconds || data.createdAt.seconds;
+                    formattedCreatedAt = new Date(seconds * 1000);
+                } else if (typeof data.createdAt === 'string') {
+                    // Handle ISO string format
+                    formattedCreatedAt = new Date(data.createdAt);
+                }
+            }
+
             return {
                 id: doc.id,
                 ...data,
-                createdAt: data.createdAt.toDate() // Convert Firestore Timestamp to JavaScript Date
+                createdAt: formattedCreatedAt || new Date() // Fallback to current date if no valid timestamp
             };
         });
-        console.log(results)
+
+        console.log('Processed results:', results);
         res.status(200).json(results);
     } catch (error) {
         console.error('Error fetching inquiries and feedback:', error);
-        res.status(500).send('Error fetching inquiries and feedback.');
+        res.status(500).json({
+            error: 'Error fetching inquiries and feedback',
+            details: error.message
+        });
     }
 });
 
