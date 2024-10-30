@@ -674,6 +674,10 @@ export const updateEmployee = (employeeId, data) =>
 // Vessel Visits
 export const getVesselVisits = () => authAxios.get('/vessel-visits').catch(handleApiError);
 
+export const getVesselVisitsConfirmedWithoutManifests = () => {
+  return axios.get('/vessel-visits-confirmed-without-manifests').catch(handleApiError);
+}
+
 export const createVesselVisit = (visitData) =>
   authAxios.post('/vessel-visits', visitData).catch(handleApiError);
 

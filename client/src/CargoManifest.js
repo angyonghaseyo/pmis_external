@@ -94,7 +94,7 @@ const CargoManifest = () => {
   };
   const fetchVesselVisits = async () => {
     try {
-      const response = await fetch('http://localhost:5001/vessel-visits');
+      const response = await fetch('http://localhost:5001/vessel-visits-confirmed-without-manifests');
       if (!response.ok) {
         throw new Error('Failed to fetch vessel visits');
       }

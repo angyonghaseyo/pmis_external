@@ -283,31 +283,44 @@ app.post('/simulate-asset-test-data', async (req, res) => {
     }
 });
 
-
 // Endpoint to fetch vessel visits
 app.get('/vessel-visits', async (req, res) => {
     try {
+    const querySnapshot = await db.collection('vesselVisitRequests').get();
+    const visitsArray = querySnapshot.docs.map((doc) => ({
+    documentId: doc.id,
+     ...doc.data(),
+    }));
+    res.status(200).json(visitsArray);
+    } catch (error) {
+    console.error('Error fetching vessel visits:', error);
+    res.status(500).send('Error fetching vessel visits.');
+    }
+    });
+
+app.get('/vessel-visits-confirmed-without-manifests', async (req, res) => {
+    try {
         // Access `cargo_manifests` collection and get IMO numbers
-const manifestsRef = db.collection("cargo_manifests");
-const manifestsSnapshot = await manifestsRef.get();
-const existingManifestIMOs = new Set(
-  manifestsSnapshot.docs.map(doc => doc.data().imoNumber)
-);
+        const manifestsRef = db.collection("cargo_manifests");
+        const manifestsSnapshot = await manifestsRef.get();
+        const existingManifestIMOs = new Set(
+        manifestsSnapshot.docs.map(doc => doc.data().imoNumber)
+        );
 
-// Access `vesselVisitRequests` collection and query confirmed vessel visits
-const vesselVisitRequestsRef = db.collection("vesselVisitRequests");
-const q = vesselVisitRequestsRef.where("status", "==", "confirmed");
-const querySnapshot = await q.get();
+        // Access `vesselVisitRequests` collection and query confirmed vessel visits
+        const vesselVisitRequestsRef = db.collection("vesselVisitRequests");
+        const q = vesselVisitRequestsRef.where("status", "==", "confirmed");
+        const querySnapshot = await q.get();
 
-// Filter out vessels that already have manifests
-const vesselVisitsData = querySnapshot.docs
-  .map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  }))
-  .filter(visit => !existingManifestIMOs.has(visit.imoNumber));
-console.log("HI",vesselVisitsData);
-res.status(200).json(vesselVisitsData);
+        // Filter out vessels that already have manifests
+        const vesselVisitsData = querySnapshot.docs
+        .map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }))
+        .filter(visit => !existingManifestIMOs.has(visit.imoNumber));
+        console.log("HI",vesselVisitsData);
+        res.status(200).json(vesselVisitsData);
 
     } catch (error) {
         console.error('Error fetching vessel visits:', error);
