@@ -17,9 +17,6 @@ import OperatorRequisition from './OperatorRequisition';
 import VesselVisits from './VesselVisits';
 import CargoManifest from './CargoManifest'; // Add this import
 import { Box, CssBaseline, CircularProgress } from '@mui/material';
-import { simulateBerthTestData } from './SimulateBerthTestData';
-import { simulateManpowerTestData } from './SimulateManpowerTestData';
-import { simulateAssetTestData } from './SimulateAssetTestData';
 import ContainerRequest from './ContainerRequest';
 import ContainerPricingManager from './ContainerPricingManager';
 import BookingForm from './BookingForm';
@@ -36,52 +33,16 @@ function App() {
   const { user, login, logout } = useAuth();
   const [loading, setLoading] = useState(true);
 
-  const runSimulations = useCallback(async () => {
-    console.log("Starting simulations...");
-
-    try {
-      const berthResponse = await fetch('http://localhost:5001/simulate-berth-test-data', {
-        method: 'POST',
-      });
-
-      if (!berthResponse.ok) {
-        throw new Error('Failed to simulate berth test data');
-      }
-      // console.log("FacilityList data simulation completed.");
-
-      const manpowerResponse = await fetch('http://localhost:5001/simulate-manpower-test-data', {
-        method: 'POST',
-      });
-
-      if (!manpowerResponse.ok) {
-        throw new Error('Failed to simulate manpower test data');
-      }
-      // console.log("Manpower data simulation completed.");
-
-      const assetResponse = await fetch('http://localhost:5001/simulate-asset-test-data', {
-        method: 'POST',
-      });
-
-      if (!assetResponse.ok) {
-        throw new Error('Failed to simulate asset test data');
-      }
-      // console.log("Asset data simulation completed.");
-    } catch (error) {
-      console.error("Error running simulations:", error);
-    }
-  }, []);
-
   useEffect(() => {
     const token = localStorage.getItem('authToken');
     if (token) {
       const decodedToken = jwtDecode(token);
       setLoading(false);
 
-      runSimulations();
     } else {
       setLoading(false);
     }
-  }, [runSimulations, login]);
+  }, [login]);
 
   const hasAccessRights = (requiredRights) => {
     // console.log('User access rights:', user?.accessRights);
