@@ -46,6 +46,9 @@ import {
 import {
   getStorage,
   ref,
+  getDownloadURL,
+  uploadBytes,
+  listAll,
   deleteObject,
 } from "firebase/storage";
 import { useAuth } from './AuthContext';
@@ -121,7 +124,6 @@ const VesselVisits = () => {
     fetchData();
   }, []);
 
-
   const fetchVesselVisits = async () => {
     try {
       const response = await fetch('http://localhost:5001/vessel-visits');
@@ -150,7 +152,7 @@ const VesselVisits = () => {
 
 
   async function checkAssetAvailability(vesselVisitRequest) {
-    const { eta, etd, containersOffloaded, containersOnloaded } =
+    const { imoNumber, eta, etd, containersOffloaded, containersOnloaded } =
       vesselVisitRequest;
     // Initialize required assets count
     let requiredCranes = 0;
@@ -199,8 +201,8 @@ const VesselVisits = () => {
         ) {
           console.log(
             "Berth " +
-            asset.name +
-            "is not available because it has been reserved"
+              asset.name +
+              "is not available because it has been reserved"
           );
           return false;
         }
@@ -211,15 +213,16 @@ const VesselVisits = () => {
     // 1. Check cranes availability
     let craneCapacityPerHour = 0;
     let craneCount = 0;
+    let craneArray = [];
     for (const crane of cranes) {
       if (isAssetAvailable(crane, eta, etd)) {
         console.log(
           "Crane with id " +
-          crane.name +
-          " is available time-wise and is being demand checked"
+            crane.name +
+            " is available time-wise and is being demand checked"
         );
-        craneCapacityPerHour += crane.numberOfContainers;
-        craneCount += 1;
+        craneArray.push(crane);
+        craneCapacityPerHour += +crane.numberOfContainers; // Unary + to coerce to number
         requiredCranes += 1; // Add to required cranes
         const requiredHoursForCranes = totalContainers / craneCapacityPerHour;
         // If required hours exceed the available time window, return false
@@ -238,6 +241,22 @@ const VesselVisits = () => {
           console.log(
             "there is enough cranes with a quantity of " + requiredCranes
           );
+          //I need to update the crane's bookedPeriod map. key: vessel's IMO number value: [eta, etd]
+          craneArray.forEach((crane) => {
+            crane.bookedPeriod[imoNumber] = [
+              eta.toISOString(),
+              etd.toISOString(),
+            ];
+          });
+          //Next I need to setDoc
+          const toBeUpdatedDocRef = doc(db, "assets", crane.name);
+          await setDoc(toBeUpdatedDocRef, crane)
+            .then(() => {
+              console.log("Document successfully replaced");
+            })
+            .catch((error) => {
+              console.error("Error replacing document: ", error);
+            });
           cranePass = true;
           break;
         }
@@ -249,15 +268,19 @@ const VesselVisits = () => {
     let truckCount = 0;
     for (const truck of trucks) {
       console.log(
-        "Truck with id" +
-        truck.name +
-        "is available and is being demand checked"
+        "Truck with id " +
+          truck.name +
+          "is available and is being demand checked"
       );
       if (isAssetAvailable(truck, eta, etd)) {
-        truckCapacityPerHour += truck.numberOfContainers;
+        truckCapacityPerHour += +truck.numberOfContainers;
         truckCount += 1;
         requiredTrucks += 1; // Add to required trucks
         const requiredHoursForTrucks = totalContainers / truckCapacityPerHour;
+        console.log("totalContainers is " + totalContainers);
+        console.log("truckCapacityPerHour is " + truckCapacityPerHour);
+        console.log("requiredHoursForTrucks is " + requiredHoursForTrucks);
+        console.log("totalAvailableHours is " + totalAvailableHours);
         // If required hours exceed the available time window, return false
         if (requiredHoursForTrucks > totalAvailableHours) {
           console.log(
@@ -268,6 +291,10 @@ const VesselVisits = () => {
           console.log(
             "there is enough trucks with a quantity of " + requiredTrucks
           );
+          truck.bookedPeriod[imoNumber] = [
+            eta.toISOString(),
+            etd.toISOString(),
+          ];
           truckPass = true;
           break;
         }
@@ -279,11 +306,17 @@ const VesselVisits = () => {
     let stackerCount = 0;
     for (const stacker of reachStackers) {
       if (isAssetAvailable(stacker, eta, etd)) {
-        stackerCapacityPerHour += stacker.numberOfContainers;
+        stackerCapacityPerHour += +stacker.numberOfContainers;
         stackerCount += 1;
         requiredReachStackers += 1; // Add to required reach stackers
         const requiredHoursForReachStackers =
           totalContainersForReachStackerOnly / stackerCapacityPerHour;
+        console.log("totalContainers is " + totalContainers);
+        console.log("stackerCapacityPerHour is " + stackerCapacityPerHour);
+        console.log(
+          "requiredHoursForReachStackers is " + requiredHoursForReachStackers
+        );
+        console.log("totalAvailableHours is " + totalAvailableHours);
         // If required hours exceed the available time window, return false
         if (requiredHoursForReachStackers > totalAvailableHours) {
           console.log(
@@ -296,8 +329,12 @@ const VesselVisits = () => {
         ) {
           console.log(
             "there is enough reach stackers with a quantity of " +
-            requiredReachStackers
+              requiredReachStackers
           );
+          stacker.bookedPeriod[imoNumber] = [
+            eta.toISOString(),
+            etd.toISOString(),
+          ];
           reachStackerPass = true;
           break;
         }
@@ -343,10 +380,16 @@ const VesselVisits = () => {
       const data = await response.json();
       return data;
     } catch (error) {
-      console.error('Error checking facility availability:', error);
-      throw error;
+      console.error("Error checking facility availability:", error);
+      return {
+        success: false,
+        assignedBerth: "",
+        adjustedEta: eta,
+        adjustedEtd: etd,
+      };
     }
   };
+
   const checkManpowerAvailability = async (vesselVisitRequest) => {
     try {
       const {
@@ -355,193 +398,143 @@ const VesselVisits = () => {
         numberOfCranesNeeded,
         numberOfTrucksNeeded,
         numberOfReachStackersNeeded,
+        scheduleJson,
       } = vesselVisitRequest;
 
       console.log("Received vesselVisitRequest:", vesselVisitRequest);
-      let totalCranesAvailable = 0;
-      let totalTrucksAvailable = 0;
-      let totalReachStackersAvailable = 0;
-      // The ETA and ETD are in UTC (from Date.toISOString())
-      const etaDateUTC = new Date(eta.getTime() + 8 * 60 * 60 * 1000); // ETA in UTC
-      const etdDateUTC = new Date(etd.getTime() + 8 * 60 * 60 * 1000); // ETD in UTC new Date(etaDateUTC.getTime() + 8 * 60 * 60 * 1000);
+
+      // Convert ETA and ETD to local time (UTC+8)
+      const etaDateUTC = new Date(eta.getTime() + 8 * 60 * 60 * 1000); // ETA in UTC+8
+      const etdDateUTC = new Date(etd.getTime() + 8 * 60 * 60 * 1000); // ETD in UTC+8
 
       console.log("Converted ETA (UTC):", etaDateUTC);
       console.log("Converted ETD (UTC):", etdDateUTC);
 
-      // Extract just the date part (YYYY-MM-DD) from ETA and ETD
-      const etaString = etaDateUTC.toISOString().split("T")[0];
-      const etdString = etdDateUTC.toISOString().split("T")[0];
-
-      console.log("ETA Date (UTC)X:", etaString);
-      console.log("ETD Date (UTC)X:", etdString);
-
-      // Define shift periods (in UTC, adjusted from Singapore time)
-      const shifts = [
-        { start: "16:00", end: "00:00", label: "00:00-08:00" },
-        { start: "00:00", end: "08:00", label: "08:00-16:00" },
-        { start: "08:00", end: "16:00", label: "16:00-24:00" },
+      // Define roles that we need to check availability for
+      const rolesToCheck = [
+        { role: "Crane Operator", required: numberOfCranesNeeded },
+        { role: "Truck Operator", required: numberOfTrucksNeeded },
+        {
+          role: "Reach Stacker Operator",
+          required: numberOfReachStackersNeeded,
+        },
       ];
 
-      console.log("Defined shifts in UTC:", shifts);
-
-      // Loop through the dates and shifts, finding relevant schedules
-      let loopCount = 0; // Initialize a counter
-      let queriedSchedules = [];
-      let currentDate = new Date(etaDateUTC);
-      while (currentDate <= etdDateUTC) {
-        const currentDateString = currentDate.toISOString().split("T")[0];
-
-        console.log(`Checking date: ${currentDateString}`);
-
-        shifts.forEach((shift) => {
-          console.log(
-            `Adding shift ${shift.label} for date ${currentDateString}`
-          );
-          queriedSchedules.push({
-            date: currentDateString,
-            shift: shift.label,
-          });
-        });
-        currentDate.setDate(currentDate.getDate() + 1); // Move to the next day
-        loopCount++;
+      // Helper function to check if an employee's schedule can cover the given ETA to ETD period
+      function canCoverTime(scheduleJson, eta, etd) {
+        const etaDate = new Date(eta);
+        const etdDate = new Date(etd);
+      
+        // // Loop through each hour within the range from ETA to ETD
+        // for (let currentHour = new Date(etaDate); currentHour <= etdDate; currentHour.setHours(currentHour.getHours() + 1)) {
+        //   const hourStr = currentHour.getHours().toString().padStart(2, "0") + ":00"; // Format hour as "HH:00"
+          
+        //   // Format the date as 'dd/mm/yy'
+        //   const day = currentHour.getDate().toString().padStart(2, "0");
+        //   const month = (currentHour.getMonth() + 1).toString().padStart(2, "0");
+        //   const year = currentHour.getFullYear().toString().slice(-2);
+        //   const currentDay = `${day}/${month}/${year}`; // Format as 'dd/mm/yy'
+      
+        //   // Check if the hour and day exist in the scheduleJson and are marked as "Scheduled shift"
+        //   if (
+        //     !scheduleJson[hourStr] || // If this hour doesn't exist in the scheduleJson
+        //     !scheduleJson[hourStr][currentDay] || // If this specific day within the hour doesn't exist
+        //     scheduleJson[hourStr][currentDay] !== "Scheduled shift" // If the status is not "Scheduled shift"
+        //   ) {
+        //     return false; // Employee is not available for this hour
+        //   }
+        // }
+      
+        return true; // Employee is available for the entire period from ETA to ETD
       }
+      
+      
+      
+      
+      
 
-      console.log("Total queried schedules:", queriedSchedules);
+      // Array to hold arrays of employee IDs per role
+      const roleEmployeeIds = {};
 
-      // Start
-      // Query Firebase for schedules with only one condition (startDate <= etdString)
-      const schedulesRef = collection(db, "denzel_work_schedule");
-      const scheduleQuery = query(
-        schedulesRef,
-        where("startDate", "<=", etdString) // Only apply one inequality filter on startDate
-      );
+      // Scan through the collection of employees
+      const employeeCollectionRef = collection(db, "employees");
+      const employeeSnapshot = await getDocs(employeeCollectionRef);
 
-      const scheduleSnapshot = await getDocs(scheduleQuery);
-
-      console.log(
-        "Firebase query completed. Filtering schedules based on other conditions..."
-      );
-
-      // Filter results manually for the other two conditions: endDate and timePeriod
-      const filteredSchedules = scheduleSnapshot.docs.filter((doc) => {
-        const schedule = doc.data();
-        console.log("Checking schedule:", schedule);
-
-        const endDateCheck = schedule.endDate >= etaString; // Manually filter for endDate >= etaString
-        const timePeriodCheck = queriedSchedules.some(
-          (qs) => qs.shift === schedule.timePeriod
-        ); // Manually check timePeriod
-
-        // Step 4: Loop through the assignedUsers map
-        if (schedule.assignedUsers) {
-          // Convert the map into an array and iterate through it
-          Object.values(schedule.assignedUsers).forEach((user) => {
-            if (user.role === "Crane Operator") {
-              totalCranesAvailable += 1;
-            }
-            if (user.role === "Truck Operator") {
-              totalTrucksAvailable += 1;
-            }
-            if (user.role === "Reach Stacker Operator") {
-              totalReachStackersAvailable += 1;
-            }
-          });
-        }
-
-        return endDateCheck && timePeriodCheck; // Return true if both conditions are satisfied
+      // Initialize arrays for each role
+      rolesToCheck.forEach((roleCheck) => {
+        roleEmployeeIds[roleCheck.role] = [];
       });
 
-      console.log(
-        "Filtered schedules after all conditions:",
-        filteredSchedules
-      );
+      // Go through each employee document
+      employeeSnapshot.forEach((doc) => {
+        const employeeData = doc.data();
+        const employeeRole = employeeData.userRole;
 
-      // If fewer schedules than required are found, return false
-      if (filteredSchedules.length * loopCount < queriedSchedules.length) {
-        console.log("Insufficient schedules found.");
-        return {
-          success: false,
-          message: "Insufficient manpower for the vessel visit.",
-        };
-      }
-      //End
-      // Initialize counters for required roles (crane operators, truck operators)
+        // Check if this employee's role matches any of the roles we need to check
+        rolesToCheck.forEach((roleCheck) => {
+          if (employeeRole === roleCheck.role) {
+            // Store the employee ID in the respective array
+            roleEmployeeIds[roleCheck.role].push(employeeData.employeeId);
+          }
+        });
+      });
 
-      // scheduleSnapshot.forEach((doc) => {
-      //   const scheduleData = doc.data();
-      //   console.log("Processing schedule data:", scheduleData);
-      // });
+      console.log("Employee IDs per role:", roleEmployeeIds);
 
-      console.log("Total Cranes Available:", totalCranesAvailable);
-      console.log("Total Trucks Available:", totalTrucksAvailable);
-      console.log(
-        "Total Reach stackers Available:",
-        totalReachStackersAvailable
-      );
+      // Now check if we have enough employees for each role
+      const missingRoles = [];
 
-      // Calculate missing workers for each role
-      const missingCranes = numberOfCranesNeeded - totalCranesAvailable;
-      const missingTrucks = numberOfTrucksNeeded - totalTrucksAvailable;
-      const missingReachStackers =
-        numberOfReachStackersNeeded - totalReachStackersAvailable;
-
-      console.log("Missing Cranes:", missingCranes > 0 ? missingCranes : 0);
-      console.log("Missing Trucks:", missingTrucks > 0 ? missingTrucks : 0);
-      console.log(
-        "Missing Trucks:",
-        missingReachStackers > 0 ? missingReachStackers : 0
-      );
-
-      // Compare total available manpower with required manpower
-      const cranesSufficient = totalCranesAvailable >= numberOfCranesNeeded;
-      const trucksSufficient = totalTrucksAvailable >= numberOfTrucksNeeded;
-      const reachStackersSufficient =
-        totalReachStackersAvailable >= numberOfReachStackersNeeded;
-
-      console.log("Cranes Sufficient:", cranesSufficient);
-      console.log("Trucks Sufficient:", trucksSufficient);
-      console.log("Trucks Sufficient:", reachStackersSufficient);
-
-      // Return true if sufficient manpower is found, false otherwise with missing details
-      if (cranesSufficient && trucksSufficient && reachStackersSufficient) {
-        console.log("Sufficient manpower available.");
-        return {
-          success: true,
-          message: "Sufficient manpower for the vessel visit.",
-        };
-      } else {
-        const missingRoles = [];
-        if (missingCranes > 0) {
-          missingRoles.push({ role: "Crane Operator", missing: missingCranes });
-        }
-        if (missingTrucks > 0) {
-          missingRoles.push({ role: "Truck Operator", missing: missingTrucks });
-        }
-        if (missingTrucks > 0) {
+      rolesToCheck.forEach((roleCheck) => {
+        const availableEmployees = roleEmployeeIds[roleCheck.role].length;
+        const workersWhoCanCover = []; // To keep track of workers who can cover the visit
+      
+        if (availableEmployees < roleCheck.required) {
           missingRoles.push({
-            role: "Reach Stacker Operator",
-            missing: missingReachStackers,
+            role: roleCheck.role,
+            missing: roleCheck.required - availableEmployees,
           });
+        } else {
+          // Check each employee's schedule to see if they can cover the required hours
+          const etaDateUTC = new Date(eta);
+          const etdDateUTC = new Date(etd);
+          
+          // Loop through all employees for the current role
+          roleEmployeeIds[roleCheck.role].forEach((employeeId) => {
+            // Get the employee's schedule JSON (this might be retrieved from a Firestore collection or provided as scheduleJson)
+            const employeeSchedule = scheduleJson; // Assuming scheduleJson is an object with employeeId as keys
+      
+            // Check if the employee can cover the required time range
+            if (canCoverTime(employeeSchedule, etaDateUTC, etdDateUTC)) {
+              workersWhoCanCover.push(employeeId);
+            }
+          });
+      
+          // Now, check if the number of workers who can cover the visit is sufficient
+          if (workersWhoCanCover.length < roleCheck.required) {
+            missingRoles.push({
+              role: roleCheck.role,
+              missing: roleCheck.required - workersWhoCanCover.length,
+            });
+          }
         }
+      });
+      
 
-        console.log(
-          "Insufficient manpower available. Missing roles:",
-          missingRoles
-        );
-
+      if (missingRoles.length > 0) {
         return {
           success: false,
-          message: "Insufficient manpower for the vessel visit.",
-          missingRoles: missingRoles,
+          message: "Not enough employees for one or more roles.",
+          missingRoles,
         };
       }
+
+      return {
+        success: true,
+        message: "Sufficient employees for all roles.",
+      };
     } catch (error) {
       console.error("Error checking manpower availability:", error);
-      // Ensure that it returns an object even on failure
-      return {
-        success: false,
-        message: "Error occurred while checking manpower availability.",
-      };
+      throw new Error("Failed to check manpower availability");
     }
   };
 
@@ -560,6 +553,7 @@ const VesselVisits = () => {
 
       // Step 2: Check asset availability
       const assetsDemandCheckBooleanAndQuantity = await checkAssetAvailability({
+        imoNumber: formData.imoNumber,
         eta: formData.eta,
         etd: formData.etd,
         containersOffloaded: formData.containersOffloaded,
@@ -570,9 +564,14 @@ const VesselVisits = () => {
       const manpowerDemandCheckBoolean = await checkManpowerAvailability({
         eta: formData.eta,
         etd: formData.etd,
-        numberOfCranesNeeded: 1,
-        numberOfTrucksNeeded: 1,
-        numberOfReachStackersNeeded: 1,
+        numberOfCranesNeeded:
+          assetsDemandCheckBooleanAndQuantity.requiredAssets.requiredCranes,
+        numberOfTrucksNeeded:
+          assetsDemandCheckBooleanAndQuantity.requiredAssets.requiredTrucks,
+        numberOfReachStackersNeeded:
+          assetsDemandCheckBooleanAndQuantity.requiredAssets
+            .requiredReachStackers,
+            scheduleJson: formData.scheduleJson,
       });
 
       // Handle the result of manpower check
@@ -812,6 +811,7 @@ const VesselVisits = () => {
     console.log(resourceCheck);
 
     // The dates are already stored in ISO format in formData
+    if (resourceCheck.facilitiesDemandCheckBooleanAndBerth?.success) {
     const newVisit = {
       vesselName: formData.vesselName,
       imoNumber: formData.imoNumber,
@@ -853,8 +853,8 @@ const VesselVisits = () => {
       // status for UI purposes
       status:
         resourceCheck.manpowerDemandCheckBoolean.success &&
-          resourceCheck.assetsDemandCheckBooleanAndQuantity.success &&
-          resourceCheck.facilitiesDemandCheckBooleanAndBerth.success
+        resourceCheck.assetsDemandCheckBooleanAndQuantity.success &&
+        resourceCheck.facilitiesDemandCheckBooleanAndBerth.success
           ? "confirmed"
           : "pending user intervention",
       vesselGridCount:
@@ -868,7 +868,7 @@ const VesselVisits = () => {
       stowageplan: formData.stowageplan, // Store the parsed stowage plan array
       visitType: formData.visitType,
     };
-
+  
     try {
       // Parsing the CSV file and storing as an array of objects (instead of URL)
       const parsedCSVData = await parseCSVFile(selectedFile);
@@ -879,10 +879,11 @@ const VesselVisits = () => {
       console.error("Error parsing the CSV file:", error);
       return; // Exit the function if CSV parsing fails
     }
-
+  
+  
     try {
       const docRef = doc(db, "vesselVisitRequests", formData.imoNumber);
-      await setDoc(docRef, newVisit);
+      await setDoc(docRef, newVisit, { merge: false });
 
       if (editingId) {
         // Editing an existing record: update the corresponding entry in vesselVisitsData
@@ -908,6 +909,7 @@ const VesselVisits = () => {
     } catch (error) {
       console.error("Error adding or updating document: ", error);
     }
+  }
   };
 
   const handleDelete = async (id) => {
@@ -1035,25 +1037,25 @@ const VesselVisits = () => {
                   <TableCell>
                     {visit.eta
                       ? new Date(visit.eta).toLocaleString("en-SG", {
-                        hour12: true,
-                        year: "numeric",
-                        month: "2-digit",
-                        day: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
+                          hour12: true,
+                          year: "numeric",
+                          month: "2-digit",
+                          day: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
                       : "Invalid Date"}
                   </TableCell>
                   <TableCell>
                     {visit.etd
                       ? new Date(visit.etd).toLocaleString("en-SG", {
-                        hour12: true,
-                        year: "numeric",
-                        month: "2-digit",
-                        day: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
+                          hour12: true,
+                          year: "numeric",
+                          month: "2-digit",
+                          day: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
                       : "Invalid Date"}
                   </TableCell>{" "}
                   {/* ISO string */}
@@ -1107,12 +1109,12 @@ const VesselVisits = () => {
                 onChange={handleChange}
                 fullWidth
                 required
-              // disabled={!!formData.vesselName}
-              // helperText={
-              //   formData.vesselName
-              //     ? "This field cannot be edited after it is set"
-              //     : ""
-              // }
+                // disabled={!!formData.vesselName}
+                // helperText={
+                //   formData.vesselName
+                //     ? "This field cannot be edited after it is set"
+                //     : ""
+                // }
               />
             </Grid>
             <Grid item xs={6}>
@@ -1124,12 +1126,12 @@ const VesselVisits = () => {
                 onChange={handleChange}
                 fullWidth
                 required
-              // disabled={!!formData.imoNumber}
-              // helperText={
-              //   formData.imoNumber
-              //     ? "This field cannot be edited after it is set"
-              //     : ""
-              // }
+                // disabled={!!formData.imoNumber}
+                // helperText={
+                //   formData.imoNumber
+                //     ? "This field cannot be edited after it is set"
+                //     : ""
+                // }
               />
             </Grid>
             <Grid item xs={6}>
