@@ -1,9 +1,5 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { doc, setDoc, getDoc, updateDoc, increment } from 'firebase/firestore';
-import { auth, storage, db } from './firebaseConfig';
 import './AuthForms.css';
 
 const teams = [
