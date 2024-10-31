@@ -66,6 +66,9 @@ const BookingForm = ({ user }) => {
   });
   const [bookingData, setBookingData] = useState([]);
   const [uploadStatus, setUploadStatus] = useState({});
+  const [vesselVisits, setVesselVisits] = useState([]);
+  const [selectedVessel, setSelectedVessel] = useState('');
+  const [availableVoyages, setAvailableVoyages] = useState([]);
 
   const cargoTypes = [
     "General Cargo",
@@ -92,6 +95,48 @@ const BookingForm = ({ user }) => {
     };
     fetchBookings();
   }, []);
+
+  useEffect(() => {
+    const fetchVesselVisits = async () => {
+      const querySnapshot = await getDocs(collection(db, "vesselVisitRequests"));
+      const visits = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setVesselVisits(visits);
+    };
+    fetchVesselVisits();
+  }, []);
+
+  const handleVesselChange = (event) => {
+    const selectedVesselName = event.target.value;
+    setSelectedVessel(selectedVesselName);
+
+    // Find the selected vessel's voyages
+    const selectedVesselData = vesselVisits.find(visit => visit.vesselName === selectedVesselName);
+    setAvailableVoyages(selectedVesselData?.voyages || []);
+
+    setFormData(prev => ({
+      ...prev,
+      vesselName: selectedVesselName,
+      voyageNumber: '',
+      portLoading: '',
+      portDestination: ''
+    }));
+  };
+
+  const handleVoyageChange = (event) => {
+    const selectedVoyageNumber = event.target.value;
+    const selectedVoyage = availableVoyages.find(v => v.voyageNumber === selectedVoyageNumber);
+
+    setFormData(prev => ({
+      ...prev,
+      voyageNumber: selectedVoyageNumber,
+      portLoading: selectedVoyage?.departurePort || '',
+      portDestination: selectedVoyage?.arrivalPort || ''
+    }));
+  };
+
 
   const handleOpenDialog = (booking = null) => {
     if (booking) {
@@ -617,6 +662,42 @@ const BookingForm = ({ user }) => {
         </DialogTitle>
         <DialogContent>
           <Grid container spacing={2}>
+
+            <Grid item xs={6}>
+              <FormControl fullWidth required>
+                <InputLabel>Vessel Name</InputLabel>
+                <Select
+                  value={selectedVessel}
+                  onChange={handleVesselChange}
+                  label="Vessel Name"
+                >
+                  {vesselVisits.map((visit) => (
+                    <MenuItem key={visit.vesselName} value={visit.vesselName}>
+                      {visit.vesselName}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={6}>
+              <FormControl fullWidth required disabled={!selectedVessel}>
+                <InputLabel>Voyage Number</InputLabel>
+                <Select
+                  value={formData.voyageNumber || ''}
+                  onChange={handleVoyageChange}
+                  label="Voyage Number"
+                >
+                  {availableVoyages.map((voyage) => (
+                    <MenuItem
+                      key={voyage.voyageNumber}
+                      value={voyage.voyageNumber}
+                    >
+                      {voyage.voyageNumber} ({voyage.departurePort} → {voyage.arrivalPort})
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
             <Grid item xs={6}>
               <TextField
                 label="Pickup Date"
