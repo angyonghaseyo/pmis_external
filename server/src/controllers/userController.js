@@ -3,6 +3,23 @@ class UserController {
         this.userService = userService;
     }
 
+    async getUserProfile(req, res) {
+        const { email } = req.query;
+        try {
+            if (!email) {
+                return res.status(400).send('Email is required');
+            }
+            const userProfile = await this.userService.fetchUserProfile(email);
+            if (!userProfile) {
+                return res.status(404).send('User not found');
+            }
+            res.status(200).json(userProfile);
+        } catch (error) {
+            console.error('Error fetching user profile:', error);
+            res.status(500).send('Error fetching user profile.');
+        }
+    }
+
     async register(req, res) {
         try {
             const { formData, photoFile } = req.body;
@@ -24,19 +41,6 @@ class UserController {
         }
     }
 
-    async getUserProfile(req, res) {
-        const { uid } = req.params;
-        try {
-            const userProfile = await this.userService.fetchUserProfile(uid);
-            if (!userProfile) {
-                return res.status(404).send('User not found');
-            }
-            res.status(200).json(userProfile);
-        } catch (error) {
-            console.error('Error fetching user profile:', error);
-            res.status(500).send('Error fetching user profile.');
-        }
-    }
     async updateUserProfile(req, res) {
         const { email, salutation, firstName, lastName, company, userType } = req.body;
         const photoFile = req.file;
@@ -131,7 +135,6 @@ class UserController {
             res.status(500).send('Error canceling invitation');
         }
     }
-
 }
 
 module.exports = UserController;

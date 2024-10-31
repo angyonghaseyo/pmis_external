@@ -34,7 +34,7 @@ function EditProfile() {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
 
   useEffect(() => {
-    fetchCurrentUserProfile(user.email);
+    fetchCurrentUserProfile();
   }, []);
 
   const fetchProfile = async (email) => {

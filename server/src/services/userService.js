@@ -17,6 +17,15 @@ class UserService {
         this.db = db;
     }
 
+    async fetchUserProfile(email) {
+        const userQuery = await this.db.collection('users').where('email', '==', email).get();
+        if (userQuery.empty) {
+            return null;
+        }
+        const userDoc = userQuery.docs[0];
+        return userDoc.data();
+    }
+
     async registerUser(formData, photoFile) {
         let photoURL = '';
         if (photoFile) {
@@ -72,15 +81,6 @@ class UserService {
 
         const token = jwt.sign({ email, accessRights: userData.accessRights, enrolledPrograms: userData?.enrolledPrograms, company: userData.company, firstName: userData?.firstName, photo: userData?.photoURL }, JWT_SECRET, { expiresIn: '24h' });
         return token;
-    }
-
-    async fetchUserProfile(uid) {
-        const userQuery = await this.db.collection('users').where('email', '==', uid).get();
-        if (userQuery.empty) {
-            return null;
-        }
-        const userDoc = userQuery.docs[0];
-        return userDoc.data();
     }
 
     async updateUserProfile(email, salutation, firstName, lastName, company, userType, photoFile) {
