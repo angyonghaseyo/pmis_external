@@ -381,12 +381,6 @@ const VesselVisits = () => {
       return data;
     } catch (error) {
       console.error("Error checking facility availability:", error);
-      return {
-        success: false,
-        assignedBerth: "",
-        adjustedEta: eta,
-        adjustedEtd: etd,
-      };
     }
   };
 
