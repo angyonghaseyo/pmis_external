@@ -103,6 +103,7 @@ const VesselVisits = () => {
   const [fileError, setFileError] = useState("");
   const fileInputRef = useRef(null); // Create a ref for the file input
   const [downloadURL, setDownloadURL] = useState("");
+  const [deleteConfirmation, setDeleteConfirmation] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -181,8 +182,8 @@ const VesselVisits = () => {
         ) {
           console.log(
             "Berth " +
-              asset.name +
-              "is not available because it has been reserved"
+            asset.name +
+            "is not available because it has been reserved"
           );
           return false;
         }
@@ -198,8 +199,8 @@ const VesselVisits = () => {
       if (isAssetAvailable(crane, eta, etd)) {
         console.log(
           "Crane with id " +
-            crane.name +
-            " is available time-wise and is being demand checked"
+          crane.name +
+          " is available time-wise and is being demand checked"
         );
         craneArray.push(crane);
         craneCapacityPerHour += +crane.numberOfContainers; // Unary + to coerce to number
@@ -249,8 +250,8 @@ const VesselVisits = () => {
     for (const truck of trucks) {
       console.log(
         "Truck with id " +
-          truck.name +
-          "is available and is being demand checked"
+        truck.name +
+        "is available and is being demand checked"
       );
       if (isAssetAvailable(truck, eta, etd)) {
         truckCapacityPerHour += +truck.numberOfContainers;
@@ -309,7 +310,7 @@ const VesselVisits = () => {
         ) {
           console.log(
             "there is enough reach stackers with a quantity of " +
-              requiredReachStackers
+            requiredReachStackers
           );
           stacker.bookedPeriod[imoNumber] = [
             eta.toISOString(),
@@ -361,8 +362,8 @@ const VesselVisits = () => {
         ) {
           console.log(
             "Berth " +
-              facility.name +
-              "is not available because it has been reserved"
+            facility.name +
+            "is not available because it has been reserved"
           );
           return false;
         }
@@ -448,7 +449,7 @@ const VesselVisits = () => {
         let assignedBerth = matchedBerths.pop();
         console.log(
           "The berth that has been assigned to the vessel is " +
-            assignedBerth.name
+          assignedBerth.name
         );
         //I need to update the assignedBerth's bookedPeriod map. key: vessel's IMO number value: [eta, etd]
         assignedBerth.bookedPeriod[formData.imoNumber] = [
@@ -520,17 +521,17 @@ const VesselVisits = () => {
       function canCoverTime(scheduleJson, eta, etd) {
         const etaDate = new Date(eta);
         const etdDate = new Date(etd);
-      
+
         // // Loop through each hour within the range from ETA to ETD
         // for (let currentHour = new Date(etaDate); currentHour <= etdDate; currentHour.setHours(currentHour.getHours() + 1)) {
         //   const hourStr = currentHour.getHours().toString().padStart(2, "0") + ":00"; // Format hour as "HH:00"
-          
+
         //   // Format the date as 'dd/mm/yy'
         //   const day = currentHour.getDate().toString().padStart(2, "0");
         //   const month = (currentHour.getMonth() + 1).toString().padStart(2, "0");
         //   const year = currentHour.getFullYear().toString().slice(-2);
         //   const currentDay = `${day}/${month}/${year}`; // Format as 'dd/mm/yy'
-      
+
         //   // Check if the hour and day exist in the scheduleJson and are marked as "Scheduled shift"
         //   if (
         //     !scheduleJson[hourStr] || // If this hour doesn't exist in the scheduleJson
@@ -540,14 +541,14 @@ const VesselVisits = () => {
         //     return false; // Employee is not available for this hour
         //   }
         // }
-      
+
         return true; // Employee is available for the entire period from ETA to ETD
       }
-      
-      
-      
-      
-      
+
+
+
+
+
 
       // Array to hold arrays of employee IDs per role
       const roleEmployeeIds = {};
@@ -583,7 +584,7 @@ const VesselVisits = () => {
       rolesToCheck.forEach((roleCheck) => {
         const availableEmployees = roleEmployeeIds[roleCheck.role].length;
         const workersWhoCanCover = []; // To keep track of workers who can cover the visit
-      
+
         if (availableEmployees < roleCheck.required) {
           missingRoles.push({
             role: roleCheck.role,
@@ -593,18 +594,18 @@ const VesselVisits = () => {
           // Check each employee's schedule to see if they can cover the required hours
           const etaDateUTC = new Date(eta);
           const etdDateUTC = new Date(etd);
-          
+
           // Loop through all employees for the current role
           roleEmployeeIds[roleCheck.role].forEach((employeeId) => {
             // Get the employee's schedule JSON (this might be retrieved from a Firestore collection or provided as scheduleJson)
             const employeeSchedule = scheduleJson; // Assuming scheduleJson is an object with employeeId as keys
-      
+
             // Check if the employee can cover the required time range
             if (canCoverTime(employeeSchedule, etaDateUTC, etdDateUTC)) {
               workersWhoCanCover.push(employeeId);
             }
           });
-      
+
           // Now, check if the number of workers who can cover the visit is sufficient
           if (workersWhoCanCover.length < roleCheck.required) {
             missingRoles.push({
@@ -614,7 +615,7 @@ const VesselVisits = () => {
           }
         }
       });
-      
+
 
       if (missingRoles.length > 0) {
         return {
@@ -667,7 +668,7 @@ const VesselVisits = () => {
         numberOfReachStackersNeeded:
           assetsDemandCheckBooleanAndQuantity.requiredAssets
             .requiredReachStackers,
-            scheduleJson: formData.scheduleJson,
+        scheduleJson: formData.scheduleJson,
       });
 
       // Handle the result of manpower check
@@ -909,107 +910,108 @@ const VesselVisits = () => {
 
     // The dates are already stored in ISO format in formData
     if (resourceCheck.facilitiesDemandCheckBooleanAndBerth?.success) {
-    const newVisit = {
-      vesselName: formData.vesselName,
-      imoNumber: formData.imoNumber,
-      vesselType: formData.vesselType,
-      loa: formData.loa,
-      draft: formData.draft,
-      eta: resourceCheck.facilitiesDemandCheckBooleanAndBerth.success
-        ? resourceCheck.facilitiesDemandCheckBooleanAndBerth.adjustedEta.toISOString()
-        : formData.eta.toISOString(),
-      etd: resourceCheck.facilitiesDemandCheckBooleanAndBerth.success
-        ? resourceCheck.facilitiesDemandCheckBooleanAndBerth.adjustedEtd.toISOString()
-        : formData.etd.toISOString(),
-      cargoType: formData.cargoType,
-      cargoVolume: formData.cargoVolume,
-      pilotage: formData.pilotage,
-      tugAssistance: formData.tugAssistance,
-      cargoHandlingEquipment: formData.cargoHandlingEquipment,
-      agentName: formData.agentName,
-      agentContact: formData.agentContact,
-      containersOffloaded: formData.containersOffloaded,
-      containersOnloaded: formData.containersOnloaded,
-      facilityDemandCheckBoolean:
-        resourceCheck.facilitiesDemandCheckBooleanAndBerth.success,
-      berthAssigned:
-        resourceCheck.facilitiesDemandCheckBooleanAndBerth.assignedBerth,
-      assetDemandCheckBoolean:
-        resourceCheck.assetsDemandCheckBooleanAndQuantity.success,
-      numberOfCranesNeeded:
-        resourceCheck.assetsDemandCheckBooleanAndQuantity.requiredAssets
-          .requiredCranes,
-      numberOfTrucksNeeded:
-        resourceCheck.assetsDemandCheckBooleanAndQuantity.requiredAssets
-          .requiredTrucks,
-      numberOfReachStackersNeeded:
-        resourceCheck.assetsDemandCheckBooleanAndQuantity.requiredAssets
-          .requiredReachStackers,
-      manpowerDemandCheckBoolean:
-        resourceCheck.manpowerDemandCheckBoolean.success,
-      // status for UI purposes
-      status:
-        resourceCheck.manpowerDemandCheckBoolean.success &&
-        resourceCheck.assetsDemandCheckBooleanAndQuantity.success &&
-        resourceCheck.facilitiesDemandCheckBooleanAndBerth.success
-          ? "confirmed"
-          : "pending user intervention",
-      vesselGridCount:
-        formData.vesselGridCount !== undefined ? formData.vesselGridCount : 0, // Provide default value for undefined
-      vesselBayCount:
-        formData.vesselBayCount !== undefined ? formData.vesselBayCount : 0, // Provide default value for undefined
-      vesselTierCount:
-        formData.vesselTierCount !== undefined ? formData.vesselTierCount : 0, // Provide default value for undefined
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      stowageplan: formData.stowageplan, // Store the parsed stowage plan array
-      visitType: formData.visitType,
-    };
-  
-    try {
-      // Parsing the CSV file and storing as an array of objects (instead of URL)
-      const parsedCSVData = await parseCSVFile(selectedFile);
-      newVisit.stowageplan = parsedCSVData;
-      console.log("Stowage plan data stored as an array:", parsedCSVData);
-    } catch (error) {
-      setFileError("Error parsing the CSV file.");
-      console.error("Error parsing the CSV file:", error);
-      return; // Exit the function if CSV parsing fails
-    }
-  
-  
-    try {
-      const docRef = doc(db, "vesselVisitRequests", formData.imoNumber);
-      await setDoc(docRef, newVisit, { merge: false });
+      const newVisit = {
+        vesselName: formData.vesselName,
+        imoNumber: formData.imoNumber,
+        vesselType: formData.vesselType,
+        loa: formData.loa,
+        draft: formData.draft,
+        eta: resourceCheck.facilitiesDemandCheckBooleanAndBerth.success
+          ? resourceCheck.facilitiesDemandCheckBooleanAndBerth.adjustedEta.toISOString()
+          : formData.eta.toISOString(),
+        etd: resourceCheck.facilitiesDemandCheckBooleanAndBerth.success
+          ? resourceCheck.facilitiesDemandCheckBooleanAndBerth.adjustedEtd.toISOString()
+          : formData.etd.toISOString(),
+        cargoType: formData.cargoType,
+        cargoVolume: formData.cargoVolume,
+        pilotage: formData.pilotage,
+        tugAssistance: formData.tugAssistance,
+        cargoHandlingEquipment: formData.cargoHandlingEquipment,
+        agentName: formData.agentName,
+        agentContact: formData.agentContact,
+        containersOffloaded: formData.containersOffloaded,
+        containersOnloaded: formData.containersOnloaded,
+        facilityDemandCheckBoolean:
+          resourceCheck.facilitiesDemandCheckBooleanAndBerth.success,
+        berthAssigned:
+          resourceCheck.facilitiesDemandCheckBooleanAndBerth.assignedBerth,
+        assetDemandCheckBoolean:
+          resourceCheck.assetsDemandCheckBooleanAndQuantity.success,
+        numberOfCranesNeeded:
+          resourceCheck.assetsDemandCheckBooleanAndQuantity.requiredAssets
+            .requiredCranes,
+        numberOfTrucksNeeded:
+          resourceCheck.assetsDemandCheckBooleanAndQuantity.requiredAssets
+            .requiredTrucks,
+        numberOfReachStackersNeeded:
+          resourceCheck.assetsDemandCheckBooleanAndQuantity.requiredAssets
+            .requiredReachStackers,
+        manpowerDemandCheckBoolean:
+          resourceCheck.manpowerDemandCheckBoolean.success,
+        // status for UI purposes
+        status:
+          resourceCheck.manpowerDemandCheckBoolean.success &&
+            resourceCheck.assetsDemandCheckBooleanAndQuantity.success &&
+            resourceCheck.facilitiesDemandCheckBooleanAndBerth.success
+            ? "confirmed"
+            : "pending user intervention",
+        vesselGridCount:
+          formData.vesselGridCount !== undefined ? formData.vesselGridCount : 0, // Provide default value for undefined
+        vesselBayCount:
+          formData.vesselBayCount !== undefined ? formData.vesselBayCount : 0, // Provide default value for undefined
+        vesselTierCount:
+          formData.vesselTierCount !== undefined ? formData.vesselTierCount : 0, // Provide default value for undefined
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        stowageplan: formData.stowageplan, // Store the parsed stowage plan array
+        visitType: formData.visitType,
+      };
 
-      if (editingId) {
-        // Editing an existing record: update the corresponding entry in vesselVisitsData
-        setVesselVisitsData((prev) =>
-          prev.map((visit) =>
-            visit.documentId === formData.imoNumber
-              ? { ...newVisit, documentId: formData.imoNumber }
-              : visit
-          )
-        );
-      } else {
-        setVesselVisitsData((prev) => [
-          ...prev,
-          { ...newVisit, documentId: formData.imoNumber },
-        ]);
+      try {
+        // Parsing the CSV file and storing as an array of objects (instead of URL)
+        const parsedCSVData = await parseCSVFile(selectedFile);
+        newVisit.stowageplan = parsedCSVData;
+        console.log("Stowage plan data stored as an array:", parsedCSVData);
+      } catch (error) {
+        setFileError("Error parsing the CSV file.");
+        console.error("Error parsing the CSV file:", error);
+        return; // Exit the function if CSV parsing fails
       }
-      handleCloseDialog();
 
-      console.log(
-        "Vessel visit request saved successfully with ID:",
-        formData.imoNumber
-      );
-    } catch (error) {
-      console.error("Error adding or updating document: ", error);
+
+      try {
+        const docRef = doc(db, "vesselVisitRequests", formData.imoNumber);
+        await setDoc(docRef, newVisit, { merge: false });
+
+        if (editingId) {
+          // Editing an existing record: update the corresponding entry in vesselVisitsData
+          setVesselVisitsData((prev) =>
+            prev.map((visit) =>
+              visit.documentId === formData.imoNumber
+                ? { ...newVisit, documentId: formData.imoNumber }
+                : visit
+            )
+          );
+        } else {
+          setVesselVisitsData((prev) => [
+            ...prev,
+            { ...newVisit, documentId: formData.imoNumber },
+          ]);
+        }
+        handleCloseDialog();
+
+        console.log(
+          "Vessel visit request saved successfully with ID:",
+          formData.imoNumber
+        );
+      } catch (error) {
+        console.error("Error adding or updating document: ", error);
+      }
     }
-  }
   };
 
   const handleDelete = async (id) => {
+    setDeleteConfirmation(null); // Close dialog after deletion
     try {
       // Create a reference to a specific document
       const docRef = doc(db, "vesselVisitRequests", id);
@@ -1144,25 +1146,25 @@ const VesselVisits = () => {
                   <TableCell>
                     {visit.eta
                       ? new Date(visit.eta).toLocaleString("en-SG", {
-                          hour12: true,
-                          year: "numeric",
-                          month: "2-digit",
-                          day: "2-digit",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
+                        hour12: true,
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
                       : "Invalid Date"}
                   </TableCell>
                   <TableCell>
                     {visit.etd
                       ? new Date(visit.etd).toLocaleString("en-SG", {
-                          hour12: true,
-                          year: "numeric",
-                          month: "2-digit",
-                          day: "2-digit",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
+                        hour12: true,
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
                       : "Invalid Date"}
                   </TableCell>{" "}
                   {/* ISO string */}
@@ -1181,7 +1183,7 @@ const VesselVisits = () => {
                     )}
                     {hasRole(["Delete Vessel Visit Requests"]) && (
                       <IconButton
-                        onClick={() => handleDelete(visit.documentId)}
+                        onClick={() => setDeleteConfirmation(visit.documentId)}
                         color="secondary"
                       >
                         <DeleteIcon />
@@ -1216,12 +1218,12 @@ const VesselVisits = () => {
                 onChange={handleChange}
                 fullWidth
                 required
-                // disabled={!!formData.vesselName}
-                // helperText={
-                //   formData.vesselName
-                //     ? "This field cannot be edited after it is set"
-                //     : ""
-                // }
+              // disabled={!!formData.vesselName}
+              // helperText={
+              //   formData.vesselName
+              //     ? "This field cannot be edited after it is set"
+              //     : ""
+              // }
               />
             </Grid>
             <Grid item xs={6}>
@@ -1233,12 +1235,12 @@ const VesselVisits = () => {
                 onChange={handleChange}
                 fullWidth
                 required
-                // disabled={!!formData.imoNumber}
-                // helperText={
-                //   formData.imoNumber
-                //     ? "This field cannot be edited after it is set"
-                //     : ""
-                // }
+              // disabled={!!formData.imoNumber}
+              // helperText={
+              //   formData.imoNumber
+              //     ? "This field cannot be edited after it is set"
+              //     : ""
+              // }
               />
             </Grid>
             <Grid item xs={6}>
@@ -1503,6 +1505,30 @@ const VesselVisits = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Dialog
+        open={Boolean(deleteConfirmation)}
+        onClose={() => setDeleteConfirmation(null)}
+      >
+        <DialogTitle>Confirm Delete</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete this vessel visit request?
+            This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteConfirmation(null)}>Cancel</Button>
+          <Button
+            onClick={() => handleDelete(deleteConfirmation)}
+            color="error"
+            variant="contained"
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
     </Container>
   );
 };
