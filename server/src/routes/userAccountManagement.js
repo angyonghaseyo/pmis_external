@@ -73,23 +73,23 @@ router.put('/users/:userId', adminCheck, async (req, res) => {
   try {
     const { userId } = req.params;
     const { firstName, lastName, teams, userType, status } = req.body;
-    
+
     if (status === 'Pending') {
-      await admin.firestore().collection('invitations').doc(userId).update({ 
-        firstName, 
-        lastName, 
+      await admin.firestore().collection('invitations').doc(userId).update({
+        firstName,
+        lastName,
         teams,
         userType
       });
     } else {
-      await admin.firestore().collection('users').doc(userId).update({ 
-        firstName, 
-        lastName, 
+      await admin.firestore().collection('users').doc(userId).update({
+        firstName,
+        lastName,
         teams,
         userType
       });
     }
-    
+
     res.json({ message: 'User updated successfully' });
   } catch (error) {
     console.error('Error updating user:', error);
@@ -121,13 +121,13 @@ router.delete('/users/:userId', adminCheck, async (req, res) => {
 router.post('/invite', adminCheck, async (req, res) => {
   try {
     const { email, firstName, lastName, teams, userType } = req.body;
-    
+
     // Check if the user already exists
     const existingUserSnapshot = await admin.firestore().collection('users')
       .where('email', '==', email)
       .where('company', '==', req.user.company)
       .get();
-    
+
     if (!existingUserSnapshot.empty) {
       return res.status(400).json({ error: 'User with this email already exists' });
     }
@@ -138,7 +138,7 @@ router.post('/invite', adminCheck, async (req, res) => {
       .where('company', '==', req.user.company)
       .where('status', '==', 'Pending')
       .get();
-    
+
     if (!existingInvitationSnapshot.empty) {
       return res.status(400).json({ error: 'An invitation for this email is already pending' });
     }
@@ -197,10 +197,10 @@ router.delete('/invitations/:invitationId', adminCheck, async (req, res) => {
 router.post('/accept-invitation', async (req, res) => {
   try {
     const { invitationId, password } = req.body;
-    
+
     // Get the invitation
     const invitationDoc = await admin.firestore().collection('invitations').doc(invitationId).get();
-    
+
     if (!invitationDoc.exists) {
       return res.status(404).json({ error: 'Invitation not found' });
     }

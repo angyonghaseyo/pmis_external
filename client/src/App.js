@@ -1,9 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { auth, db } from './firebaseConfig';
-import { doc, getDoc } from 'firebase/firestore';
-import { getUserData } from './services/api';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import Header from './Header';
 import Sidebar from './Sidebar';
 import UserWorkspace from './components/UserWorkspace';
@@ -14,7 +10,6 @@ import ForgotPassword from './ForgotPassword';
 import ResetPassword from './ResetPassword';
 import EditProfile from './EditProfile';
 import InquiryFeedback from './InquiryFeedback';
-import InquiryFeedbackDetail from './InquiryFeedbackDetail';
 import TrainingProgram from './TrainingProgram';
 import CompanyInfo from './CompanyInfo';
 import OperatorRequisition from './OperatorRequisition';
@@ -28,60 +23,32 @@ import AdHocResourceRequest from './AdHocResourceRequest';
 import ContainerMenu from './ContainerMenu';
 import TruckRegistration from './TruckRegistration';
 import ContainerRequestsList from './ContainerRequestsList';
+import { useAuth } from './AuthContext';
+import { jwtDecode } from "jwt-decode";
 
 const drawerWidth = 240;
 
 function App() {
-  const [user, setUser] = useState(null);
+  const { user, login, logout } = useAuth();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchUserData = async (currentUser) => {
-      try {
-        const userDocRef = doc(db, 'users', currentUser.uid);
-        const userDoc = await getDoc(userDocRef);
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      const decodedToken = jwtDecode(token);
+      setLoading(false);
 
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          console.log('Fetched user data:', userData);
-          setUser({
-            ...currentUser,
-            ...userData,
-            accessRights: userData.accessRights || []
-          });
-
-        } else {
-          console.log("No user profile found in 'users' collection, signing out");
-          await signOut(auth);
-          setUser(null);
-        }
-      } catch (error) {
-        console.error("Error fetching user data:", error);
-        await signOut(auth);
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        await fetchUserData(currentUser);
-      } else {
-        setUser(null);
-        setLoading(false);
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
+    } else {
+      setLoading(false);
+    }
+  }, [login]);
 
   const hasAccessRights = (requiredRights) => {
-    console.log('User access rights:', user?.accessRights);
-    console.log('Required rights:', requiredRights);
+    // console.log('User access rights:', user?.accessRights);
+    // console.log('Required rights:', requiredRights);
     if (!user || !user.accessRights) return false;
     const hasRights = requiredRights.some(right => user.accessRights.includes(right));
-    console.log('Has required rights:', hasRights);
+    // console.log('Has required rights:', hasRights);
     return hasRights;
   };
 
@@ -94,22 +61,21 @@ function App() {
   }
 
   return (
-    <Router>
-      <Box sx={{ display: 'flex' }}>
-        <CssBaseline />
-        {user && <Header user={user} />}
-        {user && <Sidebar user={user} />}
-        <Box
-          component="main"
-          sx={{
-            flexGrow: 1,
-            p: 3,
-            width: user ? `calc(100% - ${drawerWidth}px)` : '100%',
-            mt: user ? '80px' : 0,
-            minHeight: '100vh',
-          }}
-        >
-          <Routes>
+    <Box sx={{ display: 'flex' }}>
+      <CssBaseline />
+      {user && <Header user={user} />}
+      {user && <Sidebar user={user} />}
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          p: 3,
+          width: user ? `calc(100% - ${drawerWidth}px)` : '100%',
+          mt: user ? '80px' : 0,
+          minHeight: '100vh',
+        }}
+      >
+        <Routes>
             {user ? (
               <>
                 <Route path="/" element={<UserWorkspace user={user} />} />
@@ -148,7 +114,7 @@ function App() {
                 {hasAccessRights(['View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest']) && (
                   <Route path="/cargos/cargo-manifest" element={<CargoManifest user={user} />} />
                 )}
-                {hasAccessRights(['create cargo booking']) && (
+                {hasAccessRights(['abc']) && (
                   <Route path="/cargos/booking-form" element={<BookingForm user={user} />} />
                 )}
                 <Route path="/vessels/ad-hoc-resource-request" element={<AdHocResourceRequest />} />
@@ -170,9 +136,8 @@ function App() {
               </>
             )}
           </Routes>
-        </Box>
       </Box>
-    </Router>
+    </Box>
   );
 }
 

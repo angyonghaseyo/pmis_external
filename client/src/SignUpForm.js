@@ -1,19 +1,15 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { doc, setDoc, getDoc, updateDoc, increment } from 'firebase/firestore';
-import { auth, storage, db } from './firebaseConfig';
 import './AuthForms.css';
 
 const teams = [
-  'Assets and Facilities',
-  'Manpower',
-  'Vessel Visits',
-  'Port Operations and Resources',
-  'Cargos',
-  'Financial',
-  'Customs and Trade Documents'
+    'Assets and Facilities',
+    'Manpower',
+    'Vessel Visits',
+    'Port Operations and Resources',
+    'Cargos',
+    'Financial',
+    'Customs and Trade Documents'
 ];
 
 function SignUpForm() {
@@ -89,53 +85,26 @@ function SignUpForm() {
         setLoading(true);
 
         try {
-            // Create user
-            const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
-            const user = userCredential.user;
-
-            // Upload photo if provided
-            let photoURL = '';
+            const formDataToSend = new FormData();
+            formDataToSend.append('email', formData.email);
+            formDataToSend.append('password', formData.password);
+            formDataToSend.append('salutation', formData.salutation);
+            formDataToSend.append('firstName', formData.firstName);
+            formDataToSend.append('lastName', formData.lastName);
+            formDataToSend.append('company', formData.company);
+            formDataToSend.append('teams', JSON.stringify(formData.teams)); // Convert teams array to JSON string
             if (photoFile) {
-                const storageRef = ref(storage, `profile_photos/${user.uid}`);
-                await uploadBytes(storageRef, photoFile);
-                photoURL = await getDownloadURL(storageRef);
+                formDataToSend.append('photoFile', photoFile);
             }
 
-            // Update user profile
-            await updateProfile(user, {
-                displayName: `${formData.salutation} ${formData.firstName} ${formData.lastName}`,
-                photoURL: photoURL
+            const response = await fetch('http://localhost:5001/register', {
+                method: 'POST',
+                body: formDataToSend,
             });
 
-            // Check if company exists and update or create accordingly
-            const companyRef = doc(db, 'companies', formData.company);
-            const companyDoc = await getDoc(companyRef);
-
-            if (companyDoc.exists()) {
-                // Company exists, increment user count
-                await updateDoc(companyRef, {
-                    userCount: increment(1)
-                });
-            } else {
-                // Company doesn't exist, create new company document
-                await setDoc(companyRef, {
-                    name: formData.company,
-                    userCount: 1
-                });
+            if (!response.ok) {
+                throw new Error('Error during sign up');
             }
-
-            // Store additional user info in Firestore
-            await setDoc(doc(db, 'users', user.uid), {
-                email: formData.email,
-                firstName: formData.firstName,
-                lastName: formData.lastName,
-                salutation: formData.salutation,
-                photoURL: photoURL,
-                company: formData.company,
-                teams: formData.teams,
-                userType: 'Admin',
-                createdAt: new Date()
-            });
 
             // Navigate to home page or dashboard
             navigate('/');
@@ -146,7 +115,6 @@ function SignUpForm() {
             setLoading(false);
         }
     };
-
     return (
         <div className="auth-form">
             <h2>🚢 Oceania PMIS</h2>

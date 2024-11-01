@@ -24,6 +24,7 @@ import {
   arrayUnion,
   Timestamp,
   arrayRemove,
+  runTransaction,
   orderBy
 } from 'firebase/firestore';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -102,80 +103,35 @@ export const sendPasswordResetEmailToUser = (email) =>
 export const confirmUserPasswordReset = (oobCode, newPassword) =>
   confirmPasswordReset(auth, oobCode, newPassword).catch(handleApiError);
 
-// User Account Management
-export const getUsers = async () => {
+export const getUsers = async (userId) => {
   try {
-    const currentUser = auth.currentUser;
-    if (!currentUser) {
-      throw new Error('No authenticated user');
+
+    const response = await fetch(`http://localhost:5001/users?email=${userId}`);
+    if (!response.ok) {
+      throw new Error('Error fetching users');
     }
-
-    const userDocRef = doc(db, 'users', currentUser.uid);
-    const userDocSnap = await getDoc(userDocRef);
-    const currentUserData = userDocSnap.data();
-
-    if (!currentUserData || !currentUserData.company) {
-      throw new Error('User company information not found');
-    }
-
-    // Fetch users from the 'users' collection
-    const usersQuery = query(
-      collection(db, 'users'),
-      where('company', '==', currentUserData.company)
-    );
-    const usersSnapshot = await getDocs(usersQuery);
-    const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), status: 'Active' }));
-
-    // Fetch invitations - pending, approved, and rejected ones
-    const invitationsQuery = query(
-      collection(db, 'invitations'),
-      where('company', '==', currentUserData.company),
-      where('status', 'in', ['Pending', 'Approved', 'Rejected'])
-    );
-    const invitationsSnapshot = await getDocs(invitationsQuery);
-    const invitationUsers = invitationsSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      status: doc.data().status === 'Rejected' ? 'Rejected' : doc.data().status === 'Approved' ? 'Approved' : 'Pending',
-    }));
-
-    return [...users, ...invitationUsers];
+    const users = await response.json();
+    return users;
   } catch (error) {
     console.error('Error fetching users:', error);
     throw error;
   }
 };
 
-export const getAllUsersInCompany = async () => {
+
+export const getAllUsersInCompany = async (userId) => {
   try {
-    const currentUser = auth.currentUser;
-    if (!currentUser) {
-      throw new Error('No authenticated user');
+    const response = await fetch(`http://localhost:5001/all-users-in-company?email=${userId}`);
+    if (!response.ok) {
+      throw new Error('Error fetching users in company');
     }
-
-    const userDocRef = doc(db, 'users', currentUser.uid);
-    const userDocSnap = await getDoc(userDocRef);
-    const currentUserData = userDocSnap.data();
-
-    if (!currentUserData || !currentUserData.company) {
-      throw new Error('User company information not found');
-    }
-
-    const usersQuery = query(
-      collection(db, 'users'),
-      where('company', '==', currentUserData.company)
-    );
-    const usersSnapshot = await getDocs(usersQuery);
-
-    const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
+    const users = await response.json();
     return users;
   } catch (error) {
     console.error('Error fetching users in company:', error);
     throw error;
   }
 };
-
 
 export const createUser = async (userData) => {
   try {
@@ -203,19 +159,31 @@ export const updateUser = async (userId, userData, isPending = false) => {
   }
 };
 
-export const deleteUser = async (userId) => {
+export const deleteUser = async (email) => {
   try {
-    await deleteDoc(doc(db, 'users', userId));
+    const response = await fetch(`http://localhost:5001/users?email=${encodeURIComponent(email)}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      throw new Error('Error deleting user');
+    }
   } catch (error) {
     handleApiError(error);
   }
 };
 
-export const deleteUserAccount = async () => {
+export const deleteUserAccount = async (email) => {
   try {
-    const user = auth.currentUser;
-    await deleteDoc(doc(db, 'users', user.uid));
-    await firebaseDeleteUser(user);
+    const response = await fetch('http://localhost:5001/user-account', {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User-Email': email,
+      },
+    });
+    if (!response.ok) {
+      throw new Error('Error deleting user account');
+    }
   } catch (error) {
     handleApiError(error);
   }
@@ -223,13 +191,18 @@ export const deleteUserAccount = async () => {
 
 export const inviteUser = async (userData) => {
   try {
-    const invitationRef = await addDoc(collection(db, 'invitations'), {
-      ...userData,
-      userType: 'Normal',
-      createdAt: new Date(),
-      status: 'Pending'
+    const response = await fetch('http://localhost:5001/invitations', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(userData),
     });
-    return invitationRef.id;
+    if (!response.ok) {
+      throw new Error('Error inviting user');
+    }
+    const result = await response.json();
+    return result.id;
   } catch (error) {
     handleApiError(error);
   }
@@ -237,127 +210,77 @@ export const inviteUser = async (userData) => {
 
 export const cancelInvitation = async (invitationId) => {
   try {
-    await deleteDoc(doc(db, 'invitations', invitationId));
+    const response = await fetch(`http://localhost:5001/invitations/${invitationId}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      throw new Error('Error canceling invitation');
+    }
   } catch (error) {
     handleApiError(error);
   }
 };
 
 // Get user's inquiries and feedback
-export const getUserInquiriesFeedback = async () => {
+export const getUserInquiriesFeedback = async (userId) => {
   try {
-    const user = auth.currentUser;
-    if (!user) throw new Error('No authenticated user');
-
-    const q = query(collection(db, 'inquiries_feedback'), where('userId', '==', user.uid));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const response = await fetch(`http://localhost:5001/inquiries-feedback/${userId}`);
+    if (!response.ok) {
+      throw new Error('Error fetching inquiries and feedback');
+    }
+    const results = await response.json();
+    console.log(results)
+    return results;
   } catch (error) {
     console.error('Error fetching inquiries and feedback:', error);
     throw error;
   }
 };
-
 // Create new inquiry or feedback with auto-incrementing ID
 export const createInquiryFeedback = async (data) => {
   try {
-    const user = auth.currentUser;
-    if (!user) {
-      throw new Error('No authenticated user');
+    const formData = new FormData();
+    for (const key in data) {
+      formData.append(key, data[key]);
     }
 
-    let fileURL = null;
+    const response = await fetch('http://localhost:5001/inquiries-feedback', {
+      method: 'POST',
+      body: formData,
+    });
 
-    // Process file upload if a file exists
-    if (data.file && data.file instanceof File) {
-      try {
-        const fileExtension = data.file.name.split('.').pop();
-        const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 15)}.${fileExtension}`;
-        const fileRef = storageRef(storage, `inquiries_feedback/${fileName}`);
-        const snapshot = await uploadBytes(fileRef, data.file);
-        fileURL = await getDownloadURL(snapshot.ref);
-      } catch (uploadError) {
-        console.error('Error uploading file:', uploadError);
-        throw new Error('Failed to upload file: ' + uploadError.message);
-      }
+    if (!response.ok) {
+      throw new Error('Error creating inquiry/feedback');
     }
 
-    const { file, ...dataWithoutFile } = data;
-    const inquiriesRef = collection(db, 'inquiries_feedback');
-    const snapshot = await getDocs(inquiriesRef);
-    const newIncrementalId = snapshot.size + 1;
-
-    const docData = {
-      ...dataWithoutFile,
-      incrementalId: newIncrementalId,
-      userId: user.uid,
-      createdAt: serverTimestamp(),
-      status: 'Pending',
-      fileURL: fileURL,
-    };
-
-    console.log('Final document data:', docData);
-
-    const docRef = await addDoc(inquiriesRef, docData);
-    return docRef.id;
+    const result = await response.json();
+    return result.id;
   } catch (error) {
     console.error('Error in createInquiryFeedback:', error);
     throw error;
   }
 };
 
-// Update inquiry or feedback
 export const updateInquiryFeedback = async (incrementalId, data) => {
   try {
-    const user = auth.currentUser;
-    if (!user) {
-      throw new Error('No authenticated user');
+    const formData = new FormData();
+    for (const key in data) {
+      formData.append(key, data[key]);
     }
 
-    const inquiriesRef = collection(db, 'inquiries_feedback');
-    const querySnapshot = await getDocs(inquiriesRef);
-    let docId = null;
-
-    querySnapshot.forEach((doc) => {
-      const inquiryData = doc.data();
-      if (inquiryData.incrementalId === incrementalId) {
-        docId = doc.id;
-      }
+    const response = await fetch(`http://localhost:5001/inquiries-feedback/${incrementalId}`, {
+      method: 'PUT',
+      body: formData,
     });
 
-    if (!docId) {
-      throw new Error(`No inquiry/feedback found with incremental ID: ${incrementalId}`);
+    if (!response.ok) {
+      throw new Error('Error updating inquiry/feedback');
     }
-
-    // Process file upload if there is a new file
-    let fileURL = data.fileURL || null;
-    if (data.file && data.file instanceof File) {
-      try {
-        const fileExtension = data.file.name.split('.').pop();
-        const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 15)}.${fileExtension}`;
-        const fileRef = storageRef(storage, `inquiries_feedback/${fileName}`);
-        const snapshot = await uploadBytes(fileRef, data.file);
-        fileURL = await getDownloadURL(snapshot.ref);
-      } catch (uploadError) {
-        console.error('Error uploading file:', uploadError);
-        throw new Error('Failed to upload file: ' + uploadError.message);
-      }
-    }
-
-    const { file, ...dataWithoutFile } = data;
-    const updateData = {
-      ...dataWithoutFile,
-      fileURL: fileURL,
-    };
-
-    const docRef = doc(db, 'inquiries_feedback', docId);
-    await updateDoc(docRef, updateData);
   } catch (error) {
     console.error('Error updating inquiry/feedback:', error);
     throw error;
   }
 };
-
 // Delete inquiry or feedback
 export const deleteInquiryFeedback = async (id) => {
   try {
@@ -372,59 +295,64 @@ export const deleteInquiryFeedback = async (id) => {
 // Company operations
 export const getCompanyInfo = async (companyName) => {
   try {
-    const companyDoc = await getDoc(doc(db, 'companies', companyName));
-    if (companyDoc.exists()) {
-      return companyDoc.data();
-    } else {
-      throw new Error('Company not found');
+    console.log("Company Name", companyName)
+    const response = await fetch(`http://localhost:5001/company-data?companyName=${encodeURIComponent(companyName)}`);
+    if (!response.ok) {
+      throw new Error('Error fetching company data');
     }
+    const companyData = await response.json();
+    return companyData;
   } catch (error) {
-    console.error('Error fetching company info:', error);
+    console.error('Error fetching company data:', error);
     throw error;
   }
 };
 
 export const updateCompanyInfo = async (companyName, data) => {
   try {
-    const companyRef = doc(db, 'companies', companyName);
-    await updateDoc(companyRef, data);
+    const response = await fetch(`http://localhost:5001/company-data/${companyName}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      throw new Error('Error updating company info');
+    }
   } catch (error) {
     console.error('Error updating company info:', error);
     throw new Error(`Failed to update company information: ${error.message}`);
   }
 };
-
 export const getOperatorRequisitions = async (userId) => {
   try {
-    console.log('Fetching operator requisitions for user:', userId);
-    const q = query(
-      collection(db, 'operator_requisitions'),
-      where('userId', '==', userId),
-      orderBy('createdAt', 'desc')
-    );
-    const querySnapshot = await getDocs(q);
-    console.log('Query snapshot:', querySnapshot);
-    const results = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    console.log('Fetched requisitions:', results);
+    const response = await fetch(`http://localhost:5001/operator-requisitions/${userId}`);
+    if (!response.ok) {
+      throw new Error('Error fetching operator requisitions');
+    }
+    const results = await response.json();
     return results;
   } catch (error) {
     console.error('Error fetching operator requisitions:', error);
-    if (error.code === 'failed-precondition') {
-      console.error('This query requires an index. Please check the Firebase console for a link to create the index, or create it manually.');
-    }
     throw error;
   }
 };
 
 export const createOperatorRequisition = async (requisitionData) => {
   try {
-    const docRef = await addDoc(collection(db, 'operator_requisitions'), {
-      ...requisitionData,
-      createdAt: serverTimestamp(),
-      status: 'Pending'
+    const response = await fetch('http://localhost:5001/operator-requisitions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requisitionData),
     });
-    console.log('Created new requisition with ID:', docRef.id);
-    return docRef.id;
+    if (!response.ok) {
+      throw new Error('Error creating operator requisition');
+    }
+    const data = await response.json();
+    return data.id;
   } catch (error) {
     console.error('Error creating operator requisition:', error);
     throw error;
@@ -433,9 +361,16 @@ export const createOperatorRequisition = async (requisitionData) => {
 
 export const updateOperatorRequisition = async (requisitionId, updateData) => {
   try {
-    const requisitionRef = doc(db, 'operator_requisitions', requisitionId);
-    await updateDoc(requisitionRef, updateData);
-    console.log('Updated requisition:', requisitionId);
+    const response = await fetch(`http://localhost:5001/operator-requisitions/${requisitionId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updateData),
+    });
+    if (!response.ok) {
+      throw new Error('Error updating operator requisition');
+    }
   } catch (error) {
     console.error('Error updating operator requisition:', error);
     throw error;
@@ -444,8 +379,12 @@ export const updateOperatorRequisition = async (requisitionId, updateData) => {
 
 export const deleteOperatorRequisition = async (requisitionId) => {
   try {
-    await deleteDoc(doc(db, 'operator_requisitions', requisitionId));
-    console.log('Deleted requisition:', requisitionId);
+    const response = await fetch(`http://localhost:5001/operator-requisitions/${requisitionId}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      throw new Error('Error deleting operator requisition');
+    }
   } catch (error) {
     console.error('Error deleting operator requisition:', error);
     throw error;
@@ -454,9 +393,12 @@ export const deleteOperatorRequisition = async (requisitionId) => {
 
 export const getTrainingPrograms = async () => {
   try {
-    const programsRef = collection(db, 'training_programs');
-    const programsSnapshot = await getDocs(programsRef);
-    return programsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const response = await fetch('http://localhost:5001/training-programs');
+    if (!response.ok) {
+      throw new Error('Error fetching training programs');
+    }
+    const programs = await response.json();
+    return programs;
   } catch (error) {
     console.error('Error fetching training programs:', error);
     throw error;
@@ -480,57 +422,110 @@ export const getUserData = async (userId) => {
   }
 };
 
-// Register user for a training program
-export const registerForProgram = async (programId, userId) => {
+export const getUserUpdatedData = async (userEmail) => {
   try {
-    const userRef = doc(db, 'users', userId);
-    const programRef = doc(db, 'training_programs', programId);
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('email', '==', userEmail));
+    const querySnapshot = await getDocs(q);
+    
+    if (querySnapshot.empty) {
+      throw new Error('User not found');
+    }
 
-    // Update user document
-    await updateDoc(userRef, {
-      enrolledPrograms: arrayUnion({
-        programId: programId,
-        enrollmentDate: Timestamp.now(),
-        status: 'Enrolled'
-      })
-    });
-
-    // Update program document
-    await updateDoc(programRef, {
-      numberOfCurrentRegistrations: increment(1)
-    });
+    return querySnapshot.docs[0].data();
   } catch (error) {
-    console.error('Error registering for program:', error);
+    console.error('Error fetching updated user data:', error);
     throw error;
   }
 };
 
-// Withdraw user from a training program
-export const withdrawFromProgram = async (programId, userId) => {
+export const registerForProgram = async (programId, userEmail) => {
   try {
-    const userRef = doc(db, 'users', userId);
-    const programRef = doc(db, 'training_programs', programId);
-
-    // Get user data to find the specific enrollment to remove
-    const userDoc = await getDoc(userRef);
-    const userData = userDoc.data();
-    const enrollmentToRemove = userData.enrolledPrograms.find(ep => ep.programId === programId);
-
-    if (!enrollmentToRemove) {
-      throw new Error('User is not enrolled in this program');
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('email', '==', userEmail));
+    const querySnapshot = await getDocs(q);
+    
+    if (querySnapshot.empty) {
+      throw new Error('User not found');
     }
 
-    // Update user document
-    await updateDoc(userRef, {
-      enrolledPrograms: arrayRemove(enrollmentToRemove)
-    });
+    const userDoc = querySnapshot.docs[0];
+    const userData = userDoc.data();
+    const programRef = doc(db, 'training_programs', programId);
+    const programDoc = await getDoc(programRef);
 
-    // Update program document
-    await updateDoc(programRef, {
-      numberOfCurrentRegistrations: increment(-1)
+    if (!programDoc.exists()) {
+      throw new Error('Program not found');
+    }
+
+    const programData = programDoc.data();
+
+    // Check capacity
+    if (programData.numberOfCurrentRegistrations >= programData.participantCapacity) {
+      throw new Error('Program is full');
+    }
+
+    // Check if already enrolled
+    if (userData.enrolledPrograms?.some(program => program.programId === programId)) {
+      throw new Error('Already enrolled in this program');
+    }
+
+    // Use transaction to ensure atomicity
+    await runTransaction(db, async (transaction) => {
+      // Update program registrations
+      transaction.update(programRef, {
+        numberOfCurrentRegistrations: increment(1)
+      });
+
+      // Update user enrollments
+      transaction.update(userDoc.ref, {
+        enrolledPrograms: arrayUnion({
+          programId: programId,
+          enrollmentDate: Timestamp.now(),
+          status: 'Enrolled'
+        })
+      });
     });
   } catch (error) {
-    console.error('Error withdrawing from program:', error);
+    console.error('Error in registerForProgram:', error);
+    throw error;
+  }
+};
+
+export const withdrawFromProgram = async (programId, userEmail) => {
+  try {
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('email', '==', userEmail));
+    const querySnapshot = await getDocs(q);
+    
+    if (querySnapshot.empty) {
+      throw new Error('User not found');
+    }
+
+    const userDoc = querySnapshot.docs[0];
+    const userData = userDoc.data();
+    const programRef = doc(db, 'training_programs', programId);
+    
+    const enrollmentToRemove = userData.enrolledPrograms?.find(ep => ep.programId === programId);
+    
+    if (!enrollmentToRemove) {
+      throw new Error('Not enrolled in this program');
+    }
+
+    // Use transaction to ensure atomicity
+    await runTransaction(db, async (transaction) => {
+      // Update program registrations
+      transaction.update(programRef, {
+        numberOfCurrentRegistrations: increment(-1)
+      });
+
+      // Update user enrollments
+      transaction.update(userDoc.ref, {
+        enrolledPrograms: arrayRemove(enrollmentToRemove)
+      });
+    });
+  } catch (error) {
+    console.error('Error in withdrawFromProgram:', error);
     throw error;
   }
 };
@@ -582,9 +577,18 @@ export const getCargoManifests = async () => {
 
 export const submitCargoManifest = async (manifestData) => {
   try {
-    const manifestsRef = collection(db, 'cargo_manifests');
-    const docRef = await addDoc(manifestsRef, manifestData);
-    return docRef.id;
+    const response = await fetch('http://localhost:5001/cargo-manifests', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(manifestData),
+    });
+    if (!response.ok) {
+      throw new Error('Error submitting cargo manifest');
+    }
+    const data = await response.json();
+    return data.id;
   } catch (error) {
     console.error('Error submitting cargo manifest:', error);
     throw error;
@@ -593,47 +597,114 @@ export const submitCargoManifest = async (manifestData) => {
 
 export const updateCargoManifest = async (id, manifestData) => {
   try {
-    const manifestRef = doc(db, 'cargo_manifests', id);
-    await updateDoc(manifestRef, manifestData);
+    const response = await fetch(`http://localhost:5001/cargo-manifests/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(manifestData),
+    });
+    if (!response.ok) {
+      throw new Error('Error updating cargo manifest');
+    }
   } catch (error) {
     console.error('Error updating cargo manifest:', error);
     throw error;
   }
 };
 
+
 export const deleteCargoManifest = async (id) => {
   try {
-    const manifestRef = doc(db, 'cargo_manifests', id);
-    await deleteDoc(manifestRef);
+    const response = await fetch(`http://localhost:5001/cargo-manifests/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      throw new Error('Error deleting cargo manifest');
+    }
   } catch (error) {
     console.error('Error deleting cargo manifest:', error);
     throw error;
   }
 };
 
-// Function to get vessel visit requests with specific statuses
 export const getVesselVisitRequestsAdHocRequest = async () => {
   try {
-    // Define the statuses to filter by
-    const statuses = ['confirmed', 'arriving', 'under tow', 'berthed'];
-
-    // Create a Firestore query to get vessel visits with the defined statuses
-    const vesselVisitRequestsRef = collection(db, 'vesselVisitRequests');
-    const q = query(vesselVisitRequestsRef, where('status', 'in', statuses));
-
-    // Execute the query and fetch the documents
-    const querySnapshot = await getDocs(q);
-
-    // Map the results into an array of objects
-    const vesselVisits = querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-
-    return vesselVisits;
+    const response = await fetch('http://localhost:5001/vessel-visits-adhoc-requests');
+    if (!response.ok) {
+      throw new Error('Failed to fetch vessel visits');
+    }
+    const data = await response.json();
+    return data;
   } catch (error) {
-    console.error('Error fetching vessel visit requests:', error);
-    throw new Error('Failed to fetch vessel visit requests');
+    console.error('Error fetching vessel visits:', error);
+    throw error;
+  }
+};
+
+export const getActiveVesselVisits = async () => {
+  try {
+    const response = await fetch('http://localhost:5001/active-vessel-visits');
+    if (!response.ok) {
+      throw new Error('Failed to fetch active vessel visits');
+    }
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching active vessel visits:', error);
+    throw error;
+  }
+};
+
+// In api.js, add these functions
+export const getAdHocResourceRequests = async () => {
+  try {
+    const response = await fetch('http://localhost:5001/ad-hoc-resource-requests');
+    if (!response.ok) {
+      throw new Error('Failed to fetch ad hoc requests');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching ad hoc requests:', error);
+    throw error;
+  }
+};
+
+export const submitAdHocResourceRequest = async (requestData) => {
+  try {
+    const response = await fetch('http://localhost:5001/ad-hoc-resource-requests', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestData),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to submit ad hoc request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error submitting ad hoc request:', error);
+    throw error;
+  }
+};
+
+export const updateAdHocResourceRequest = async (requestId, requestData) => {
+  try {
+    const response = await fetch(`http://localhost:5001/ad-hoc-resource-requests/${requestId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestData),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to update ad hoc request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating ad hoc request:', error);
+    throw error;
   }
 };
 
@@ -657,6 +728,10 @@ export const updateEmployee = (employeeId, data) =>
 
 // Vessel Visits
 export const getVesselVisits = () => authAxios.get('/vessel-visits').catch(handleApiError);
+
+export const getVesselVisitsConfirmedWithoutManifests = () => {
+  return axios.get('/vessel-visits-confirmed-without-manifests').catch(handleApiError);
+}
 
 export const createVesselVisit = (visitData) =>
   authAxios.post('/vessel-visits', visitData).catch(handleApiError);
@@ -748,7 +823,10 @@ const api = {
   submitCargoManifest,
   updateCargoManifest,
   deleteCargoManifest,
-  getVesselVisitRequestsAdHocRequest
+  getVesselVisitRequestsAdHocRequest,
+  getAdHocResourceRequests,
+  submitAdHocResourceRequest,
+  updateAdHocResourceRequest,
 };
 
 export default api;
