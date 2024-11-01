@@ -96,6 +96,11 @@ const VesselVisits = () => {
     vesselTierCount: 0,
     stowageplanURL: "",
     //Denzel
+    voyages: [{
+      voyageNumber: '',
+      departurePort: '',
+      arrivalPort: ''
+    }],
   });
   const [vesselVisitsData, setVesselVisitsData] = useState([]);
   const [error, setError] = useState({});
@@ -733,6 +738,11 @@ const VesselVisits = () => {
         vesselTierCount: visit.vesselTierCount,
         stowageplanURL: visit.stowageplanURL,
         visitType: type,
+        voyages: visit.voyages || [{ // Add default if voyages doesn't exist
+          voyageNumber: '',
+          departurePort: '',
+          arrivalPort: ''
+        }]
       });
       setEditingId("Edit"); //  setEditingId(visit.id); Denzel
     } else {
@@ -759,6 +769,11 @@ const VesselVisits = () => {
         vesselTierCount: 0,
         stowageplanURL: "",
         visitType: type,
+        voyages: [{ // Make sure to include voyages here too
+          voyageNumber: '',
+          departurePort: '',
+          arrivalPort: ''
+        }],
       });
     }
     setOpenDialog(true);
@@ -965,6 +980,7 @@ const VesselVisits = () => {
         updatedAt: new Date().toISOString(),
         stowageplan: formData.stowageplan, // Store the parsed stowage plan array
         visitType: formData.visitType,
+        voyages: formData.voyages,
       };
 
       try {
@@ -1300,7 +1316,77 @@ const VesselVisits = () => {
                 />
               </LocalizationProvider>
             </Grid>
-
+            <Grid item xs={12}>
+              <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
+                Voyage Details
+              </Typography>
+              {formData.voyages.map((voyage, index) => (
+                <Box key={index} sx={{ mb: 2 }}>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={4}>
+                      <TextField
+                        fullWidth
+                        label="Voyage Number"
+                        value={voyage.voyageNumber}
+                        onChange={(e) => {
+                          const newVoyages = [...formData.voyages];
+                          newVoyages[index].voyageNumber = e.target.value;
+                          setFormData({ ...formData, voyages: newVoyages });
+                        }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <TextField
+                        fullWidth
+                        label="Port of Departure"
+                        value={voyage.departurePort}
+                        onChange={(e) => {
+                          const newVoyages = [...formData.voyages];
+                          newVoyages[index].departurePort = e.target.value;
+                          setFormData({ ...formData, voyages: newVoyages });
+                        }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <TextField
+                        fullWidth
+                        label="Port of Arrival"
+                        value={voyage.arrivalPort}
+                        onChange={(e) => {
+                          const newVoyages = [...formData.voyages];
+                          newVoyages[index].arrivalPort = e.target.value;
+                          setFormData({ ...formData, voyages: newVoyages });
+                        }}
+                      />
+                    </Grid>
+                  </Grid>
+                  {formData.voyages.length > 1 && (
+                    <Button
+                      color="error"
+                      onClick={() => {
+                        const newVoyages = formData.voyages.filter((_, i) => i !== index);
+                        setFormData({ ...formData, voyages: newVoyages });
+                      }}
+                      sx={{ mt: 1 }}
+                    >
+                      Remove Voyage
+                    </Button>
+                  )}
+                </Box>
+              ))}
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  setFormData({
+                    ...formData,
+                    voyages: [...formData.voyages, { voyageNumber: '', departurePort: '', arrivalPort: '' }]
+                  });
+                }}
+                sx={{ mt: 1 }}
+              >
+                Add Another Voyage
+              </Button>
+            </Grid>
             <Grid item xs={6}>
               <TextField
                 label="Cargo Type"
