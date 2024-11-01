@@ -630,26 +630,15 @@ export const deleteCargoManifest = async (id) => {
 
 export const getVesselVisitRequestsAdHocRequest = async () => {
   try {
-    // Define the statuses to filter by
-    const statuses = ['confirmed', 'arriving', 'under tow', 'berthed'];
-
-    // Create a Firestore query to get vessel visits with the defined statuses
-    const vesselVisitRequestsRef = collection(db, 'vesselVisitRequests');
-    const q = query(vesselVisitRequestsRef, where('status', 'in', statuses));
-
-    // Execute the query and fetch the documents
-    const querySnapshot = await getDocs(q);
-
-    // Map the results into an array of objects
-    const vesselVisits = querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-
-    return vesselVisits;
+    const response = await fetch('http://localhost:5001/vessel-visits-adhoc-requests');
+    if (!response.ok) {
+      throw new Error('Failed to fetch vessel visits');
+    }
+    const data = await response.json();
+    return data;
   } catch (error) {
-    console.error('Error fetching vessel visit requests:', error);
-    throw new Error('Failed to fetch vessel visit requests');
+    console.error('Error fetching vessel visits:', error);
+    throw error;
   }
 };
 

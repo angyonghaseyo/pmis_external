@@ -30,6 +30,18 @@ class VesselService {
             }))
             .filter(visit => !existingManifestIMOs.has(visit.imoNumber));
     }
+
+    async fetchVesselVisitsAdHocRequests() {
+        const statuses = ['confirmed', 'arriving', 'under tow', 'berthed'];
+        const vesselVisitRequestsRef = db.collection('vesselVisitRequests');
+        const q = vesselVisitRequestsRef.where('status', 'in', statuses); 
+        const querySnapshot = await q.get();
+    
+        return querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+      }
 }
 
 module.exports = VesselService;

@@ -9,5 +9,6 @@ const vesselController = new VesselController(vesselService);
 
 router.get('/vessel-visits', (req, res) => vesselController.getVesselVisits(req, res));
 router.get('/vessel-visits-confirmed-without-manifests', (req, res) => vesselController.getConfirmedVesselVisitsWithoutManifests(req, res));
+router.get('/vessel-visits-adhoc-requests', (req, res) => vesselController.getVesselVisitsAdHocRequests(req, res));
 
 module.exports = router;
