@@ -102,19 +102,20 @@ const OperatorRequisition = () => {
     fetchData();
   }, [user, fetchRequisitions]);
 
-
-  const fetchUserProfile = async (uid) => {
+  const fetchUserProfile = async (email) => {
     try {
-      const response = await fetch(`http://localhost:5001/user-profile/${uid}`);
+      const response = await fetch(`http://localhost:5001/user-profile?email=${encodeURIComponent(email)}`);
       if (!response.ok) {
         throw new Error('Failed to fetch user profile');
       }
-      const data = await response.json();
-      setUserProfile(data);
+      const profileData = await response.json();
+      setUserProfile(profileData);
     } catch (error) {
       console.error('Error fetching user profile:', error);
+      setError('Failed to fetch user profile. Please try again later.');
     }
   };
+
   const hasRole = (requiredRoles) => {
 
     if (!userProfile || !Array.isArray(userProfile.accessRights)) return false;
