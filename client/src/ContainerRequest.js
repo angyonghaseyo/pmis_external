@@ -52,6 +52,7 @@ const ContainerRequest = ({ user }) => {
     const [bookings, setBookings] = useState([]);
     const [openDetailsDialog, setOpenDetailsDialog] = useState(false);
     const [selectedRequest, setSelectedRequest] = useState(null);
+    const [voyage, setVoyage] = useState("");
 
     const steps = [
         'Enter Booking Details',
@@ -116,6 +117,7 @@ const ContainerRequest = ({ user }) => {
                 const bookingData = bookingDoc.data();
                 setBookingData(bookingData);
                 setIsBookingValid(true);
+                setVoyage(bookingData.voyageNumber);
 
                 const cargoMap = bookingData.cargo || {};
                 const cargoArray = Object.entries(cargoMap).map(([id, cargoData]) => ({
@@ -281,9 +283,7 @@ const ContainerRequest = ({ user }) => {
                                     fullWidth
                                     label="Voyage Number"
                                     name="voyageNumber"
-                                    value={formData.voyageNumber}
-                                    onChange={(e) => setFormData({ ...formData, voyageNumber: e.target.value })}
-                                    required
+                                    value={voyage}
                                 />
                             </Grid>
                         </Grid>
@@ -605,7 +605,6 @@ const ContainerRequest = ({ user }) => {
                             <TextField
                                 fullWidth
                                 label="Status"
-                                value={request.status || ''}
                                 disabled
                                 variant="outlined"
                                 size="small"
