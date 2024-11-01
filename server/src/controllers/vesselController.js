@@ -32,7 +32,16 @@ class VesselController {
           res.status(500).send('Error fetching vessel visits.');
         }
       }
-    
+
+      async getActiveVesselVisits(req, res) {
+        try {
+          const activeVisits = await this.vesselService.fetchActiveVesselVisits();
+          res.status(200).json(activeVisits);
+        } catch (error) {
+          console.error('Error fetching active vessel visits:', error);
+          res.status(500).send('Error fetching active vessel visits.');
+        }
+      }
 }
 
 module.exports = VesselController;

@@ -642,8 +642,21 @@ export const getVesselVisitRequestsAdHocRequest = async () => {
   }
 };
 
-// In api.js, add these functions
+export const getActiveVesselVisits = async () => {
+  try {
+    const response = await fetch('http://localhost:5001/active-vessel-visits');
+    if (!response.ok) {
+      throw new Error('Failed to fetch active vessel visits');
+    }
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching active vessel visits:', error);
+    throw error;
+  }
+};
 
+// In api.js, add these functions
 export const getAdHocResourceRequests = async () => {
   try {
     const response = await fetch('http://localhost:5001/ad-hoc-resource-requests');

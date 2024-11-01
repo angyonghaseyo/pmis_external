@@ -22,20 +22,27 @@ import {
   Tab,
   Snackbar,
   Alert,
-  Container
+  FormControl,
+  InputLabel,
+  Select,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import { Close } from '@mui/icons-material';
-import { getOperatorRequisitions, createOperatorRequisition, updateOperatorRequisition, deleteOperatorRequisition, getUserData } from './services/api';
+import { 
+  getOperatorRequisitions,
+  createOperatorRequisition, 
+  updateOperatorRequisition, 
+  deleteOperatorRequisition,
+  getActiveVesselVisits 
+} from './services/api';
 import { useAuth } from './AuthContext';
 
-const operatorSkills = ['Crane Operator', 'Forklift Operator', 'Equipment Technician'];
-const durations = ['1 Hour', '2 Hours', '3 Hours', '4 Hours']; // Fixed duration options
+const operatorSkills = ['Tugboat Operator', 'Pilot Operator'];
+const durations = ['1 Hour', '2 Hours', '3 Hours', '4 Hours'];
 
 const OperatorRequisition = () => {
   const { user } = useAuth();
-
   const [pendingRequests, setPendingRequests] = useState([]);
   const [resolvedRequests, setResolvedRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -45,25 +52,27 @@ const OperatorRequisition = () => {
     date: '',
     time: '',
     duration: '',
+    quantity: 1,
+    imoNumber: '',
   });
 
   const [open, setOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(null);
   const [tabValue, setTabValue] = useState(0);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
-  const [userProfile, setUserProfile] = useState(null);
+  const [activeVesselVisits, setActiveVesselVisits] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
   const fetchRequisitions = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      if (!user) {
+      if (!user || !user.email) {
         setError('No authenticated user found');
         return;
       }
       const requisitions = await getOperatorRequisitions(user.email);
 
-      // Filter pending, approved, and rejected requests
       const pending = requisitions.filter(req => req.status === 'Pending');
       const resolved = requisitions.filter(req => ['Approved', 'Rejected'].includes(req.status));
 
@@ -74,7 +83,17 @@ const OperatorRequisition = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
+
+  const fetchActiveVessels = async () => {
+    try {
+      const visits = await getActiveVesselVisits();
+      setActiveVesselVisits(visits);
+    } catch (error) {
+      console.error('Error fetching active vessels:', error);
+      setError('Failed to fetch vessel visits');
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -84,7 +103,7 @@ const OperatorRequisition = () => {
           setError(null);
           await Promise.all([
             fetchRequisitions(),
-            fetchUserProfile(user.email)
+            fetchActiveVessels()
           ]);
         } catch (error) {
           console.error('Error fetching data:', error);
@@ -94,7 +113,6 @@ const OperatorRequisition = () => {
         }
       } else {
         setError('Please log in to view requisitions.');
-        setUserProfile(null);
         setIsLoading(false);
       }
     };
@@ -102,48 +120,52 @@ const OperatorRequisition = () => {
     fetchData();
   }, [user, fetchRequisitions]);
 
-  const fetchUserProfile = async (email) => {
-    try {
-      const response = await fetch(`http://localhost:5001/user-profile?email=${encodeURIComponent(email)}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch user profile');
-      }
-      const profileData = await response.json();
-      setUserProfile(profileData);
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-      setError('Failed to fetch user profile. Please try again later.');
-    }
-  };
-
   const hasRole = (requiredRoles) => {
-
-    if (!userProfile || !Array.isArray(userProfile.accessRights)) return false;
-
-    // Check if the user has any of the required roles
-    const hasRequiredRole = requiredRoles.some(role => user.accessRights.includes(role));
-
-    // Return true if the user has a required role or is an Admin
-    return hasRequiredRole || userProfile.role === 'Admin';
-
-
+    if (!user || !Array.isArray(user.accessRights)) return false;
+    return requiredRoles.some(role => user.accessRights.includes(role));
   };
-
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    if (name === 'imoNumber') {
+      const selectedVisit = activeVesselVisits.find(visit => visit.imoNumber === value);
+      if (selectedVisit) {
+        const etaDate = new Date(selectedVisit.eta);
+        setFormData(prev => ({
+          ...prev,
+          [name]: value,
+          date: etaDate.toISOString().split('T')[0],
+          time: etaDate.toTimeString().split(' ')[0].slice(0, 5),
+        }));
+      }
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
   };
 
-  const handleOpenDialog = () => setOpen(true);
-  const handleCloseDialog = () => {
-    setOpen(false);
+  const handleOpenDialog = () => {
+    if (activeVesselVisits.length === 0) {
+      setSnackbar({
+        open: true,
+        message: 'No active vessel visits available for operator requisition',
+        severity: 'warning'
+      });
+      return;
+    }
+    setOpen(true);
     setFormData({
       operatorSkill: '',
       date: '',
       time: '',
       duration: '',
+      quantity: 1,
+      imoNumber: '',
     });
+  };
+
+  const handleCloseDialog = () => {
+    setOpen(false);
     setIsEditing(null);
   };
 
@@ -151,12 +173,11 @@ const OperatorRequisition = () => {
     try {
       if (!user) throw new Error('No authenticated user');
 
-      if (!formData.time) {
-        setSnackbar({ open: true, message: 'Time is a required field', severity: 'error' });
+      if (!formData.time || !formData.imoNumber) {
+        setSnackbar({ open: true, message: 'All fields are required', severity: 'error' });
         return;
       }
 
-      // Validate if the selected date and time is in the past
       const selectedDateTime = new Date(`${formData.date}T${formData.time}`);
       const currentDateTime = new Date();
       if (selectedDateTime < currentDateTime) {
@@ -164,14 +185,38 @@ const OperatorRequisition = () => {
         return;
       }
 
-      if (isEditing !== null) {
-        await updateOperatorRequisition(isEditing, { ...formData, userId: user.uid });
-      } else {
-        await createOperatorRequisition({ ...formData, email: user.email, status: 'Pending' });
+      const selectedVisit = activeVesselVisits.find(visit => visit.imoNumber === formData.imoNumber);
+      if (!selectedVisit) {
+        setSnackbar({ 
+          open: true, 
+          message: 'Selected vessel visit is no longer available. Please select another vessel.', 
+          severity: 'error' 
+        });
+        return;
       }
+
+      if (isEditing !== null) {
+        await updateOperatorRequisition(isEditing, { ...formData, email: user.email });
+      } else {
+        const quantity = parseInt(formData.quantity, 10);
+        const createPromises = Array(quantity).fill().map(() => 
+          createOperatorRequisition({
+            ...formData,
+            email: user.email,
+            status: 'Pending',
+            quantity: 1
+          })
+        );
+        await Promise.all(createPromises);
+      }
+
       handleCloseDialog();
       await fetchRequisitions();
-      setSnackbar({ open: true, message: 'Requisition saved successfully', severity: 'success' });
+      setSnackbar({ 
+        open: true, 
+        message: isEditing ? 'Requisition updated successfully' : `${formData.quantity} requisition(s) created successfully`, 
+        severity: 'success' 
+      });
     } catch (err) {
       setSnackbar({ open: true, message: 'Failed to save requisition', severity: 'error' });
     }
@@ -180,16 +225,17 @@ const OperatorRequisition = () => {
   const handleDelete = async (id) => {
     try {
       await deleteOperatorRequisition(id);
-      await fetchRequisitions(); // Refetch after deletion
+      await fetchRequisitions();
       setSnackbar({ open: true, message: 'Requisition deleted successfully', severity: 'success' });
     } catch (err) {
       setSnackbar({ open: true, message: 'Failed to delete requisition', severity: 'error' });
     }
   };
+
   const handleEdit = (request) => {
     setFormData(request);
     setIsEditing(request.id);
-    handleOpenDialog();
+    setOpen(true);
   };
 
   const handleTabChange = (event, newValue) => setTabValue(newValue);
@@ -214,9 +260,9 @@ const OperatorRequisition = () => {
 
   if (isLoading) {
     return (
-      <Container maxWidth="lg" sx={{ mt: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+      <Box display="flex" justifyContent="center" alignItems="center" height="100vh">
         <CircularProgress />
-      </Container>
+      </Box>
     );
   }
 
@@ -225,6 +271,7 @@ const OperatorRequisition = () => {
       <Typography variant="h4" gutterBottom>
         Operator Requisition
       </Typography>
+      
       {hasRole(["Create Operator Requisition"]) && (
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
           <Button variant="contained" color="primary" onClick={handleOpenDialog}>
@@ -243,6 +290,7 @@ const OperatorRequisition = () => {
           <Table>
             <TableHead>
               <TableRow>
+                <TableCell>IMO Number</TableCell>
                 <TableCell>Operator Skill</TableCell>
                 <TableCell>Date</TableCell>
                 <TableCell>Time</TableCell>
@@ -254,13 +302,14 @@ const OperatorRequisition = () => {
             <TableBody>
               {pendingRequests.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center">
+                  <TableCell colSpan={7} align="center">
                     No pending requests found
                   </TableCell>
                 </TableRow>
               ) : (
                 pendingRequests.map((request) => (
                   <TableRow key={request.id}>
+                    <TableCell>{request.imoNumber}</TableCell>
                     <TableCell>{request.operatorSkill}</TableCell>
                     <TableCell>{request.date}</TableCell>
                     <TableCell>{request.time}</TableCell>
@@ -287,6 +336,7 @@ const OperatorRequisition = () => {
           <Table>
             <TableHead>
               <TableRow>
+                <TableCell>IMO Number</TableCell>
                 <TableCell>Operator Skill</TableCell>
                 <TableCell>Date</TableCell>
                 <TableCell>Time</TableCell>
@@ -297,13 +347,14 @@ const OperatorRequisition = () => {
             <TableBody>
               {resolvedRequests.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} align="center">
+                  <TableCell colSpan={6} align="center">
                     No approved or rejected requests found
                   </TableCell>
                 </TableRow>
               ) : (
                 resolvedRequests.map((request) => (
                   <TableRow key={request.id}>
+                    <TableCell>{request.imoNumber}</TableCell>
                     <TableCell>{request.operatorSkill}</TableCell>
                     <TableCell>{request.date}</TableCell>
                     <TableCell>{request.time}</TableCell>
@@ -317,7 +368,7 @@ const OperatorRequisition = () => {
         </TableContainer>
       )}
 
-      <Dialog open={open} onClose={handleCloseDialog}>
+      <Dialog open={open} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
         <DialogTitle>
           {isEditing !== null ? 'Update Operator Request' : 'Create Operator Request'}
           <IconButton
@@ -334,6 +385,22 @@ const OperatorRequisition = () => {
           </IconButton>
         </DialogTitle>
         <DialogContent>
+          <FormControl fullWidth margin="normal">
+            <InputLabel>IMO Number</InputLabel>
+            <Select
+              name="imoNumber"
+              value={formData.imoNumber}
+              onChange={handleInputChange}
+              disabled={isEditing}
+            >
+              {activeVesselVisits.map((visit) => (
+                <MenuItem key={visit.imoNumber} value={visit.imoNumber}>
+                  {visit.imoNumber}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
           <TextField
             select
             label="Operator Skill"
@@ -349,6 +416,26 @@ const OperatorRequisition = () => {
               </MenuItem>
             ))}
           </TextField>
+
+          {!isEditing && (
+            <TextField
+              label="Quantity"
+              type="number"
+              name="quantity"
+              value={formData.quantity}
+              onChange={handleInputChange}
+              fullWidth
+              margin="normal"
+              InputProps={{ 
+                inputProps: { 
+                  min: 1,
+                  max: 10
+                } 
+              }}
+              helperText="Number of identical requests to create (1-10)"
+            />
+          )}
+
           <TextField
             label="Date"
             type="date"
@@ -358,7 +445,9 @@ const OperatorRequisition = () => {
             fullWidth
             margin="normal"
             InputLabelProps={{ shrink: true }}
+            disabled
           />
+
           <TextField
             label="Time"
             type="time"
@@ -368,7 +457,9 @@ const OperatorRequisition = () => {
             fullWidth
             margin="normal"
             InputLabelProps={{ shrink: true }}
+            disabled
           />
+
           <TextField
             select
             label="Duration"
@@ -387,14 +478,28 @@ const OperatorRequisition = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={handleSubmit} variant="contained" color="primary">
+          <Button 
+            onClick={handleSubmit} 
+            variant="contained" 
+            color="primary"
+            disabled={!formData.imoNumber || !formData.operatorSkill || !formData.duration}
+          >
             {isEditing !== null ? 'Update' : 'Create'}
           </Button>
         </DialogActions>
       </Dialog>
 
-      <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={6000} 
+        onClose={handleCloseSnackbar} 
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity} 
+          sx={{ width: '100%' }}
+        >
           {snackbar.message}
         </Alert>
       </Snackbar>

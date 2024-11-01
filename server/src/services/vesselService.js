@@ -41,7 +41,37 @@ class VesselService {
           id: doc.id,
           ...doc.data()
         }));
-      }
+    }
+
+    async fetchActiveVesselVisits() {
+        try {
+            const vesselVisitRequestsRef = db.collection("vesselVisitRequests");
+            const q = vesselVisitRequestsRef.where('status', '!=', 'completed');
+            const querySnapshot = await q.get();
+            
+            const currentTime = new Date().getTime();
+            const visits = querySnapshot.docs
+            .map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }))
+            .filter(visit => {
+                const etd = new Date(visit.etd).getTime();
+                const eta = new Date(visit.eta).getTime();
+                return etd > currentTime && 
+                    visit.status === "pending user intervention" && 
+                    !isNaN(eta) && 
+                    !isNaN(etd);
+            })
+            .sort((a, b) => new Date(a.eta).getTime() - new Date(b.eta).getTime());
+
+            return visits;
+        } catch (error) {
+            console.error('Error fetching active vessel visits:', error);
+            throw error;
+        }
+    }
+
 }
 
 module.exports = VesselService;
