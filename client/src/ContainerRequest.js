@@ -605,7 +605,6 @@ const ContainerRequest = ({ user }) => {
                             <TextField
                                 fullWidth
                                 label="Status"
-                                value={request.status || ''}
                                 disabled
                                 variant="outlined"
                                 size="small"
