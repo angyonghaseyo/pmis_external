@@ -59,7 +59,7 @@ class VesselService {
                 const etd = new Date(visit.etd).getTime();
                 const eta = new Date(visit.eta).getTime();
                 return etd > currentTime && 
-                    visit.status === "pending user intervention" && 
+                    visit.status === "confirmed" && 
                     !isNaN(eta) && 
                     !isNaN(etd);
             })
