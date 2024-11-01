@@ -653,6 +653,59 @@ export const getVesselVisitRequestsAdHocRequest = async () => {
   }
 };
 
+// In api.js, add these functions
+
+export const getAdHocResourceRequests = async () => {
+  try {
+    const response = await fetch('http://localhost:5001/ad-hoc-resource-requests');
+    if (!response.ok) {
+      throw new Error('Failed to fetch ad hoc requests');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching ad hoc requests:', error);
+    throw error;
+  }
+};
+
+export const submitAdHocResourceRequest = async (requestData) => {
+  try {
+    const response = await fetch('http://localhost:5001/ad-hoc-resource-requests', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestData),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to submit ad hoc request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error submitting ad hoc request:', error);
+    throw error;
+  }
+};
+
+export const updateAdHocResourceRequest = async (requestId, requestData) => {
+  try {
+    const response = await fetch(`http://localhost:5001/ad-hoc-resource-requests/${requestId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestData),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to update ad hoc request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating ad hoc request:', error);
+    throw error;
+  }
+};
+
 // Dashboard data
 export const getLeaveStatistics = () => authAxios.get('/leave-statistics').catch(handleApiError);
 
@@ -768,7 +821,10 @@ const api = {
   submitCargoManifest,
   updateCargoManifest,
   deleteCargoManifest,
-  getVesselVisitRequestsAdHocRequest
+  getVesselVisitRequestsAdHocRequest,
+  getAdHocResourceRequests,
+  submitAdHocResourceRequest,
+  updateAdHocResourceRequest,
 };
 
 export default api;

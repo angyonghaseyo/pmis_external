@@ -18,6 +18,7 @@ const facilityRoutes = require('./src/routes/facilityRoutes');
 const inquiryRoutes = require('./src/routes/inquiryRoutes');
 const trainingRoutes = require('./src/routes/trainingRoutes');
 const companyRoutes = require('./src/routes/companyRoutes');
+const adHocResourceRequestRoutes = require('./src/routes/adHocResourceRequestRoutes');
 
 require('./src/config/firebase');
 
@@ -43,6 +44,7 @@ app.use('/', facilityRoutes);
 app.use('/', inquiryRoutes);
 app.use('/', trainingRoutes);
 app.use('/', companyRoutes);
+app.use('/', adHocResourceRequestRoutes);
 
 
 app.listen(5001, () => {
