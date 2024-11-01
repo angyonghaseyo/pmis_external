@@ -10,7 +10,6 @@ import ForgotPassword from './ForgotPassword';
 import ResetPassword from './ResetPassword';
 import EditProfile from './EditProfile';
 import InquiryFeedback from './InquiryFeedback';
-import InquiryFeedbackDetail from './InquiryFeedbackDetail';
 import TrainingProgram from './TrainingProgram';
 import CompanyInfo from './CompanyInfo';
 import OperatorRequisition from './OperatorRequisition';
