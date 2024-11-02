@@ -83,7 +83,7 @@ const FacilityRental = () => {
                 id: doc.id,
                 ...doc.data(),
                 bookedPeriods: doc.data().bookedPeriods || []
-            })).filter(facility => facility.status === 'Available');
+            }));
             setFacilities(facilitiesData);
         } catch (error) {
             console.error('Error fetching facilities:', error);
@@ -98,7 +98,9 @@ const FacilityRental = () => {
             const querySnapshot = await getDocs(collection(db, 'facility_rentals'));
             const requests = querySnapshot.docs.map(doc => ({
                 id: doc.id,
-                ...doc.data()
+                ...doc.data(),
+                bookedPeriodStart: doc.data().bookedPeriodStart,
+                bookedPeriodEnd: doc.data().bookedPeriodEnd
             }));
             setRentalRequests(requests);
         } catch (error) {
@@ -110,10 +112,7 @@ const FacilityRental = () => {
     const checkBookingConflict = (facility, start, end) => {
         if (!facility || !start || !end) return false;
 
-        // Only check against approved bookings
-        const approvedBookings = facility.bookedPeriods.filter(period => period.status === 'Approved');
-
-        return approvedBookings.some(period => {
+        return facility.bookedPeriods.some(period => {
             const periodStart = new Date(period.start);
             const periodEnd = new Date(period.end);
             const newStart = new Date(start);
@@ -179,6 +178,20 @@ const FacilityRental = () => {
         });
     };
 
+    const handleViewDetails = (request) => {
+        const facility = facilities.find(f => f.id === request.facilityId);
+        setSelectedFacility(facility);
+        setFormData({
+            ...request,
+            bookedPeriodStart: new Date(request.bookedPeriodStart),
+            bookedPeriodEnd: new Date(request.bookedPeriodEnd)
+        });
+        setSelectedRequest(request);
+        setViewMode(true);
+        setOpenDialog(true);
+        setActiveStep(2);
+    };
+
     const handleSubmit = async () => {
         try {
             if (bookingConflict) {
@@ -187,7 +200,6 @@ const FacilityRental = () => {
             }
 
             setLoading(true);
-            // Create rental request without adding to booked periods yet
             const rentalData = {
                 ...formData,
                 facilityName: selectedFacility.name,
@@ -212,21 +224,6 @@ const FacilityRental = () => {
         }
     };
 
-    const handleCloseDialog = () => {
-        setOpenDialog(false);
-        setSelectedFacility(null);
-        setActiveStep(0);
-        setFormData({
-            facilityId: '',
-            bookedPeriodStart: null,
-            bookedPeriodEnd: null,
-            purpose: '',
-            specialRequirements: ''
-        });
-        setViewMode(false);
-        setBookingConflict(false);
-    };
-
     const handleCancelRequest = async (request) => {
         try {
             setLoading(true);
@@ -241,21 +238,20 @@ const FacilityRental = () => {
         }
     };
 
-    const getApprovedBookingsDisplay = (facility) => {
-        const approvedBookings = facility.bookedPeriods.filter(period => period.status === 'Approved');
-        
-        if (!approvedBookings || approvedBookings.length === 0) {
-            return 'No current bookings';
-        }
-
-        return approvedBookings.map((period, index) => (
-            <Box key={index} sx={{ mb: 1 }}>
-                <Typography variant="body2">
-                    {new Date(period.start).toLocaleDateString()} - 
-                    {new Date(period.end).toLocaleDateString()}
-                </Typography>
-            </Box>
-        ));
+    const handleCloseDialog = () => {
+        setOpenDialog(false);
+        setSelectedFacility(null);
+        setActiveStep(0);
+        setFormData({
+            facilityId: '',
+            bookedPeriodStart: null,
+            bookedPeriodEnd: null,
+            purpose: '',
+            specialRequirements: ''
+        });
+        setViewMode(false);
+        setSelectedRequest(null);
+        setBookingConflict(false);
     };
 
     const getStepContent = (step) => {
@@ -265,7 +261,7 @@ const FacilityRental = () => {
                     <Grid container spacing={3}>
                         {facilities.map((facility) => (
                             <Grid item xs={12} md={4} key={facility.id}>
-                                <Card
+                                <Card 
                                     sx={{
                                         height: '100%',
                                         display: 'flex',
@@ -278,7 +274,7 @@ const FacilityRental = () => {
                                     }}
                                     onClick={() => handleFacilitySelect(facility)}
                                 >
-                                    <CardContent sx={{ flexGrow: 1 }}>
+                                    <CardContent>
                                         <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
                                             <Warehouse sx={{ fontSize: 40 }} />
                                         </Box>
@@ -291,7 +287,7 @@ const FacilityRental = () => {
                                         <Typography variant="body2" color="text.secondary" paragraph>
                                             Location: {facility.location}
                                         </Typography>
-                                        <Typography variant="subtitle1" color="primary">
+                                        <Typography variant="h6" color="primary">
                                             ${facility.pricePerDay}/day
                                         </Typography>
                                         {facility.features && (
@@ -299,11 +295,6 @@ const FacilityRental = () => {
                                                 Features: {facility.features}
                                             </Typography>
                                         )}
-                                        <Divider sx={{ my: 2 }} />
-                                        <Typography variant="subtitle2" gutterBottom>
-                                            Current Bookings:
-                                        </Typography>
-                                        {getApprovedBookingsDisplay(facility)}
                                     </CardContent>
                                 </Card>
                             </Grid>
@@ -318,8 +309,7 @@ const FacilityRental = () => {
                             <Alert severity={bookingConflict ? 'error' : 'info'}>
                                 {bookingConflict 
                                     ? 'Selected period conflicts with existing bookings'
-                                    : 'Please select your desired booking period'
-                                }
+                                    : 'Please select your desired booking period'}
                             </Alert>
                         </Grid>
                         <Grid item xs={12} sm={6}>
@@ -344,16 +334,6 @@ const FacilityRental = () => {
                                 />
                             </LocalizationProvider>
                         </Grid>
-                        {selectedFacility && (
-                            <Grid item xs={12}>
-                                <Paper sx={{ p: 2, mt: 2 }}>
-                                    <Typography variant="subtitle2" gutterBottom>
-                                        Current Approved Bookings for {selectedFacility.name}:
-                                    </Typography>
-                                    {getApprovedBookingsDisplay(selectedFacility)}
-                                </Paper>
-                            </Grid>
-                        )}
                         <Grid item xs={12}>
                             <TextField
                                 fullWidth
@@ -381,7 +361,6 @@ const FacilityRental = () => {
             case 2:
                 return (
                     <Box>
-                        <Typography variant="h6" gutterBottom>Review Booking Details</Typography>
                         <Grid container spacing={2}>
                             <Grid item xs={12}>
                                 <Paper sx={{ p: 2 }}>
@@ -426,7 +405,7 @@ const FacilityRental = () => {
                             </Grid>
                             <Grid item xs={12}>
                                 <Paper sx={{ p: 2 }}>
-                                    <Typography variant="subtitle1" gutterBottom>Purpose & Requirements</Typography>
+                                <Typography variant="subtitle1" gutterBottom>Purpose & Requirements</Typography>
                                     <Typography variant="body2" paragraph>
                                         <strong>Purpose:</strong> {formData.purpose}
                                     </Typography>
@@ -440,7 +419,6 @@ const FacilityRental = () => {
                         </Grid>
                     </Box>
                 );
-
             default:
                 return 'Unknown step';
         }
@@ -513,12 +491,7 @@ const FacilityRental = () => {
                                             <Tooltip title="View Details">
                                                 <IconButton
                                                     size="small"
-                                                    onClick={() => {
-                                                        setSelectedRequest(request);
-                                                        setViewMode(true);
-                                                        setOpenDialog(true);
-                                                        setActiveStep(2);
-                                                    }}
+                                                    onClick={() => handleViewDetails(request)}
                                                 >
                                                     <Visibility />
                                                 </IconButton>
@@ -543,7 +516,6 @@ const FacilityRental = () => {
                 </TableContainer>
             </Paper>
 
-            {/* Rental Dialog */}
             <Dialog
                 open={openDialog}
                 onClose={handleCloseDialog}
@@ -611,7 +583,6 @@ const FacilityRental = () => {
                 </DialogActions>
             </Dialog>
 
-            {/* Snackbar */}
             <Snackbar
                 open={snackbar.open}
                 autoHideDuration={6000}
