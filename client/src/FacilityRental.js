@@ -27,8 +27,12 @@ import {
     TableCell,
     Divider,
     CircularProgress,
-    Tooltip,
-    Snackbar
+    Snackbar,
+    Stack,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem
 } from '@mui/material';
 import {
     Warehouse,
@@ -37,15 +41,42 @@ import {
     Close,
     ArrowForward,
     ArrowBack,
-    Event
+    Event,
+    AccessTime
 } from '@mui/icons-material';
-import { collection, addDoc, getDocs, doc, getDoc, deleteDoc, query, where, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, getDoc, deleteDoc } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { addHours, isBefore, isAfter, format } from 'date-fns';
 
-const steps = ['Select Facility', 'Specify Booking Period', 'Review & Submit'];
+const steps = ['Select Facility', 'Specify Booking Hours', 'Review & Submit'];
+
+// Utility function to check for booking conflicts
+const checkBookingConflict = (bookedPeriods, newStart, newEnd) => {
+    if (!bookedPeriods || !newStart || !newEnd) return false;
+
+    const requestStart = new Date(newStart).getTime();
+    const requestEnd = new Date(newEnd).getTime();
+
+    // Check for invalid time range
+    if (requestEnd <= requestStart) {
+        return true;
+    }
+
+    return bookedPeriods.some(period => {
+        if (period.status !== 'Approved') return false;
+        const periodStart = new Date(period.start).getTime();
+        const periodEnd = new Date(period.end).getTime();
+
+        return (
+            (requestStart >= periodStart && requestStart < periodEnd) ||
+            (requestEnd > periodStart && requestEnd <= periodEnd) ||
+            (requestStart <= periodStart && requestEnd >= periodEnd)
+        );
+    });
+};
 
 const FacilityRental = () => {
     const [activeStep, setActiveStep] = useState(0);
@@ -54,8 +85,8 @@ const FacilityRental = () => {
     const [facilities, setFacilities] = useState([]);
     const [formData, setFormData] = useState({
         facilityId: '',
-        bookedPeriodStart: null,
-        bookedPeriodEnd: null,
+        startTime: null,
+        endTime: null,
         purpose: '',
         specialRequirements: ''
     });
@@ -69,11 +100,23 @@ const FacilityRental = () => {
     const [viewMode, setViewMode] = useState(false);
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [bookingConflict, setBookingConflict] = useState(false);
+    const [timeSlots, setTimeSlots] = useState([]);
 
     useEffect(() => {
         fetchFacilities();
         fetchRentalRequests();
     }, []);
+
+    useEffect(() => {
+        if (formData.startTime && formData.endTime && selectedFacility) {
+            const hasConflict = checkBookingConflict(
+                selectedFacility.bookedPeriods || [],
+                formData.startTime,
+                formData.endTime
+            );
+            setBookingConflict(hasConflict);
+        }
+    }, [formData.startTime, formData.endTime, selectedFacility]);
 
     const fetchFacilities = async () => {
         try {
@@ -83,7 +126,7 @@ const FacilityRental = () => {
                 id: doc.id,
                 ...doc.data(),
                 bookedPeriods: doc.data().bookedPeriods || []
-            }));
+            })).filter(facility => facility.status === 'Available');
             setFacilities(facilitiesData);
         } catch (error) {
             console.error('Error fetching facilities:', error);
@@ -98,9 +141,7 @@ const FacilityRental = () => {
             const querySnapshot = await getDocs(collection(db, 'facility_rentals'));
             const requests = querySnapshot.docs.map(doc => ({
                 id: doc.id,
-                ...doc.data(),
-                bookedPeriodStart: doc.data().bookedPeriodStart,
-                bookedPeriodEnd: doc.data().bookedPeriodEnd
+                ...doc.data()
             }));
             setRentalRequests(requests);
         } catch (error) {
@@ -109,47 +150,19 @@ const FacilityRental = () => {
         }
     };
 
-    const checkBookingConflict = (facility, start, end) => {
-        if (!facility || !start || !end) return false;
-
-        return facility.bookedPeriods.some(period => {
-            const periodStart = new Date(period.start);
-            const periodEnd = new Date(period.end);
-            const newStart = new Date(start);
-            const newEnd = new Date(end);
-
-            return (
-                (newStart >= periodStart && newStart <= periodEnd) ||
-                (newEnd >= periodStart && newEnd <= periodEnd) ||
-                (newStart <= periodStart && newEnd >= periodEnd)
-            );
-        });
-    };
-
-    const handleDateChange = (field, value) => {
-        setFormData(prev => {
-            const newData = { ...prev, [field]: value };
-
-            if (selectedFacility && newData.bookedPeriodStart && newData.bookedPeriodEnd) {
-                const hasConflict = checkBookingConflict(
-                    selectedFacility,
-                    newData.bookedPeriodStart,
-                    newData.bookedPeriodEnd
-                );
-                setBookingConflict(hasConflict);
-            }
-
-            return newData;
-        });
-    };
-
     const calculateTotalPrice = () => {
-        if (!selectedFacility || !formData.bookedPeriodStart || !formData.bookedPeriodEnd) return 0;
-        const days = Math.ceil(
-            (new Date(formData.bookedPeriodEnd) - new Date(formData.bookedPeriodStart)) / 
-            (1000 * 60 * 60 * 24)
-        );
-        return days * selectedFacility.pricePerDay;
+        if (!selectedFacility || !formData.startTime || !formData.endTime) return 0;
+        
+        const start = new Date(formData.startTime).getTime();
+        const end = new Date(formData.endTime).getTime();
+        
+        // Calculate hours, rounding up to nearest hour
+        const hours = Math.ceil((end - start) / (1000 * 60 * 60));
+        
+        // Convert daily rate to hourly
+        const hourlyRate = selectedFacility.pricePerDay / 24;
+        
+        return hours * hourlyRate;
     };
 
     const handleNext = () => {
@@ -178,38 +191,57 @@ const FacilityRental = () => {
         });
     };
 
-    const handleViewDetails = (request) => {
-        const facility = facilities.find(f => f.id === request.facilityId);
-        setSelectedFacility(facility);
-        setFormData({
-            ...request,
-            bookedPeriodStart: new Date(request.bookedPeriodStart),
-            bookedPeriodEnd: new Date(request.bookedPeriodEnd)
-        });
-        setSelectedRequest(request);
-        setViewMode(true);
-        setOpenDialog(true);
-        setActiveStep(2);
+    const validateBookingForm = () => {
+        if (!formData.startTime || !formData.endTime) {
+            showSnackbar('Please select both start and end times', 'error');
+            return false;
+        }
+
+        const start = new Date(formData.startTime);
+        const end = new Date(formData.endTime);
+        const now = new Date();
+
+        if (isBefore(start, now)) {
+            showSnackbar('Cannot book time slots in the past', 'error');
+            return false;
+        }
+
+        if (!isAfter(end, start)) {
+            showSnackbar('End time must be after start time', 'error');
+            return false;
+        }
+
+        const hours = Math.ceil((end - start) / (1000 * 60 * 60));
+        if (hours < 1) {
+            showSnackbar('Minimum booking duration is 1 hour', 'error');
+            return false;
+        }
+
+        return true;
     };
 
     const handleSubmit = async () => {
+        if (!validateBookingForm()) return;
+
         try {
+            setLoading(true);
             if (bookingConflict) {
-                showSnackbar('Selected period conflicts with existing bookings', 'error');
+                showSnackbar('Selected time slot is not available', 'error');
                 return;
             }
 
-            setLoading(true);
             const rentalData = {
-                ...formData,
+                facilityId: selectedFacility.id,
                 facilityName: selectedFacility.name,
                 facilityType: selectedFacility.type,
-                status: 'Pending',
+                startTime: formData.startTime.toISOString(),
+                endTime: formData.endTime.toISOString(),
+                purpose: formData.purpose,
+                specialRequirements: formData.specialRequirements,
                 totalPrice: calculateTotalPrice(),
+                status: 'Pending',
                 squareFootage: selectedFacility.squareFootage,
-                createdAt: serverTimestamp(),
-                bookedPeriodStart: formData.bookedPeriodStart.toISOString(),
-                bookedPeriodEnd: formData.bookedPeriodEnd.toISOString()
+                createdAt: new Date().toISOString()
             };
 
             await addDoc(collection(db, 'facility_rentals'), rentalData);
@@ -224,10 +256,25 @@ const FacilityRental = () => {
         }
     };
 
-    const handleCancelRequest = async (request) => {
+    const handleCloseDialog = () => {
+        setOpenDialog(false);
+        setSelectedFacility(null);
+        setActiveStep(0);
+        setFormData({
+            facilityId: '',
+            startTime: null,
+            endTime: null,
+            purpose: '',
+            specialRequirements: ''
+        });
+        setViewMode(false);
+        setBookingConflict(false);
+    };
+
+    const handleCancelRequest = async (requestId) => {
         try {
             setLoading(true);
-            await deleteDoc(doc(db, 'facility_rentals', request.id));
+            await deleteDoc(doc(db, 'facility_rentals', requestId));
             showSnackbar('Request cancelled successfully', 'success');
             await fetchRentalRequests();
         } catch (error) {
@@ -238,20 +285,21 @@ const FacilityRental = () => {
         }
     };
 
-    const handleCloseDialog = () => {
-        setOpenDialog(false);
-        setSelectedFacility(null);
-        setActiveStep(0);
-        setFormData({
-            facilityId: '',
-            bookedPeriodStart: null,
-            bookedPeriodEnd: null,
-            purpose: '',
-            specialRequirements: ''
-        });
-        setViewMode(false);
-        setSelectedRequest(null);
-        setBookingConflict(false);
+    const getApprovedBookingsDisplay = (facility) => {
+        if (!facility.bookedPeriods || facility.bookedPeriods.length === 0) {
+            return 'No current bookings';
+        }
+
+        return facility.bookedPeriods
+            .filter(period => period.status === 'Approved')
+            .map((period, index) => (
+                <Box key={index} sx={{ mb: 1 }}>
+                    <Typography variant="body2">
+                        {format(new Date(period.start), 'MMM dd, yyyy HH:mm')} - 
+                        {format(new Date(period.end), 'HH:mm')}
+                    </Typography>
+                </Box>
+            ));
     };
 
     const getStepContent = (step) => {
@@ -261,7 +309,7 @@ const FacilityRental = () => {
                     <Grid container spacing={3}>
                         {facilities.map((facility) => (
                             <Grid item xs={12} md={4} key={facility.id}>
-                                <Card 
+                                <Card
                                     sx={{
                                         height: '100%',
                                         display: 'flex',
@@ -275,26 +323,35 @@ const FacilityRental = () => {
                                     onClick={() => handleFacilitySelect(facility)}
                                 >
                                     <CardContent>
-                                        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
-                                            <Warehouse sx={{ fontSize: 40 }} />
-                                        </Box>
-                                        <Typography variant="h6" gutterBottom>
-                                            {facility.name}
-                                        </Typography>
-                                        <Typography variant="body2" color="text.secondary" paragraph>
-                                            {facility.type} - {facility.squareFootage} sq ft
-                                        </Typography>
-                                        <Typography variant="body2" color="text.secondary" paragraph>
-                                            Location: {facility.location}
-                                        </Typography>
-                                        <Typography variant="h6" color="primary">
-                                            ${facility.pricePerDay}/day
-                                        </Typography>
-                                        {facility.features && (
-                                            <Typography variant="body2" color="text.secondary">
-                                                Features: {facility.features}
+                                        <Stack spacing={2}>
+                                            <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                                                <Warehouse sx={{ fontSize: 40 }} />
+                                            </Box>
+                                            <Typography variant="h6">
+                                                {facility.name}
                                             </Typography>
-                                        )}
+                                            <Typography variant="body2" color="text.secondary">
+                                                {facility.type} - {facility.squareFootage} sq ft
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                Location: {facility.location}
+                                            </Typography>
+                                            <Typography variant="h6" color="primary">
+                                                ${(facility.pricePerDay / 24).toFixed(2)}/hour
+                                            </Typography>
+                                            {facility.features && (
+                                                <Typography variant="body2" color="text.secondary">
+                                                    Features: {facility.features}
+                                                </Typography>
+                                            )}
+                                            <Divider />
+                                            <Box>
+                                                <Typography variant="subtitle2" gutterBottom>
+                                                    Current Bookings:
+                                                </Typography>
+                                                {getApprovedBookingsDisplay(facility)}
+                                            </Box>
+                                        </Stack>
                                     </CardContent>
                                 </Card>
                             </Grid>
@@ -304,67 +361,89 @@ const FacilityRental = () => {
 
             case 1:
                 return (
-                    <Grid container spacing={3}>
-                        <Grid item xs={12}>
-                            <Alert severity={bookingConflict ? 'error' : 'info'}>
-                                {bookingConflict 
-                                    ? 'Selected period conflicts with existing bookings'
-                                    : 'Please select your desired booking period'}
-                            </Alert>
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <LocalizationProvider dateAdapter={AdapterDateFns}>
-                                <DateTimePicker
-                                    label="Booking Start"
-                                    value={formData.bookedPeriodStart}
-                                    onChange={(date) => handleDateChange('bookedPeriodStart', date)}
-                                    renderInput={(params) => <TextField {...params} fullWidth />}
-                                    minDate={new Date()}
+                    <Box>
+                        <Alert
+                            severity={bookingConflict ? 'error' : 'info'}
+                            sx={{ mb: 3 }}
+                        >
+                            {bookingConflict
+                                ? 'Selected time slot conflicts with existing bookings'
+                                : 'Please select your desired booking hours'}
+                        </Alert>
+                        <Grid container spacing={3}>
+                            <Grid item xs={12} sm={6}>
+                                <LocalizationProvider dateAdapter={AdapterDateFns}>
+                                    <DateTimePicker
+                                        label="Start Time"
+                                        value={formData.startTime}
+                                        onChange={(date) => setFormData(prev => ({
+                                            ...prev,
+                                            startTime: date
+                                        }))}
+                                        renderInput={(params) => <TextField {...params} fullWidth />}
+                                        minDate={new Date()}
+                                        minutesStep={60}
+                                    />
+                                </LocalizationProvider>
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <LocalizationProvider dateAdapter={AdapterDateFns}>
+                                    <DateTimePicker
+                                        label="End Time"
+                                        value={formData.endTime}
+                                        onChange={(date) => setFormData(prev => ({
+                                            ...prev,
+                                            endTime: date
+                                        }))}
+                                        renderInput={(params) => <TextField {...params} fullWidth />}
+                                        minDate={formData.startTime || new Date()}
+                                        minutesStep={60}
+                                    />
+                                </LocalizationProvider>
+                            </Grid>
+                            <Grid item xs={12}>
+                                <TextField
+                                    fullWidth
+                                    label="Purpose of Rental"
+                                    value={formData.purpose}
+                                    onChange={(e) => setFormData(prev => ({
+                                        ...prev,
+                                        purpose: e.target.value
+                                    }))}
+                                    multiline
+                                    rows={3}
+                                    required
                                 />
-                            </LocalizationProvider>
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <LocalizationProvider dateAdapter={AdapterDateFns}>
-                                <DateTimePicker
-                                    label="Booking End"
-                                    value={formData.bookedPeriodEnd}
-                                    onChange={(date) => handleDateChange('bookedPeriodEnd', date)}
-                                    renderInput={(params) => <TextField {...params} fullWidth />}
-                                    minDate={formData.bookedPeriodStart || new Date()}
+                            </Grid>
+                            <Grid item xs={12}>
+                                <TextField
+                                    fullWidth
+                                    label="Special Requirements"
+                                    value={formData.specialRequirements}
+                                    onChange={(e) => setFormData(prev => ({
+                                        ...prev,
+                                        specialRequirements: e.target.value
+                                    }))}
+                                    multiline
+                                    rows={3}
                                 />
-                            </LocalizationProvider>
+                            </Grid>
                         </Grid>
-                        <Grid item xs={12}>
-                            <TextField
-                                fullWidth
-                                label="Purpose of Rental"
-                                value={formData.purpose}
-                                onChange={(e) => setFormData(prev => ({ ...prev, purpose: e.target.value }))}
-                                multiline
-                                rows={3}
-                                required
-                            />
-                        </Grid>
-                        <Grid item xs={12}>
-                            <TextField
-                                fullWidth
-                                label="Special Requirements"
-                                value={formData.specialRequirements}
-                                onChange={(e) => setFormData(prev => ({ ...prev, specialRequirements: e.target.value }))}
-                                multiline
-                                rows={3}
-                            />
-                        </Grid>
-                    </Grid>
+                    </Box>
                 );
 
             case 2:
                 return (
                     <Box>
+                        <Typography variant="h6" gutterBottom>
+                            Review Booking Details
+                        </Typography>
                         <Grid container spacing={2}>
                             <Grid item xs={12}>
                                 <Paper sx={{ p: 2 }}>
-                                    <Typography variant="subtitle1" gutterBottom>Selected Facility</Typography>
+                                    <Typography variant="subtitle1" gutterBottom>
+                                        Selected Facility
+                                    </Typography>
                                     <Typography variant="body1" color="primary">
                                         {selectedFacility?.name} - {selectedFacility?.squareFootage} sq ft
                                     </Typography>
@@ -374,38 +453,53 @@ const FacilityRental = () => {
                                     <Typography variant="body2" color="text.secondary">
                                         Location: {selectedFacility?.location}
                                     </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        Hourly Rate: ${(selectedFacility?.pricePerDay / 24).toFixed(2)}
+                                    </Typography>
                                 </Paper>
                             </Grid>
+
                             <Grid item xs={12}>
                                 <Paper sx={{ p: 2 }}>
-                                    <Typography variant="subtitle1" gutterBottom>Booking Period</Typography>
+                                    <Typography variant="subtitle1" gutterBottom>
+                                        Booking Period
+                                    </Typography>
                                     <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                                        <Event color="primary" />
+                                        <AccessTime color="primary" />
                                         <Box>
                                             <Typography variant="body2" color="text.secondary">
-                                                Start: {formData.bookedPeriodStart?.toLocaleString()}
+                                                Start: {formData.startTime?.toLocaleString()}
                                             </Typography>
                                             <Typography variant="body2" color="text.secondary">
-                                                End: {formData.bookedPeriodEnd?.toLocaleString()}
+                                                End: {formData.endTime?.toLocaleString()}
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                Duration: {Math.ceil(
+                                                    (new Date(formData.endTime) - new Date(formData.startTime)) / 
+                                                    (1000 * 60 * 60)
+                                                )} hours
                                             </Typography>
                                         </Box>
                                     </Box>
                                 </Paper>
                             </Grid>
+
                             <Grid item xs={12}>
                                 <Paper sx={{ p: 2 }}>
-                                    <Typography variant="subtitle1" gutterBottom>Total Price</Typography>
-                                    <Typography variant="h4" color="primary">
-                                        ${calculateTotalPrice().toLocaleString()}
+                                    <Typography variant="subtitle1" gutterBottom>
+                                        Total Price
                                     </Typography>
-                                    <Typography variant="body2" color="text.secondary">
-                                        Based on ${selectedFacility?.pricePerDay} per day
+                                    <Typography variant="h4" color="primary">
+                                        ${calculateTotalPrice().toFixed(2)}
                                     </Typography>
                                 </Paper>
                             </Grid>
+
                             <Grid item xs={12}>
                                 <Paper sx={{ p: 2 }}>
-                                <Typography variant="subtitle1" gutterBottom>Purpose & Requirements</Typography>
+                                    <Typography variant="subtitle1" gutterBottom>
+                                        Purpose & Requirements
+                                    </Typography>
                                     <Typography variant="body2" paragraph>
                                         <strong>Purpose:</strong> {formData.purpose}
                                     </Typography>
@@ -419,6 +513,7 @@ const FacilityRental = () => {
                         </Grid>
                     </Box>
                 );
+
             default:
                 return 'Unknown step';
         }
@@ -426,6 +521,7 @@ const FacilityRental = () => {
 
     return (
         <Container maxWidth="lg" sx={{ py: 4 }}>
+            {/* Facilities Section */}
             <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
                     <Typography variant="h4">Facility Rental</Typography>
@@ -438,14 +534,14 @@ const FacilityRental = () => {
                     </Button>
                 </Box>
 
+                {/* Rental Requests Table */}
                 <TableContainer>
                     <Table>
                         <TableHead>
                             <TableRow>
-                                <TableCell>Facility Name</TableCell>
-                                <TableCell>Type</TableCell>
-                                <TableCell>Square Footage</TableCell>
+                                <TableCell>Facility</TableCell>
                                 <TableCell>Booking Period</TableCell>
+                                <TableCell>Duration</TableCell>
                                 <TableCell>Total Price</TableCell>
                                 <TableCell>Status</TableCell>
                                 <TableCell>Actions</TableCell>
@@ -454,13 +550,13 @@ const FacilityRental = () => {
                         <TableBody>
                             {loading ? (
                                 <TableRow>
-                                    <TableCell colSpan={7} align="center">
+                                    <TableCell colSpan={6} align="center">
                                         <CircularProgress />
                                     </TableCell>
                                 </TableRow>
                             ) : rentalRequests.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={7} align="center">
+                                    <TableCell colSpan={6} align="center">
                                         <Typography>No rental requests found</Typography>
                                     </TableCell>
                                 </TableRow>
@@ -468,44 +564,40 @@ const FacilityRental = () => {
                                 rentalRequests.map((request) => (
                                     <TableRow key={request.id}>
                                         <TableCell>{request.facilityName}</TableCell>
-                                        <TableCell>{request.facilityType}</TableCell>
-                                        <TableCell>{request.squareFootage}</TableCell>
                                         <TableCell>
                                             <Typography variant="body2">
-                                                {new Date(request.bookedPeriodStart).toLocaleDateString()} -
+                                                {new Date(request.startTime).toLocaleString()}
                                             </Typography>
                                             <Typography variant="body2">
-                                                {new Date(request.bookedPeriodEnd).toLocaleDateString()}
+                                                {new Date(request.endTime).toLocaleString()}
                                             </Typography>
                                         </TableCell>
-                                        <TableCell>${request.totalPrice?.toLocaleString()}</TableCell>
+                                        <TableCell>
+                                            {Math.ceil(
+                                                (new Date(request.endTime) - new Date(request.startTime)) / 
+                                                (1000 * 60 * 60)
+                                            )} hours
+                                        </TableCell>
+                                        <TableCell>${request.totalPrice.toFixed(2)}</TableCell>
                                         <TableCell>
                                             <Chip
                                                 label={request.status}
-                                                color={request.status === 'Approved' ? 'success' :
-                                                      request.status === 'Rejected' ? 'error' : 'warning'}
+                                                color={
+                                                    request.status === 'Approved' ? 'success' :
+                                                    request.status === 'Rejected' ? 'error' : 'warning'
+                                                }
                                                 size="small"
                                             />
                                         </TableCell>
                                         <TableCell>
-                                            <Tooltip title="View Details">
+                                            {request.status === 'Pending' && (
                                                 <IconButton
                                                     size="small"
-                                                    onClick={() => handleViewDetails(request)}
+                                                    color="error"
+                                                    onClick={() => handleCancelRequest(request.id)}
                                                 >
-                                                    <Visibility />
+                                                    <Cancel />
                                                 </IconButton>
-                                            </Tooltip>
-                                            {request.status === 'Pending' && (
-                                                <Tooltip title="Cancel Request">
-                                                    <IconButton
-                                                        size="small"
-                                                        color="error"
-                                                        onClick={() => handleCancelRequest(request)}
-                                                    >
-                                                        <Cancel />
-                                                    </IconButton>
-                                                </Tooltip>
                                             )}
                                         </TableCell>
                                     </TableRow>
@@ -516,6 +608,7 @@ const FacilityRental = () => {
                 </TableContainer>
             </Paper>
 
+            {/* Rental Dialog */}
             <Dialog
                 open={openDialog}
                 onClose={handleCloseDialog}
@@ -555,15 +648,13 @@ const FacilityRental = () => {
                     </Button>
                     {!viewMode && (
                         <>
-                            <Box sx={{ flex: '1 1 auto' }} />
-                            {activeStep > 0 && (
-                                <Button
-                                    onClick={handleBack}
-                                    startIcon={<ArrowBack />}
-                                >
-                                    Back
-                                </Button>
-                            )}
+                            <Button
+                                onClick={handleBack}
+                                disabled={activeStep === 0}
+                                startIcon={<ArrowBack />}
+                            >
+                                Back
+                            </Button>
                             <Button
                                 variant="contained"
                                 onClick={handleNext}
@@ -583,6 +674,7 @@ const FacilityRental = () => {
                 </DialogActions>
             </Dialog>
 
+            {/* Snackbar */}
             <Snackbar
                 open={snackbar.open}
                 autoHideDuration={6000}
