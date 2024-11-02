@@ -524,7 +524,7 @@ const FacilityRental = () => {
             {/* Facilities Section */}
             <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-                    <Typography variant="h4">Facility Rental</Typography>
+                    <Typography variant="h4">Facility and Space Rental</Typography>
                     <Button
                         variant="contained"
                         onClick={() => setOpenDialog(true)}

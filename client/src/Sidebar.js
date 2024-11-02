@@ -83,7 +83,7 @@ const Sidebar = ({ user }) => {
         { name: 'Container Pricing Manager', accessRights: ['Create Container Pricings', 'View Container Pricings'] },
         { name: 'Container Menu', accessRights: ['Create Container Menu', 'View Container Menu'] },
         { name: 'Container Requests List', accessRights: ['View Container Requests', 'Approve Container Requests'] },
-        { name: 'Facility Rental', accessRights: ['Create Facility Rental'] }
+        { name: 'Facility and Space Rental', accessRights: ['Create Facility Rental'] }
 
       ],
       accessRights: ['Create Cargo Booking', 'Create Facility Rental', 'View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest',
