@@ -19,6 +19,7 @@ const inquiryRoutes = require('./src/routes/inquiryRoutes');
 const trainingRoutes = require('./src/routes/trainingRoutes');
 const companyRoutes = require('./src/routes/companyRoutes');
 const adHocResourceRequestRoutes = require('./src/routes/adHocResourceRequestRoutes');
+const containerMenuRoutes = require('./src/routes/containerMenuRoutes');
 
 require('./src/config/firebase');
 
@@ -45,6 +46,7 @@ app.use('/', inquiryRoutes);
 app.use('/', trainingRoutes);
 app.use('/', companyRoutes);
 app.use('/', adHocResourceRequestRoutes);
+app.use('/', containerMenuRoutes);
 
 
 app.listen(5001, () => {

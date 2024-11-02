@@ -28,13 +28,10 @@ import {
     GridView,
     ViewList,
     CloudUpload,
-    Delete,
-    Close
+    Delete
 } from '@mui/icons-material';
-import { doc, getDoc, setDoc, collection, query, where, getDocs } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, storage } from "./firebaseConfig";
 import { useAuth } from './AuthContext';
+import { getContainerTypes, addContainerType } from './services/api';
 
 const ContainerMenu = () => {
     const { user } = useAuth();
@@ -54,53 +51,38 @@ const ContainerMenu = () => {
     });
     const [loading, setLoading] = useState(true);
 
-    const fetchUserCompany = async () => {
-        if (!user?.email) {
-            setSnackbar({
-                open: true,
-                message: "User email not found",
-                severity: 'error'
-            });
-            return;
-        }
-
-        try {
-            const usersRef = collection(db, 'users');
-            const q = query(usersRef, where('email', '==', user.email));
-            const querySnapshot = await getDocs(q);
-
-            if (querySnapshot.empty) {
+    useEffect(() => {
+        const initializeData = async () => {
+            if (!user?.company) {
                 setSnackbar({
                     open: true,
-                    message: "User not found in database",
+                    message: "Company information not available",
                     severity: 'error'
                 });
                 return;
             }
 
-            const userData = querySnapshot.docs[0].data();
-            console.log("HI", userData.company)
-            if (userData.company) {
-                setCompany(userData.company);
-                return userData.company;
-            } else {
+            setLoading(true);
+            try {
+                setCompany(user.company);
+                const containerTypes = await getContainerTypes(user.company);
+                setContainers(containerTypes);
+            } catch (error) {
+                console.error("Error loading container types:", error);
                 setSnackbar({
                     open: true,
-                    message: "No company information found for user",
+                    message: "Error loading container types",
                     severity: 'error'
                 });
-                return null;
+            } finally {
+                setLoading(false);
             }
-        } catch (error) {
-            console.error("Error fetching user company:", error);
-            setSnackbar({
-                open: true,
-                message: "Error fetching company information",
-                severity: 'error'
-            });
-            return null;
+        };
+
+        if (user) {
+            initializeData();
         }
-    };
+    }, [user]);
 
     const handleImageChange = (event) => {
         const file = event.target.files[0];
@@ -132,93 +114,54 @@ const ContainerMenu = () => {
         }
     };
 
-    const uploadImage = async () => {
-        if (!imageFile) return null;
-
-        const fileExtension = imageFile.name.split('.').pop();
-        const fileName = `${company}_${Date.now()}.${fileExtension}`;
-        const storageRef = ref(storage, `container_images/${fileName}`);
+    const handleAddContainer = async () => {
+        if (!newName || !newSize || !newPrice) {
+            setSnackbar({
+                open: true,
+                message: "Please fill in all required fields",
+                severity: 'warning'
+            });
+            return;
+        }
 
         try {
             setUploading(true);
-            const snapshot = await uploadBytes(storageRef, imageFile);
-            const downloadURL = await getDownloadURL(snapshot.ref);
-            return downloadURL;
-        } catch (error) {
-            console.error("Error uploading image:", error);
-            throw error;
-        } finally {
-            setUploading(false);
-        }
-    };
-
-    const handleAddContainer = async () => {
-        try {
-            if (!company) {
-                setSnackbar({
-                    open: true,
-                    message: "Company information not available",
-                    severity: 'error'
-                });
-                return;
-            }
-
-            const menuCollectionRef = collection(db, "container_menu");
-            const companyDocRef = doc(menuCollectionRef, company);
-            const companyDoc = await getDoc(companyDocRef);
-
-            let existingContainers = companyDoc.exists() ? companyDoc.data().container_types : [];
-
-            const isDuplicate = existingContainers.some(
-                container => container.size === parseInt(newSize) &&
-                    container.price === parseFloat(newPrice)
-            );
-
-            if (isDuplicate) {
-                setSnackbar({
-                    open: true,
-                    message: "A container with this size and price combination already exists.",
-                    severity: 'error'
-                });
-                return;
-            }
-
-            let imageUrl = null;
-            if (imageFile) {
-                imageUrl = await uploadImage();
-            }
-
-            const newContainer = {
-                size: parseInt(newSize),
-                price: parseFloat(newPrice),
+            
+            const containerData = {
+                company,
+                size: newSize,
+                price: newPrice,
                 name: newName,
-                imageUrl: imageUrl
+                imageFile: imageFile
             };
 
-            await setDoc(companyDocRef, {
-                container_types: [...existingContainers, newContainer]
-            }, { merge: true });
-
+            await addContainerType(company, containerData);
+            
             setSnackbar({
                 open: true,
                 message: 'Container type added successfully.',
                 severity: 'success'
             });
 
+            // Reset form
             setNewSize('');
             setNewPrice('');
             setNewName('');
             setImageFile(null);
             setImagePreview(null);
-            
-            fetchContainers();
+
+            // Refresh container list
+            const updatedContainers = await getContainerTypes(company);
+            setContainers(updatedContainers);
         } catch (error) {
             console.error("Error adding container:", error);
             setSnackbar({
                 open: true,
-                message: "Error adding container. Please try again.",
+                message: error.message || "Error adding container. Please try again.",
                 severity: 'error'
             });
+        } finally {
+            setUploading(false);
         }
     };
 
@@ -226,58 +169,6 @@ const ContainerMenu = () => {
         setImageFile(null);
         setImagePreview(null);
     };
-
-    const fetchContainers = async (company) => {
-        try {
-            if (!company) {
-                console.log("No company information available");
-                return;
-            }
-
-            const menuCollectionRef = collection(db, "container_menu");
-            const companyDocRef = doc(menuCollectionRef, company);
-            const companyDoc = await getDoc(companyDocRef);
-
-            if (companyDoc.exists()) {
-                setContainers(companyDoc.data().container_types || []);
-            } else {
-                setContainers([]);
-            }
-        } catch (error) {
-            console.error("Error fetching containers:", error);
-            setSnackbar({
-                open: true,
-                message: "Error fetching containers. Please try again.",
-                severity: 'error'
-            });
-        }
-    };
-
-    useEffect(() => {
-        const initializeData = async () => {
-            setLoading(true);
-            try {
-                const userCompany = await fetchUserCompany();
-                console.log("HIIIII,", userCompany)
-                if (userCompany) {
-                    await fetchContainers(userCompany);
-                }
-            } catch (error) {
-                console.error("Error initializing data:", error);
-                setSnackbar({
-                    open: true,
-                    message: "Error loading data",
-                    severity: 'error'
-                });
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        if (user) {
-            initializeData();
-        }
-    }, [user]);
 
     const handleCloseSnackbar = (event, reason) => {
         if (reason === 'clickaway') return;
@@ -323,6 +214,7 @@ const ContainerMenu = () => {
                             value={newName}
                             onChange={(e) => setNewName(e.target.value)}
                             size="small"
+                            required
                         />
                         <TextField
                             label="Container Size (ft)"
@@ -330,6 +222,7 @@ const ContainerMenu = () => {
                             value={newSize}
                             onChange={(e) => setNewSize(e.target.value)}
                             size="small"
+                            required
                         />
                         <TextField
                             label="Price (USD)"
@@ -337,6 +230,7 @@ const ContainerMenu = () => {
                             value={newPrice}
                             onChange={(e) => setNewPrice(e.target.value)}
                             size="small"
+                            required
                         />
                     </Box>
 
@@ -345,7 +239,6 @@ const ContainerMenu = () => {
                             component="label"
                             variant="outlined"
                             startIcon={<CloudUpload />}
-
                         >
                             Upload Image
                             <input

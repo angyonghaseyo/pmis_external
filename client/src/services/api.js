@@ -708,6 +708,46 @@ export const updateAdHocResourceRequest = async (requestId, requestData) => {
   }
 };
 
+export const getContainerTypes = async (company) => {
+  try {
+    const response = await fetch(`http://localhost:5001/container-types?company=${encodeURIComponent(company)}`);
+    if (!response.ok) {
+      throw new Error('Error fetching container types');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in getContainerTypes:', error);
+    throw error;
+  }
+};
+
+export const addContainerType = async (company, containerData) => {
+  try {
+    const formData = new FormData();
+    formData.append('company', company);
+    formData.append('size', containerData.size);
+    formData.append('price', containerData.price);
+    formData.append('name', containerData.name);
+    if (containerData.imageFile) {
+      formData.append('image', containerData.imageFile);
+    }
+
+    const response = await fetch('http://localhost:5001/container-types', {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error('Error adding container type');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in addContainerType:', error);
+    throw error;
+  }
+};
+
+
 // Dashboard data
 export const getLeaveStatistics = () => authAxios.get('/leave-statistics').catch(handleApiError);
 
