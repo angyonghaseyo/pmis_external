@@ -150,6 +150,35 @@ const FacilityandSpaceRental = () => {
         }
     };
 
+    const handleViewDetails = async (request) => {
+        try {
+            setLoading(true);
+            // Find the facility details
+            const facilityRef = doc(db, 'facilities', request.facilityId);
+            const facilityDoc = await getDoc(facilityRef);
+            
+            if (facilityDoc.exists()) {
+                setSelectedFacility({ id: facilityDoc.id, ...facilityDoc.data() });
+            }
+            
+            setSelectedRequest(request);
+            setViewMode(true);
+            setFormData({
+                facilityId: request.facilityId,
+                startTime: new Date(request.startTime),
+                endTime: new Date(request.endTime),
+                purpose: request.purpose,
+                specialRequirements: request.specialRequirements || ''
+            });
+            setOpenDialog(true);
+        } catch (error) {
+            console.error('Error loading request details:', error);
+            showSnackbar('Error loading request details', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const calculateTotalPrice = () => {
         if (!selectedFacility || !formData.startTime || !formData.endTime) return 0;
         
@@ -269,6 +298,7 @@ const FacilityandSpaceRental = () => {
         });
         setViewMode(false);
         setBookingConflict(false);
+        setSelectedRequest(null);
     };
 
     const handleCancelRequest = async (requestId) => {
@@ -303,6 +333,96 @@ const FacilityandSpaceRental = () => {
     };
 
     const getStepContent = (step) => {
+        if (viewMode) {
+            // Return view mode content
+            return (
+                <Box>
+                    <Grid container spacing={3}>
+                        <Grid item xs={12}>
+                            <Paper sx={{ p: 2 }}>
+                                <Typography variant="subtitle1" gutterBottom>
+                                    Facility Details
+                                </Typography>
+                                <Typography variant="h6" color="primary">
+                                    {selectedRequest?.facilityName}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    Type: {selectedRequest?.facilityType}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    Square Footage: {selectedRequest?.squareFootage} sq ft
+                                </Typography>
+                            </Paper>
+                        </Grid>
+
+                        <Grid item xs={12}>
+                            <Paper sx={{ p: 2 }}>
+                                <Typography variant="subtitle1" gutterBottom>
+                                    Booking Details
+                                </Typography>
+                                <Grid container spacing={2}>
+                                    <Grid item xs={12} md={6}>
+                                        <Typography variant="body2">
+                                            <Event sx={{ mr: 1, verticalAlign: 'middle' }} />
+                                            Start: {new Date(selectedRequest?.startTime).toLocaleString()}
+                                        </Typography>
+                                    </Grid>
+                                    <Grid item xs={12} md={6}>
+                                        <Typography variant="body2">
+                                            <Event sx={{ mr: 1, verticalAlign: 'middle' }} />
+                                            End: {new Date(selectedRequest?.endTime).toLocaleString()}
+                                        </Typography>
+                                    </Grid>
+                                </Grid>
+                                <Box sx={{ mt: 2 }}>
+                                    <Chip 
+                                        label={selectedRequest?.status}
+                                        color={
+                                            selectedRequest?.status === 'Approved' ? 'success' :
+                                            selectedRequest?.status === 'Rejected' ? 'error' : 'warning'
+                                        }
+                                    />
+                                </Box>
+                            </Paper>
+                        </Grid>
+
+                        <Grid item xs={12}>
+                            <Paper sx={{ p: 2 }}>
+                                <Typography variant="subtitle1" gutterBottom>
+                                    Purpose & Requirements
+                                </Typography>
+                                <Typography variant="body2" paragraph>
+                                    <strong>Purpose:</strong><br />
+                                    {selectedRequest?.purpose}
+                                </Typography>
+                                {selectedRequest?.specialRequirements && (
+                                    <Typography variant="body2">
+                                        <strong>Special Requirements:</strong><br />
+                                        {selectedRequest?.specialRequirements}
+                                    </Typography>
+                                )}
+                            </Paper>
+                        </Grid>
+
+                        <Grid item xs={12}>
+                            <Paper sx={{ p: 2 }}>
+                                <Typography variant="subtitle1" gutterBottom>
+                                    Pricing
+                                </Typography>
+                                <Typography variant="h4" color="primary">
+                                    ${selectedRequest?.totalPrice.toFixed(2)}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    Created: {new Date(selectedRequest?.createdAt).toLocaleString()}
+                                </Typography>
+                            </Paper>
+                        </Grid>
+                    </Grid>
+                </Box>
+            );
+        }
+
+        // Return normal booking flow content
         switch (step) {
             case 0:
                 return (
@@ -521,7 +641,6 @@ const FacilityandSpaceRental = () => {
 
     return (
         <Container maxWidth="lg" sx={{ py: 4 }}>
-            {/* Facilities Section */}
             <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
                     <Typography variant="h4">Facility and Space Rental</Typography>
@@ -534,7 +653,6 @@ const FacilityandSpaceRental = () => {
                     </Button>
                 </Box>
 
-                {/* Rental Requests Table */}
                 <TableContainer>
                     <Table>
                         <TableHead>
@@ -590,6 +708,13 @@ const FacilityandSpaceRental = () => {
                                             />
                                         </TableCell>
                                         <TableCell>
+                                            <IconButton
+                                                size="small"
+                                                color="primary"
+                                                onClick={() => handleViewDetails(request)}
+                                            >
+                                                <Visibility />
+                                            </IconButton>
                                             {request.status === 'Pending' && (
                                                 <IconButton
                                                     size="small"
@@ -608,7 +733,6 @@ const FacilityandSpaceRental = () => {
                 </TableContainer>
             </Paper>
 
-            {/* Rental Dialog */}
             <Dialog
                 open={openDialog}
                 onClose={handleCloseDialog}
@@ -674,7 +798,6 @@ const FacilityandSpaceRental = () => {
                 </DialogActions>
             </Dialog>
 
-            {/* Snackbar */}
             <Snackbar
                 open={snackbar.open}
                 autoHideDuration={6000}
