@@ -23,6 +23,7 @@ import AdHocResourceRequest from './AdHocResourceRequest';
 import ContainerMenu from './ContainerMenu';
 import TruckRegistration from './TruckRegistration';
 import ContainerRequestsList from './ContainerRequestsList';
+import FacilityRental from './FacilityRental';
 import { useAuth } from './AuthContext';
 import { jwtDecode } from "jwt-decode";
 
@@ -124,6 +125,7 @@ function App() {
                 {hasAccessRights(['View Container Requests', 'Approve Container Requests']) && (
                   <Route path="/cargos/container-requests-list" element={<ContainerRequestsList user={user} />} />
                 )}
+                <Route path="/cargos/facility-rental" element={<FacilityRental/>} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </>
             ) : (
