@@ -46,77 +46,109 @@ import {
     Visibility,
     Close,
     ArrowForward,
-    ArrowBack
+    ArrowBack,
+    Factory,
+    Warehouse,
+    LocalShipping
 } from '@mui/icons-material';
 import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebaseConfig';
-import { useAuth } from './AuthContext';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 
-const steps = ['Select Facility', 'Rental Details', 'Review & Submit'];
+const steps = ['Select Facility Type', 'Specify Requirements', 'Review & Submit'];
 
-const rentalTypes = [
-    { id: 'office', name: 'Office Space', pricePerHour: 50 },
-    { id: 'warehouse', name: 'Warehouse', pricePerHour: 100 },
-    { id: 'storage', name: 'Storage Area', pricePerHour: 75 },
-    { id: 'conference', name: 'Conference Room', pricePerHour: 40 }
+const facilityTypes = [
+    {
+        id: 'processing',
+        name: 'Processing Facility',
+        description: 'Equipped spaces for goods processing, packaging, and value addition',
+        pricePerDay: 500,
+        icon: <Factory sx={{ fontSize: 40 }} />,
+        availableAreas: [100, 200, 300], // square meters
+        features: ['Temperature control', 'Loading bays', 'Processing equipment', 'Sorting areas']
+    },
+    {
+        id: 'storage',
+        name: 'Storage Facility',
+        description: 'Temperature-controlled storage spaces for goods awaiting processing',
+        pricePerDay: 300,
+        icon: <Warehouse sx={{ fontSize: 40 }} />,
+        availableAreas: [50, 100, 150], // square meters
+        features: ['Climate control', 'Security systems', '24/7 access', 'Inventory management']
+    },
+    {
+        id: 'distribution',
+        name: 'Distribution Center',
+        description: 'Facilities for efficient goods distribution after processing',
+        pricePerDay: 400,
+        icon: <LocalShipping sx={{ fontSize: 40 }} />,
+        availableAreas: [150, 250, 350], // square meters
+        features: ['Loading docks', 'Staging areas', 'Cross-docking', 'Fleet management']
+    }
 ];
 
 const FacilityRental = () => {
-    const { user } = useAuth();
     const [activeStep, setActiveStep] = useState(0);
     const [openDialog, setOpenDialog] = useState(false);
-    const [rentalRequests, setRentalRequests] = useState([]);
     const [selectedFacility, setSelectedFacility] = useState(null);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
     const [formData, setFormData] = useState({
         facilityType: '',
+        area: '',
         startDate: null,
         endDate: null,
         purpose: '',
-        numberOfPeople: '',
-        additionalNotes: ''
+        goodsType: '',
+        processingRequirements: '',
+        estimatedVolume: '',
+        specialRequirements: ''
     });
+    const [rentalRequests, setRentalRequests] = useState([]);
+    const [loading, setLoading] = useState(false);
     const [snackbar, setSnackbar] = useState({
         open: false,
         message: '',
-        severity: 'success'
+        severity: 'info'
     });
+    const [viewMode, setViewMode] = useState(false);
+    const [selectedRequest, setSelectedRequest] = useState(null);
 
     useEffect(() => {
         fetchRentalRequests();
-    }, [user]);
+    }, []);
 
     const fetchRentalRequests = async () => {
         try {
             setLoading(true);
-            const q = query(
-                collection(db, 'rental_requests'),
-                where('userId', '==', user.email)
-            );
-            const querySnapshot = await getDocs(q);
+            const querySnapshot = await getDocs(collection(db, 'facility_rentals'));
             const requests = querySnapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
             }));
             setRentalRequests(requests);
-        } catch (err) {
-            console.error('Error fetching rental requests:', err);
-            setError('Failed to load rental requests');
+        } catch (error) {
+            console.error('Error fetching rental requests:', error);
+            setSnackbar({
+                open: true,
+                message: 'Error fetching rental requests',
+                severity: 'error'
+            });
         } finally {
             setLoading(false);
         }
     };
 
     const handleNext = () => {
-        setActiveStep((prevStep) => prevStep + 1);
+        if (activeStep === steps.length - 1) {
+            handleSubmit();
+        } else {
+            setActiveStep(prevStep => prevStep + 1);
+        }
     };
 
     const handleBack = () => {
-        setActiveStep((prevStep) => prevStep - 1);
+        setActiveStep(prevStep => prevStep - 1);
     };
 
     const handleFacilitySelect = (facility) => {
@@ -126,10 +158,10 @@ const FacilityRental = () => {
     };
 
     const calculateTotalPrice = () => {
-        if (!formData.startDate || !formData.endDate) return 0;
-        const hours = Math.ceil((formData.endDate - formData.startDate) / (1000 * 60 * 60));
-        const facility = rentalTypes.find(f => f.id === formData.facilityType);
-        return hours * facility.pricePerHour;
+        if (!selectedFacility || !formData.startDate || !formData.endDate || !formData.area) return 0;
+        const days = Math.ceil((formData.endDate - formData.startDate) / (1000 * 60 * 60 * 24));
+        const areaFactor = formData.area / 100; // Price adjustment based on area
+        return days * selectedFacility.pricePerDay * areaFactor;
     };
 
     const handleSubmit = async () => {
@@ -137,77 +169,27 @@ const FacilityRental = () => {
             setLoading(true);
             const rentalData = {
                 ...formData,
-                userId: user.email,
-                userName: user.firstName,
-                company: user.company,
                 status: 'Pending',
                 totalPrice: calculateTotalPrice(),
+                facilityName: selectedFacility.name,
                 createdAt: serverTimestamp(),
                 startDate: formData.startDate.toISOString(),
                 endDate: formData.endDate.toISOString()
             };
 
-            await addDoc(collection(db, 'rental_requests'), rentalData);
+            await addDoc(collection(db, 'facility_rentals'), rentalData);
             setSnackbar({
                 open: true,
-                message: 'Rental request submitted successfully!',
+                message: 'Rental request submitted successfully',
                 severity: 'success'
             });
             handleCloseDialog();
             fetchRentalRequests();
-        } catch (err) {
-            console.error('Error submitting rental request:', err);
+        } catch (error) {
+            console.error('Error submitting rental request:', error);
             setSnackbar({
                 open: true,
-                message: 'Failed to submit rental request',
-                severity: 'error'
-            });
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleCancel = async (requestId) => {
-        try {
-            setLoading(true);
-            const requestRef = doc(db, 'rental_requests', requestId);
-            await updateDoc(requestRef, {
-                status: 'Cancelled',
-                updatedAt: serverTimestamp()
-            });
-            setSnackbar({
-                open: true,
-                message: 'Rental request cancelled successfully',
-                severity: 'success'
-            });
-            fetchRentalRequests();
-        } catch (err) {
-            console.error('Error cancelling rental request:', err);
-            setSnackbar({
-                open: true,
-                message: 'Failed to cancel rental request',
-                severity: 'error'
-            });
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleDelete = async (requestId) => {
-        try {
-            setLoading(true);
-            await deleteDoc(doc(db, 'rental_requests', requestId));
-            setSnackbar({
-                open: true,
-                message: 'Rental request deleted successfully',
-                severity: 'success'
-            });
-            fetchRentalRequests();
-        } catch (err) {
-            console.error('Error deleting rental request:', err);
-            setSnackbar({
-                open: true,
-                message: 'Failed to delete rental request',
+                message: 'Error submitting rental request',
                 severity: 'error'
             });
         } finally {
@@ -217,16 +199,45 @@ const FacilityRental = () => {
 
     const handleCloseDialog = () => {
         setOpenDialog(false);
-        setActiveStep(0);
         setSelectedFacility(null);
+        setActiveStep(0);
         setFormData({
             facilityType: '',
+            area: '',
             startDate: null,
             endDate: null,
             purpose: '',
-            numberOfPeople: '',
-            additionalNotes: ''
+            goodsType: '',
+            processingRequirements: '',
+            estimatedVolume: '',
+            specialRequirements: ''
         });
+        setViewMode(false);
+    };
+
+    const handleDateChange = (field, date) => {
+        setFormData(prev => ({ ...prev, [field]: date }));
+    };
+
+    const handleInputChange = (field, value) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+    };
+
+    const getStatusChip = (status) => {
+        const colors = {
+            Pending: 'warning',
+            Approved: 'success',
+            Rejected: 'error',
+            Completed: 'default'
+        };
+
+        return (
+            <Chip
+                label={status}
+                color={colors[status] || 'default'}
+                size="small"
+            />
+        );
     };
 
     const getStepContent = (step) => {
@@ -234,32 +245,44 @@ const FacilityRental = () => {
             case 0:
                 return (
                     <Grid container spacing={3}>
-                        {rentalTypes.map((facility) => (
-                            <Grid item xs={12} sm={6} md={4} key={facility.id}>
+                        {facilityTypes.map((facility) => (
+                            <Grid item xs={12} md={4} key={facility.id}>
                                 <Card
                                     sx={{
                                         height: '100%',
+                                        display: 'flex',
+                                        flexDirection: 'column',
                                         cursor: 'pointer',
-                                        transition: 'transform 0.2s',
                                         '&:hover': {
-                                            transform: 'scale(1.02)'
+                                            transform: 'scale(1.02)',
+                                            transition: 'transform 0.2s ease-in-out'
                                         }
                                     }}
                                     onClick={() => handleFacilitySelect(facility)}
                                 >
-                                    <CardMedia
-                                        component="img"
-                                        height="180"
-                                        image={`/api/placeholder/400/320`}
-                                        alt={facility.name}
-                                    />
-                                    <CardContent>
+                                    <Box sx={{ p: 2, display: 'flex', justifyContent: 'center' }}>
+                                        {facility.icon}
+                                    </Box>
+                                    <CardContent sx={{ flexGrow: 1 }}>
                                         <Typography variant="h6" gutterBottom>
                                             {facility.name}
                                         </Typography>
-                                        <Typography variant="body2" color="text.secondary">
-                                            ${facility.pricePerHour}/hour
+                                        <Typography variant="body2" color="text.secondary" paragraph>
+                                            {facility.description}
                                         </Typography>
+                                        <Typography variant="subtitle1" color="primary">
+                                            ${facility.pricePerDay}/day
+                                        </Typography>
+                                        <Box sx={{ mt: 2 }}>
+                                            {facility.features.map((feature, index) => (
+                                                <Chip
+                                                    key={index}
+                                                    label={feature}
+                                                    size="small"
+                                                    sx={{ m: 0.5 }}
+                                                />
+                                            ))}
+                                        </Box>
                                     </CardContent>
                                 </Card>
                             </Grid>
@@ -269,90 +292,103 @@ const FacilityRental = () => {
 
             case 1:
                 return (
-                    <LocalizationProvider dateAdapter={AdapterDateFns}>
-                        <Grid container spacing={3}>
-                            <Grid item xs={12} sm={6}>
+                    <Grid container spacing={3}>
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth>
+                                <InputLabel>Area Required (m²)</InputLabel>
+                                <Select
+                                    value={formData.area}
+                                    onChange={(e) => handleInputChange('area', e.target.value)}
+                                    label="Area Required (m²)"
+                                >
+                                    {selectedFacility?.availableAreas.map((area) => (
+                                        <MenuItem key={area} value={area}>
+                                            {area} m²
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <LocalizationProvider dateAdapter={AdapterDateFns}>
                                 <DateTimePicker
                                     label="Start Date & Time"
                                     value={formData.startDate}
-                                    onChange={(newValue) => setFormData(prev => ({
-                                        ...prev,
-                                        startDate: newValue
-                                    }))}
-                                    slotProps={{ textField: { fullWidth: true } }}
+                                    onChange={(date) => handleDateChange('startDate', date)}
+                                    renderInput={(params) => <TextField {...params} fullWidth />}
                                     minDate={new Date()}
                                 />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
+                            </LocalizationProvider>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <LocalizationProvider dateAdapter={AdapterDateFns}>
                                 <DateTimePicker
                                     label="End Date & Time"
                                     value={formData.endDate}
-                                    onChange={(newValue) => setFormData(prev => ({
-                                        ...prev,
-                                        endDate: newValue
-                                    }))}
-                                    slotProps={{ textField: { fullWidth: true } }}
+                                    onChange={(date) => handleDateChange('endDate', date)}
+                                    renderInput={(params) => <TextField {...params} fullWidth />}
                                     minDate={formData.startDate || new Date()}
                                 />
-                            </Grid>
-                            <Grid item xs={12}>
-                                <TextField
-                                    label="Purpose of Rental"
-                                    value={formData.purpose}
-                                    onChange={(e) => setFormData(prev => ({
-                                        ...prev,
-                                        purpose: e.target.value
-                                    }))}
-                                    fullWidth
-                                    required
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    label="Number of People"
-                                    type="number"
-                                    value={formData.numberOfPeople}
-                                    onChange={(e) => setFormData(prev => ({
-                                        ...prev,
-                                        numberOfPeople: e.target.value
-                                    }))}
-                                    fullWidth
-                                    required
-                                />
-                            </Grid>
-                            <Grid item xs={12}>
-                                <TextField
-                                    label="Additional Notes"
-                                    value={formData.additionalNotes}
-                                    onChange={(e) => setFormData(prev => ({
-                                        ...prev,
-                                        additionalNotes: e.target.value
-                                    }))}
-                                    multiline
-                                    rows={4}
-                                    fullWidth
-                                />
-                            </Grid>
+                            </LocalizationProvider>
                         </Grid>
-                    </LocalizationProvider>
+                        <Grid item xs={12}>
+                            <TextField
+                                fullWidth
+                                label="Type of Goods"
+                                value={formData.goodsType}
+                                onChange={(e) => handleInputChange('goodsType', e.target.value)}
+                                required
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <TextField
+                                fullWidth
+                                label="Processing Requirements"
+                                value={formData.processingRequirements}
+                                onChange={(e) => handleInputChange('processingRequirements', e.target.value)}
+                                multiline
+                                rows={3}
+                                required
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <TextField
+                                fullWidth
+                                label="Estimated Volume"
+                                value={formData.estimatedVolume}
+                                onChange={(e) => handleInputChange('estimatedVolume', e.target.value)}
+                                required
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <TextField
+                                fullWidth
+                                label="Special Requirements"
+                                value={formData.specialRequirements}
+                                onChange={(e) => handleInputChange('specialRequirements', e.target.value)}
+                                multiline
+                                rows={3}
+                            />
+                        </Grid>
+                    </Grid>
                 );
 
             case 2:
                 return (
                     <Box>
-                        <Typography variant="h6" gutterBottom>Review Your Rental Request</Typography>
+                        <Typography variant="h6" gutterBottom>Review Rental Details</Typography>
                         <Grid container spacing={2}>
                             <Grid item xs={12}>
                                 <Paper sx={{ p: 2 }}>
-                                    <Typography variant="subtitle1">Selected Facility</Typography>
+                                    <Typography variant="subtitle1" gutterBottom>Selected Facility</Typography>
                                     <Typography variant="body1" color="primary">
-                                        {rentalTypes.find(f => f.id === formData.facilityType)?.name}
+                                        {selectedFacility?.name} - {formData.area} m²
                                     </Typography>
                                 </Paper>
                             </Grid>
                             <Grid item xs={12} sm={6}>
                                 <Paper sx={{ p: 2 }}>
-                                    <Typography variant="subtitle1">Start Time</Typography>
+                                    <Typography variant="subtitle1" gutterBottom>Start Time</Typography>
                                     <Typography variant="body1">
                                         {formData.startDate?.toLocaleString()}
                                     </Typography>
@@ -360,7 +396,7 @@ const FacilityRental = () => {
                             </Grid>
                             <Grid item xs={12} sm={6}>
                                 <Paper sx={{ p: 2 }}>
-                                    <Typography variant="subtitle1">End Time</Typography>
+                                    <Typography variant="subtitle1" gutterBottom>End Time</Typography>
                                     <Typography variant="body1">
                                         {formData.endDate?.toLocaleString()}
                                     </Typography>
@@ -368,9 +404,9 @@ const FacilityRental = () => {
                             </Grid>
                             <Grid item xs={12}>
                                 <Paper sx={{ p: 2 }}>
-                                    <Typography variant="subtitle1">Total Price</Typography>
-                                    <Typography variant="h5" color="primary">
-                                        ${calculateTotalPrice()}
+                                    <Typography variant="subtitle1" gutterBottom>Estimated Total Price</Typography>
+                                    <Typography variant="h4" color="primary">
+                                        ${calculateTotalPrice().toLocaleString()}
                                     </Typography>
                                 </Paper>
                             </Grid>
@@ -383,151 +419,134 @@ const FacilityRental = () => {
         }
     };
 
-    const getStatusColor = (status) => {
-        switch (status.toLowerCase()) {
-            case 'approved':
-                return 'success';
-            case 'pending':
-                return 'warning';
-            case 'rejected':
-                return 'error';
-            case 'cancelled':
-                return 'default';
-            default:
-                return 'default';
-        }
-    };
-
-    if (loading && !openDialog) {
-        return (
-            <Box display="flex" justifyContent="center" alignItems="center" height="100vh">
-                <CircularProgress />
-            </Box>
-        );
-    }
-
     return (
         <Container maxWidth="lg" sx={{ py: 4 }}>
             <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-                    <Typography variant="h4">Facility & Space Rental</Typography>
+                    <Typography variant="h4">Distripark Facility Rental</Typography>
                     <Button
                         variant="contained"
                         onClick={() => setOpenDialog(true)}
-                        startIcon={<CalendarMonth />}
+                        startIcon={<Warehouse />}
                     >
-                        New Rental Request
+                        Rent Facility
                     </Button>
                 </Box>
 
-                <Typography variant="h6" gutterBottom>Your Rental Requests</Typography>
-                <TableContainer component={Paper} variant="outlined">
+                <TableContainer component={Paper}>
                     <Table>
                         <TableHead>
                             <TableRow>
                                 <TableCell>Facility Type</TableCell>
+                                <TableCell>Area (m²)</TableCell>
                                 <TableCell>Start Date</TableCell>
                                 <TableCell>End Date</TableCell>
+                                <TableCell>Goods Type</TableCell>
                                 <TableCell>Total Price</TableCell>
                                 <TableCell>Status</TableCell>
-                                <TableCell align="right">Actions</TableCell>
+                                <TableCell>Actions</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {rentalRequests.map((request) => (
-                                <TableRow key={request.id}>
-                                    <TableCell>
-                                        {rentalTypes.find(f => f.id === request.facilityType)?.name}
+                            {loading ? (
+                                <TableRow>
+                                    <TableCell colSpan={8} align="center">
+                                        <CircularProgress size={24} />
                                     </TableCell>
-                                    <TableCell>
-                                        {new Date(request.startDate).toLocaleString()}
+                                </TableRow>
+                            ) : rentalRequests.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={8} align="center">
+                                        <Typography variant="body1">No rental requests found</Typography>
                                     </TableCell>
-                                    <TableCell>
-                                        {new Date(request.endDate).toLocaleString()}
-                                    </TableCell>
-                                    <TableCell>${request.totalPrice}</TableCell>
-                                    <TableCell>
-                                        <Chip
-                                            label={request.status}
-                                            color={getStatusColor(request.status)}
-                                            size="small"
-                                        />
-                                    </TableCell>
-                                    <TableCell align="right">
-                                        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                                </TableRow>
+                            ) : (
+                                rentalRequests.map((request) => (
+                                    <TableRow key={request.id}>
+                                        <TableCell>{request.facilityName}</TableCell>
+                                        <TableCell>{request.area}</TableCell>
+                                        <TableCell>
+                                            {new Date(request.startDate).toLocaleDateString()}
+                                        </TableCell>
+                                        <TableCell>
+                                            {new Date(request.endDate).toLocaleDateString()}
+                                        </TableCell>
+                                        <TableCell>{request.goodsType}</TableCell>
+                                        <TableCell>${request.totalPrice?.toLocaleString()}</TableCell>
+                                        <TableCell>
+                                            {getStatusChip(request.status)}
+                                        </TableCell>
+                                        <TableCell>
                                             <Tooltip title="View Details">
                                                 <IconButton
                                                     size="small"
-                                                    color="primary"
                                                     onClick={() => {
-                                                        setSelectedFacility(request);
-                                                        setFormData(request);
-                                                        setActiveStep(2);
+                                                        setSelectedRequest(request);
+                                                        setViewMode(true);
                                                         setOpenDialog(true);
+                                                        setActiveStep(2);
                                                     }}
                                                 >
                                                     <Visibility />
                                                 </IconButton>
                                             </Tooltip>
                                             {request.status === 'Pending' && (
-                                                <>
-                                                    <Tooltip title="Cancel Request">
-                                                        <IconButton
-                                                            size="small"
-                                                            color="warning"
-                                                            onClick={() => handleCancel(request.id)}
-                                                        >
-                                                            <Cancel />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                    <Tooltip title="Delete Request">
-                                                        <IconButton
-                                                            size="small"
-                                                            color="error"
-                                                            onClick={() => handleDelete(request.id)}
-                                                        >
-                                                            <Delete />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                </>
+                                                <Tooltip title="Cancel Request">
+                                                    <IconButton
+                                                        size="small"
+                                                        color="error"
+                                                        onClick={async () => {
+                                                            try {
+                                                                await deleteDoc(doc(db, 'facility_rentals', request.id));
+                                                                setSnackbar({
+                                                                    open: true,
+                                                                    message: 'Request cancelled successfully',
+                                                                    severity: 'success'
+                                                                });
+                                                                fetchRentalRequests();
+                                                            } catch (error) {
+                                                                console.error('Error cancelling request:', error);
+                                                                setSnackbar({
+                                                                    open: true,
+                                                                    message: 'Error cancelling request',
+                                                                    severity: 'error'
+                                                                });
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Cancel />
+                                                    </IconButton>
+                                                </Tooltip>
                                             )}
-                                        </Box>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                            {rentalRequests.length === 0 && (
-                                <TableRow>
-                                    <TableCell colSpan={6} align="center">
-                                        <Typography color="textSecondary" py={3}>
-                                            No rental requests found
-                                        </Typography>
-                                    </TableCell>
-                                </TableRow>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
                             )}
                         </TableBody>
                     </Table>
                 </TableContainer>
             </Paper>
 
-            {/* New Rental Request Dialog */}
+            {/* New Rental Dialog */}
             <Dialog
                 open={openDialog}
                 onClose={handleCloseDialog}
                 maxWidth="md"
                 fullWidth
+                PaperProps={{
+                    sx: {
+                        minHeight: viewMode ? 'auto' : '80vh'
+                    }
+                }}
             >
                 <DialogTitle>
                     <Box display="flex" justifyContent="space-between" alignItems="center">
                         <Typography variant="h6">
-                            {activeStep === 2 && selectedFacility ? 
-                                'Rental Request Details' : 
-                                'New Rental Request'
-                            }
+                            {viewMode ? 'Rental Request Details' : 'New Facility Rental Request'}
                         </Typography>
                         <IconButton
                             onClick={handleCloseDialog}
                             size="small"
-                            aria-label="close"
                         >
                             <Close />
                         </IconButton>
@@ -535,7 +554,7 @@ const FacilityRental = () => {
                 </DialogTitle>
 
                 <DialogContent>
-                    <Box sx={{ mt: 2 }}>
+                    {!viewMode && (
                         <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
                             {steps.map((label) => (
                                 <Step key={label}>
@@ -543,50 +562,40 @@ const FacilityRental = () => {
                                 </Step>
                             ))}
                         </Stepper>
-                        
-                        {getStepContent(activeStep)}
-                    </Box>
+                    )}
+                    {getStepContent(activeStep)}
                 </DialogContent>
 
-                <DialogActions sx={{ px: 3, pb: 3 }}>
+                <DialogActions sx={{ p: 3 }}>
                     <Button onClick={handleCloseDialog}>
-                        Cancel
+                        {viewMode ? 'Close' : 'Cancel'}
                     </Button>
-                    <Box sx={{ flex: '1 1 auto' }} />
-                    {activeStep > 0 && !selectedFacility && (
-                        <Button
-                            onClick={handleBack}
-                            startIcon={<ArrowBack />}
-                        >
-                            Back
-                        </Button>
-                    )}
-                    {activeStep === steps.length - 1 ? (
-                        <Button
-                            variant="contained"
-                            onClick={handleSubmit}
-                            disabled={loading || !formData.startDate || !formData.endDate || !formData.purpose}
-                        >
-                            {loading ? (
-                                <CircularProgress size={24} />
-                            ) : (
-                                'Submit Request'
+                    {!viewMode && (
+                        <>
+                            <Box sx={{ flex: '1 1 auto' }} />
+                            {activeStep > 0 && (
+                                <Button
+                                    onClick={handleBack}
+                                    startIcon={<ArrowBack />}
+                                >
+                                    Back
+                                </Button>
                             )}
-                        </Button>
-                    ) : (
-                        !selectedFacility && (
                             <Button
                                 variant="contained"
                                 onClick={handleNext}
-                                endIcon={<ArrowForward />}
-                                disabled={
-                                    (activeStep === 0 && !formData.facilityType) ||
-                                    (activeStep === 1 && (!formData.startDate || !formData.endDate || !formData.purpose))
-                                }
+                                endIcon={activeStep === steps.length - 1 ? undefined : <ArrowForward />}
+                                disabled={loading}
                             >
-                                Next
+                                {loading ? (
+                                    <CircularProgress size={24} />
+                                ) : activeStep === steps.length - 1 ? (
+                                    'Submit Request'
+                                ) : (
+                                    'Next'
+                                )}
                             </Button>
-                        )
+                        </>
                     )}
                 </DialogActions>
             </Dialog>
