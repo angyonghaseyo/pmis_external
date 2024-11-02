@@ -115,7 +115,7 @@ function App() {
                 {hasAccessRights(['View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest']) && (
                   <Route path="/cargos/cargo-manifest" element={<CargoManifest user={user} />} />
                 )}
-                {hasAccessRights(['abc']) && (
+                {hasAccessRights(['Create Booking Form']) && (
                   <Route path="/cargos/booking-form" element={<BookingForm user={user} />} />
                 )}
                 <Route path="/vessels/ad-hoc-resource-request" element={<AdHocResourceRequest />} />
@@ -125,7 +125,9 @@ function App() {
                 {hasAccessRights(['View Container Requests', 'Approve Container Requests']) && (
                   <Route path="/cargos/container-requests-list" element={<ContainerRequestsList user={user} />} />
                 )}
-                <Route path="/cargos/facility-rental" element={<FacilityRental/>} />
+                {hasAccessRights(['Create Facility Rental']) && (
+                  <Route path="/cargos/facility-rental" element={<FacilityRental/>} />
+                )}
                 <Route path="*" element={<Navigate to="/" replace />} />
               </>
             ) : (
