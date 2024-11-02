@@ -6,17 +6,12 @@ import {
     Grid,
     Card,
     CardContent,
-    CardMedia,
     Button,
     Dialog,
     DialogTitle,
     DialogContent,
     DialogActions,
     TextField,
-    Select,
-    MenuItem,
-    FormControl,
-    InputLabel,
     Box,
     Stepper,
     Step,
@@ -33,23 +28,19 @@ import {
     Divider,
     CircularProgress,
     Tooltip,
-    Snackbar
+    Snackbar,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem
 } from '@mui/material';
 import {
-    CalendarMonth,
-    LocationOn,
-    Description,
-    AttachMoney,
+    Warehouse,
     Cancel,
-    Edit,
-    Delete,
     Visibility,
     Close,
     ArrowForward,
-    ArrowBack,
-    Factory,
-    Warehouse,
-    LocalShipping
+    ArrowBack
 } from '@mui/icons-material';
 import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebaseConfig';
@@ -57,51 +48,18 @@ import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 
-const steps = ['Select Facility Type', 'Specify Requirements', 'Review & Submit'];
-
-const facilityTypes = [
-    {
-        id: 'processing',
-        name: 'Processing Facility',
-        description: 'Equipped spaces for goods processing, packaging, and value addition',
-        pricePerDay: 500,
-        icon: <Factory sx={{ fontSize: 40 }} />,
-        availableAreas: [100, 200, 300], // square meters
-        features: ['Temperature control', 'Loading bays', 'Processing equipment', 'Sorting areas']
-    },
-    {
-        id: 'storage',
-        name: 'Storage Facility',
-        description: 'Temperature-controlled storage spaces for goods awaiting processing',
-        pricePerDay: 300,
-        icon: <Warehouse sx={{ fontSize: 40 }} />,
-        availableAreas: [50, 100, 150], // square meters
-        features: ['Climate control', 'Security systems', '24/7 access', 'Inventory management']
-    },
-    {
-        id: 'distribution',
-        name: 'Distribution Center',
-        description: 'Facilities for efficient goods distribution after processing',
-        pricePerDay: 400,
-        icon: <LocalShipping sx={{ fontSize: 40 }} />,
-        availableAreas: [150, 250, 350], // square meters
-        features: ['Loading docks', 'Staging areas', 'Cross-docking', 'Fleet management']
-    }
-];
+const steps = ['Select Facility', 'Specify Requirements', 'Review & Submit'];
 
 const FacilityRental = () => {
     const [activeStep, setActiveStep] = useState(0);
     const [openDialog, setOpenDialog] = useState(false);
     const [selectedFacility, setSelectedFacility] = useState(null);
+    const [facilities, setFacilities] = useState([]);
     const [formData, setFormData] = useState({
-        facilityType: '',
-        area: '',
+        facilityId: '',
         startDate: null,
         endDate: null,
         purpose: '',
-        goodsType: '',
-        processingRequirements: '',
-        estimatedVolume: '',
         specialRequirements: ''
     });
     const [rentalRequests, setRentalRequests] = useState([]);
@@ -115,12 +73,33 @@ const FacilityRental = () => {
     const [selectedRequest, setSelectedRequest] = useState(null);
 
     useEffect(() => {
+        fetchFacilities();
         fetchRentalRequests();
     }, []);
 
-    const fetchRentalRequests = async () => {
+    const fetchFacilities = async () => {
         try {
             setLoading(true);
+            const querySnapshot = await getDocs(collection(db, 'facilities'));
+            const facilitiesData = querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            })).filter(facility => facility.status === 'Available');
+            setFacilities(facilitiesData);
+        } catch (error) {
+            console.error('Error fetching facilities:', error);
+            setSnackbar({
+                open: true,
+                message: 'Error fetching facilities',
+                severity: 'error'
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchRentalRequests = async () => {
+        try {
             const querySnapshot = await getDocs(collection(db, 'facility_rentals'));
             const requests = querySnapshot.docs.map(doc => ({
                 id: doc.id,
@@ -134,8 +113,6 @@ const FacilityRental = () => {
                 message: 'Error fetching rental requests',
                 severity: 'error'
             });
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -153,15 +130,14 @@ const FacilityRental = () => {
 
     const handleFacilitySelect = (facility) => {
         setSelectedFacility(facility);
-        setFormData(prev => ({ ...prev, facilityType: facility.id }));
+        setFormData(prev => ({ ...prev, facilityId: facility.id }));
         handleNext();
     };
 
     const calculateTotalPrice = () => {
-        if (!selectedFacility || !formData.startDate || !formData.endDate || !formData.area) return 0;
+        if (!selectedFacility || !formData.startDate || !formData.endDate) return 0;
         const days = Math.ceil((formData.endDate - formData.startDate) / (1000 * 60 * 60 * 24));
-        const areaFactor = formData.area / 100; // Price adjustment based on area
-        return days * selectedFacility.pricePerDay * areaFactor;
+        return days * selectedFacility.pricePerDay;
     };
 
     const handleSubmit = async () => {
@@ -169,9 +145,11 @@ const FacilityRental = () => {
             setLoading(true);
             const rentalData = {
                 ...formData,
+                facilityName: selectedFacility.name,
+                facilityType: selectedFacility.type,
                 status: 'Pending',
                 totalPrice: calculateTotalPrice(),
-                facilityName: selectedFacility.name,
+                squareFootage: selectedFacility.squareFootage,
                 createdAt: serverTimestamp(),
                 startDate: formData.startDate.toISOString(),
                 endDate: formData.endDate.toISOString()
@@ -202,42 +180,13 @@ const FacilityRental = () => {
         setSelectedFacility(null);
         setActiveStep(0);
         setFormData({
-            facilityType: '',
-            area: '',
+            facilityId: '',
             startDate: null,
             endDate: null,
             purpose: '',
-            goodsType: '',
-            processingRequirements: '',
-            estimatedVolume: '',
             specialRequirements: ''
         });
         setViewMode(false);
-    };
-
-    const handleDateChange = (field, date) => {
-        setFormData(prev => ({ ...prev, [field]: date }));
-    };
-
-    const handleInputChange = (field, value) => {
-        setFormData(prev => ({ ...prev, [field]: value }));
-    };
-
-    const getStatusChip = (status) => {
-        const colors = {
-            Pending: 'warning',
-            Approved: 'success',
-            Rejected: 'error',
-            Completed: 'default'
-        };
-
-        return (
-            <Chip
-                label={status}
-                color={colors[status] || 'default'}
-                size="small"
-            />
-        );
     };
 
     const getStepContent = (step) => {
@@ -245,7 +194,7 @@ const FacilityRental = () => {
             case 0:
                 return (
                     <Grid container spacing={3}>
-                        {facilityTypes.map((facility) => (
+                        {facilities.map((facility) => (
                             <Grid item xs={12} md={4} key={facility.id}>
                                 <Card
                                     sx={{
@@ -260,29 +209,25 @@ const FacilityRental = () => {
                                     }}
                                     onClick={() => handleFacilitySelect(facility)}
                                 >
-                                    <Box sx={{ p: 2, display: 'flex', justifyContent: 'center' }}>
-                                        {facility.icon}
-                                    </Box>
                                     <CardContent sx={{ flexGrow: 1 }}>
+                                        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
+                                            <Warehouse sx={{ fontSize: 40 }} />
+                                        </Box>
                                         <Typography variant="h6" gutterBottom>
                                             {facility.name}
                                         </Typography>
                                         <Typography variant="body2" color="text.secondary" paragraph>
-                                            {facility.description}
+                                            {facility.type} - {facility.squareFootage} sq ft
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary" paragraph>
+                                            Location: {facility.location}
                                         </Typography>
                                         <Typography variant="subtitle1" color="primary">
                                             ${facility.pricePerDay}/day
                                         </Typography>
-                                        <Box sx={{ mt: 2 }}>
-                                            {facility.features.map((feature, index) => (
-                                                <Chip
-                                                    key={index}
-                                                    label={feature}
-                                                    size="small"
-                                                    sx={{ m: 0.5 }}
-                                                />
-                                            ))}
-                                        </Box>
+                                        <Typography variant="body2" color="text.secondary">
+                                            Features: {facility.features}
+                                        </Typography>
                                     </CardContent>
                                 </Card>
                             </Grid>
@@ -294,27 +239,11 @@ const FacilityRental = () => {
                 return (
                     <Grid container spacing={3}>
                         <Grid item xs={12} sm={6}>
-                            <FormControl fullWidth>
-                                <InputLabel>Area Required (m²)</InputLabel>
-                                <Select
-                                    value={formData.area}
-                                    onChange={(e) => handleInputChange('area', e.target.value)}
-                                    label="Area Required (m²)"
-                                >
-                                    {selectedFacility?.availableAreas.map((area) => (
-                                        <MenuItem key={area} value={area}>
-                                            {area} m²
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
                             <LocalizationProvider dateAdapter={AdapterDateFns}>
                                 <DateTimePicker
                                     label="Start Date & Time"
                                     value={formData.startDate}
-                                    onChange={(date) => handleDateChange('startDate', date)}
+                                    onChange={(date) => setFormData(prev => ({ ...prev, startDate: date }))}
                                     renderInput={(params) => <TextField {...params} fullWidth />}
                                     minDate={new Date()}
                                 />
@@ -325,7 +254,7 @@ const FacilityRental = () => {
                                 <DateTimePicker
                                     label="End Date & Time"
                                     value={formData.endDate}
-                                    onChange={(date) => handleDateChange('endDate', date)}
+                                    onChange={(date) => setFormData(prev => ({ ...prev, endDate: date }))}
                                     renderInput={(params) => <TextField {...params} fullWidth />}
                                     minDate={formData.startDate || new Date()}
                                 />
@@ -334,29 +263,11 @@ const FacilityRental = () => {
                         <Grid item xs={12}>
                             <TextField
                                 fullWidth
-                                label="Type of Goods"
-                                value={formData.goodsType}
-                                onChange={(e) => handleInputChange('goodsType', e.target.value)}
-                                required
-                            />
-                        </Grid>
-                        <Grid item xs={12}>
-                            <TextField
-                                fullWidth
-                                label="Processing Requirements"
-                                value={formData.processingRequirements}
-                                onChange={(e) => handleInputChange('processingRequirements', e.target.value)}
+                                label="Purpose of Rental"
+                                value={formData.purpose}
+                                onChange={(e) => setFormData(prev => ({ ...prev, purpose: e.target.value }))}
                                 multiline
                                 rows={3}
-                                required
-                            />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <TextField
-                                fullWidth
-                                label="Estimated Volume"
-                                value={formData.estimatedVolume}
-                                onChange={(e) => handleInputChange('estimatedVolume', e.target.value)}
                                 required
                             />
                         </Grid>
@@ -365,7 +276,7 @@ const FacilityRental = () => {
                                 fullWidth
                                 label="Special Requirements"
                                 value={formData.specialRequirements}
-                                onChange={(e) => handleInputChange('specialRequirements', e.target.value)}
+                                onChange={(e) => setFormData(prev => ({ ...prev, specialRequirements: e.target.value }))}
                                 multiline
                                 rows={3}
                             />
@@ -382,7 +293,7 @@ const FacilityRental = () => {
                                 <Paper sx={{ p: 2 }}>
                                     <Typography variant="subtitle1" gutterBottom>Selected Facility</Typography>
                                     <Typography variant="body1" color="primary">
-                                        {selectedFacility?.name} - {formData.area} m²
+                                        {selectedFacility?.name} - {selectedFacility?.squareFootage} sq ft
                                     </Typography>
                                 </Paper>
                             </Grid>
@@ -404,7 +315,7 @@ const FacilityRental = () => {
                             </Grid>
                             <Grid item xs={12}>
                                 <Paper sx={{ p: 2 }}>
-                                    <Typography variant="subtitle1" gutterBottom>Estimated Total Price</Typography>
+                                    <Typography variant="subtitle1" gutterBottom>Total Price</Typography>
                                     <Typography variant="h4" color="primary">
                                         ${calculateTotalPrice().toLocaleString()}
                                     </Typography>
@@ -423,7 +334,7 @@ const FacilityRental = () => {
         <Container maxWidth="lg" sx={{ py: 4 }}>
             <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-                    <Typography variant="h4">Distripark Facility Rental</Typography>
+                    <Typography variant="h4">Facility Rental</Typography>
                     <Button
                         variant="contained"
                         onClick={() => setOpenDialog(true)}
@@ -437,11 +348,11 @@ const FacilityRental = () => {
                     <Table>
                         <TableHead>
                             <TableRow>
-                                <TableCell>Facility Type</TableCell>
-                                <TableCell>Area (m²)</TableCell>
+                                <TableCell>Facility Name</TableCell>
+                                <TableCell>Type</TableCell>
+                                <TableCell>Square Footage</TableCell>
                                 <TableCell>Start Date</TableCell>
                                 <TableCell>End Date</TableCell>
-                                <TableCell>Goods Type</TableCell>
                                 <TableCell>Total Price</TableCell>
                                 <TableCell>Status</TableCell>
                                 <TableCell>Actions</TableCell>
@@ -451,30 +362,34 @@ const FacilityRental = () => {
                             {loading ? (
                                 <TableRow>
                                     <TableCell colSpan={8} align="center">
-                                        <CircularProgress size={24} />
+                                        <CircularProgress />
                                     </TableCell>
                                 </TableRow>
                             ) : rentalRequests.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={8} align="center">
-                                        <Typography variant="body1">No rental requests found</Typography>
+                                        <Typography>No rental requests found</Typography>
                                     </TableCell>
                                 </TableRow>
                             ) : (
                                 rentalRequests.map((request) => (
                                     <TableRow key={request.id}>
                                         <TableCell>{request.facilityName}</TableCell>
-                                        <TableCell>{request.area}</TableCell>
+                                        <TableCell>{request.facilityType}</TableCell>
+                                        <TableCell>{request.squareFootage}</TableCell>
+                                        <TableCell>{new Date(request.startDate).toLocaleString()}</TableCell>
+                                        <TableCell>{new Date(request.endDate).toLocaleString()}</TableCell>
+                                        <TableCell>${request.totalPrice}</TableCell>
                                         <TableCell>
-                                            {new Date(request.startDate).toLocaleDateString()}
-                                        </TableCell>
-                                        <TableCell>
-                                            {new Date(request.endDate).toLocaleDateString()}
-                                        </TableCell>
-                                        <TableCell>{request.goodsType}</TableCell>
-                                        <TableCell>${request.totalPrice?.toLocaleString()}</TableCell>
-                                        <TableCell>
-                                            {getStatusChip(request.status)}
+                                            <Chip
+                                                label={request.status}
+                                                color={
+                                                    request.status === 'Approved' ? 'success' :
+                                                    request.status === 'Rejected' ? 'error' :
+                                                    'warning'
+                                                }
+                                                size="small"
+                                            />
                                         </TableCell>
                                         <TableCell>
                                             <Tooltip title="View Details">
@@ -542,7 +457,7 @@ const FacilityRental = () => {
                 <DialogTitle>
                     <Box display="flex" justifyContent="space-between" alignItems="center">
                         <Typography variant="h6">
-                            {viewMode ? 'Rental Request Details' : 'New Facility Rental Request'}
+                            {viewMode ? 'Rental Request Details' : 'New Facility Rental'}
                         </Typography>
                         <IconButton
                             onClick={handleCloseDialog}
