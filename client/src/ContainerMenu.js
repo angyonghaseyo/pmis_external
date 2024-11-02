@@ -20,26 +20,24 @@ import {
     ToggleButtonGroup,
     Snackbar,
     Alert,
-    MenuItem,
     IconButton,
     CircularProgress
 } from '@mui/material';
 import {
-    doc,
-    setDoc,
-    getDoc,
-    onSnapshot
-} from "firebase/firestore";
-import {
-    ref,
-    uploadBytes,
-    getDownloadURL,
-    deleteObject
-} from "firebase/storage";
-import { Add, GridView, ViewList, CloudUpload, Delete } from '@mui/icons-material';
-import { db, auth, storage } from "./firebaseConfig";
+    Add,
+    GridView,
+    ViewList,
+    CloudUpload,
+    Delete,
+    Close
+} from '@mui/icons-material';
+import { doc, getDoc, setDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db, storage } from "./firebaseConfig";
+import { useAuth } from './AuthContext';
 
-const ContainerMenuManager = () => {
+const ContainerMenu = () => {
+    const { user } = useAuth();
     const [containers, setContainers] = useState([]);
     const [newSize, setNewSize] = useState('');
     const [newPrice, setNewPrice] = useState('');
@@ -54,19 +52,52 @@ const ContainerMenuManager = () => {
         message: '',
         severity: 'info'
     });
-    const getCompany = async () => {
-        try {
-            const userDocRef = doc(db, "users", auth.currentUser.uid);
-            const userDoc = await getDoc(userDocRef);
+    const [loading, setLoading] = useState(true);
 
-            if (userDoc.exists()) {
-                const userData = userDoc.data();
+    const fetchUserCompany = async () => {
+        if (!user?.email) {
+            setSnackbar({
+                open: true,
+                message: "User email not found",
+                severity: 'error'
+            });
+            return;
+        }
+
+        try {
+            const usersRef = collection(db, 'users');
+            const q = query(usersRef, where('email', '==', user.email));
+            const querySnapshot = await getDocs(q);
+
+            if (querySnapshot.empty) {
+                setSnackbar({
+                    open: true,
+                    message: "User not found in database",
+                    severity: 'error'
+                });
+                return;
+            }
+
+            const userData = querySnapshot.docs[0].data();
+            console.log("HI", userData.company)
+            if (userData.company) {
                 setCompany(userData.company);
                 return userData.company;
+            } else {
+                setSnackbar({
+                    open: true,
+                    message: "No company information found for user",
+                    severity: 'error'
+                });
+                return null;
             }
-            return null;
         } catch (error) {
-            console.error("Error fetching user data:", error);
+            console.error("Error fetching user company:", error);
+            setSnackbar({
+                open: true,
+                message: "Error fetching company information",
+                severity: 'error'
+            });
             return null;
         }
     };
@@ -74,7 +105,6 @@ const ContainerMenuManager = () => {
     const handleImageChange = (event) => {
         const file = event.target.files[0];
         if (file) {
-            // Validate file type
             if (!file.type.startsWith('image/')) {
                 setSnackbar({
                     open: true,
@@ -84,7 +114,6 @@ const ContainerMenuManager = () => {
                 return;
             }
 
-            // Validate file size (max 5MB)
             if (file.size > 5 * 1024 * 1024) {
                 setSnackbar({
                     open: true,
@@ -125,12 +154,21 @@ const ContainerMenuManager = () => {
 
     const handleAddContainer = async () => {
         try {
-            const companyDocRef = doc(db, "container_menu", company);
+            if (!company) {
+                setSnackbar({
+                    open: true,
+                    message: "Company information not available",
+                    severity: 'error'
+                });
+                return;
+            }
+
+            const menuCollectionRef = collection(db, "container_menu");
+            const companyDocRef = doc(menuCollectionRef, company);
             const companyDoc = await getDoc(companyDocRef);
 
             let existingContainers = companyDoc.exists() ? companyDoc.data().container_types : [];
 
-            // Check for duplicate size and price combination
             const isDuplicate = existingContainers.some(
                 container => container.size === parseInt(newSize) &&
                     container.price === parseFloat(newPrice)
@@ -167,12 +205,13 @@ const ContainerMenuManager = () => {
                 severity: 'success'
             });
 
-            // Clear input fields
             setNewSize('');
             setNewPrice('');
             setNewName('');
             setImageFile(null);
             setImagePreview(null);
+            
+            fetchContainers();
         } catch (error) {
             console.error("Error adding container:", error);
             setSnackbar({
@@ -188,33 +227,60 @@ const ContainerMenuManager = () => {
         setImagePreview(null);
     };
 
+    const fetchContainers = async (company) => {
+        try {
+            if (!company) {
+                console.log("No company information available");
+                return;
+            }
+
+            const menuCollectionRef = collection(db, "container_menu");
+            const companyDocRef = doc(menuCollectionRef, company);
+            const companyDoc = await getDoc(companyDocRef);
+
+            if (companyDoc.exists()) {
+                setContainers(companyDoc.data().container_types || []);
+            } else {
+                setContainers([]);
+            }
+        } catch (error) {
+            console.error("Error fetching containers:", error);
+            setSnackbar({
+                open: true,
+                message: "Error fetching containers. Please try again.",
+                severity: 'error'
+            });
+        }
+    };
+
     useEffect(() => {
-        const fetchData = async () => {
+        const initializeData = async () => {
+            setLoading(true);
             try {
-                const userCompany = await getCompany();
+                const userCompany = await fetchUserCompany();
+                console.log("HIIIII,", userCompany)
                 if (userCompany) {
-                    const companyDocRef = doc(db, "container_menu", userCompany);
-                    const unsubscribe = onSnapshot(companyDocRef, (docSnapshot) => {
-                        if (docSnapshot.exists()) {
-                            setContainers(docSnapshot.data().container_types || []);
-                        } else {
-                            setContainers([]);
-                        }
-                    });
-                    return () => unsubscribe();
+                    await fetchContainers(userCompany);
                 }
             } catch (error) {
-                console.error("Error setting up real-time listener:", error);
+                console.error("Error initializing data:", error);
+                setSnackbar({
+                    open: true,
+                    message: "Error loading data",
+                    severity: 'error'
+                });
+            } finally {
+                setLoading(false);
             }
         };
 
-        fetchData();
-    }, []);
+        if (user) {
+            initializeData();
+        }
+    }, [user]);
 
     const handleCloseSnackbar = (event, reason) => {
-        if (reason === 'clickaway') {
-            return;
-        }
+        if (reason === 'clickaway') return;
         setSnackbar({ ...snackbar, open: false });
     };
 
@@ -223,6 +289,14 @@ const ContainerMenuManager = () => {
             setView(newView);
         }
     };
+
+    if (loading) {
+        return (
+            <Box display="flex" justifyContent="center" alignItems="center" height="100vh">
+                <CircularProgress />
+            </Box>
+        );
+    }
 
     return (
         <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -236,6 +310,7 @@ const ContainerMenuManager = () => {
                     {snackbar.message}
                 </Alert>
             </Snackbar>
+
             <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
                 <Typography variant="h4" gutterBottom>
                     Container Menu Management
@@ -263,7 +338,6 @@ const ContainerMenuManager = () => {
                             onChange={(e) => setNewPrice(e.target.value)}
                             size="small"
                         />
-
                     </Box>
 
                     <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
@@ -271,7 +345,7 @@ const ContainerMenuManager = () => {
                             component="label"
                             variant="outlined"
                             startIcon={<CloudUpload />}
-                            sx={{ mt: 1 }}
+
                         >
                             Upload Image
                             <input
@@ -344,7 +418,7 @@ const ContainerMenuManager = () => {
                                         component="img"
                                         height="200"
                                         image={container.imageUrl || '/api/placeholder/400/320'}
-                                        alt={`${container.name}`}
+                                        alt={container.name}
                                         sx={{
                                             objectFit: 'cover',
                                             bgcolor: '#f5f5f5',
@@ -411,4 +485,4 @@ const ContainerMenuManager = () => {
     );
 };
 
-export default ContainerMenuManager;
+export default ContainerMenu;
