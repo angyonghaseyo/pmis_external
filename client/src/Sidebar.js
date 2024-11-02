@@ -76,7 +76,7 @@ const Sidebar = ({ user }) => {
       icon: <Package />,
       path: "/cargos",
       children: [
-        { name: 'Booking Form', accessRights: ['abc'] },
+        { name: 'Booking Form', accessRights: ['Create Cargo Booking'] },
         { name: 'Container Request', accessRights: ['Create Container Request', 'View Container Request'] },
         { name: 'Truck Registration', accessRights: ['Register Truck', 'View Truck Registrations'] },
         { name: 'Cargo Manifest', accessRights: ['View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest'] },
