@@ -78,7 +78,7 @@ const checkBookingConflict = (bookedPeriods, newStart, newEnd) => {
     });
 };
 
-const FacilityRental = () => {
+const FacilityandSpaceRental = () => {
     const [activeStep, setActiveStep] = useState(0);
     const [openDialog, setOpenDialog] = useState(false);
     const [selectedFacility, setSelectedFacility] = useState(null);
@@ -693,4 +693,4 @@ const FacilityRental = () => {
     );
 };
 
-export default FacilityRental;
+export default FacilityandSpaceRental;
