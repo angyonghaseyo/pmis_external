@@ -706,6 +706,7 @@ const BookingForm = ({ user }) => {
                 value={formData.pickupDate}
                 onChange={handleChange}
                 fullWidth
+                InputLabelProps={{ shrink: true }}
                 required
               />
             </Grid>
@@ -736,6 +737,7 @@ const BookingForm = ({ user }) => {
                 type="datetime-local"
                 value={formData.cutoffDeadline}
                 onChange={handleChange}
+                InputLabelProps={{ shrink: true }}
                 fullWidth
                 required
               />
@@ -747,6 +749,7 @@ const BookingForm = ({ user }) => {
                 type="datetime-local"
                 value={formData.eta}
                 onChange={handleChange}
+                InputLabelProps={{ shrink: true }}
                 fullWidth
                 required
               />
@@ -758,6 +761,7 @@ const BookingForm = ({ user }) => {
                 type="datetime-local"
                 value={formData.etd}
                 onChange={handleChange}
+                InputLabelProps={{ shrink: true }}
                 fullWidth
                 required
               />
