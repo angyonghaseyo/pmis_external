@@ -126,7 +126,7 @@ function App() {
                   <Route path="/cargos/container-requests-list" element={<ContainerRequestsList user={user} />} />
                 )}
                 {hasAccessRights(['Create Facility Rental']) && (
-                  <Route path="/cargos/facility-rental" element={<FacilityandSpaceRental/>} />
+                  <Route path="/cargos/facility-and-space-rental" element={<FacilityandSpaceRental/>} />
                 )}
                 <Route path="*" element={<Navigate to="/" replace />} />
               </>
