@@ -28,11 +28,7 @@ import {
     Divider,
     CircularProgress,
     Snackbar,
-    Stack,
-    FormControl,
-    InputLabel,
-    Select,
-    MenuItem
+    Stack
 } from '@mui/material';
 import {
     Warehouse,
@@ -51,7 +47,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { addHours, isBefore, isAfter, format } from 'date-fns';
 
-const steps = ['Select Facility', 'Specify Booking Hours', 'Review & Submit'];
+const steps = ['Select Warehouse', 'Specify Booking Hours', 'Review & Submit'];
 
 // Utility function to check for booking conflicts
 const checkBookingConflict = (bookedPeriods, newStart, newEnd) => {
@@ -79,6 +75,7 @@ const checkBookingConflict = (bookedPeriods, newStart, newEnd) => {
 };
 
 const FacilityandSpaceRental = () => {
+    // State management
     const [activeStep, setActiveStep] = useState(0);
     const [openDialog, setOpenDialog] = useState(false);
     const [selectedFacility, setSelectedFacility] = useState(null);
@@ -100,8 +97,8 @@ const FacilityandSpaceRental = () => {
     const [viewMode, setViewMode] = useState(false);
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [bookingConflict, setBookingConflict] = useState(false);
-    const [timeSlots, setTimeSlots] = useState([]);
 
+    // Effects
     useEffect(() => {
         fetchFacilities();
         fetchRentalRequests();
@@ -118,12 +115,14 @@ const FacilityandSpaceRental = () => {
         }
     }, [formData.startTime, formData.endTime, selectedFacility]);
 
+    // Fetch functions
     const fetchFacilities = async () => {
         try {
             setLoading(true);
-            const querySnapshot = await getDocs(collection(db, 'facilities'));
+            const querySnapshot = await getDocs(collection(db, 'Warehouse'));
             const facilitiesData = querySnapshot.docs.map(doc => ({
                 id: doc.id,
+                warehouseId: doc.id,
                 ...doc.data(),
                 bookedPeriods: doc.data().bookedPeriods || []
             })).filter(facility => facility.status === 'Available');
@@ -150,11 +149,11 @@ const FacilityandSpaceRental = () => {
         }
     };
 
+    // Handler functions
     const handleViewDetails = async (request) => {
         try {
             setLoading(true);
-            // Find the facility details
-            const facilityRef = doc(db, 'facilities', request.facilityId);
+            const facilityRef = doc(db, 'Warehouse', request.facilityId);
             const facilityDoc = await getDoc(facilityRef);
             
             if (facilityDoc.exists()) {
@@ -262,7 +261,7 @@ const FacilityandSpaceRental = () => {
             const rentalData = {
                 facilityId: selectedFacility.id,
                 facilityName: selectedFacility.name,
-                facilityType: selectedFacility.type,
+                warehouseId: selectedFacility.warehouseId,
                 startTime: formData.startTime.toISOString(),
                 endTime: formData.endTime.toISOString(),
                 purpose: formData.purpose,
@@ -332,22 +331,19 @@ const FacilityandSpaceRental = () => {
             ));
     };
 
+    // Content rendering based on step
     const getStepContent = (step) => {
         if (viewMode) {
-            // Return view mode content
             return (
                 <Box>
                     <Grid container spacing={3}>
                         <Grid item xs={12}>
                             <Paper sx={{ p: 2 }}>
                                 <Typography variant="subtitle1" gutterBottom>
-                                    Facility Details
+                                    Warehouse Details
                                 </Typography>
                                 <Typography variant="h6" color="primary">
                                     {selectedRequest?.facilityName}
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                    Type: {selectedRequest?.facilityType}
                                 </Typography>
                                 <Typography variant="body2" color="text.secondary">
                                     Square Footage: {selectedRequest?.squareFootage} sq ft
@@ -422,7 +418,6 @@ const FacilityandSpaceRental = () => {
             );
         }
 
-        // Return normal booking flow content
         switch (step) {
             case 0:
                 return (
@@ -438,382 +433,374 @@ const FacilityandSpaceRental = () => {
                                         '&:hover': {
                                             transform: 'scale(1.02)',
                                             transition: 'transform 0.2s ease-in-out'
-                                        }
-                                    }}
-                                    onClick={() => handleFacilitySelect(facility)}
-                                >
-                                    <CardContent>
-                                        <Stack spacing={2}>
-                                            <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                                                <Warehouse sx={{ fontSize: 40 }} />
-                                            </Box>
-                                            <Typography variant="h6">
-                                                {facility.name}
-                                            </Typography>
-                                            <Typography variant="body2" color="text.secondary">
-                                                {facility.type} - {facility.squareFootage} sq ft
-                                            </Typography>
-                                            <Typography variant="body2" color="text.secondary">
-                                                Location: {facility.location}
-                                            </Typography>
-                                            <Typography variant="h6" color="primary">
-                                                ${(facility.pricePerDay / 24).toFixed(2)}/hour
-                                            </Typography>
-                                            {facility.features && (
+                                        }}}
+                                        onClick={() => handleFacilitySelect(facility)}
+                                    >
+                                        <CardContent>
+                                            <Stack spacing={2}>
+                                                <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                                                    <Warehouse sx={{ fontSize: 40 }} />
+                                                </Box>
+                                                <Typography variant="h6">
+                                                    {facility.name}
+                                                </Typography>
                                                 <Typography variant="body2" color="text.secondary">
-                                                    Features: {facility.features}
+                                                    Warehouse - {facility.squareFootage} sq ft
                                                 </Typography>
-                                            )}
-                                            <Divider />
-                                            <Box>
-                                                <Typography variant="subtitle2" gutterBottom>
-                                                    Current Bookings:
+                                                <Typography variant="h6" color="primary">
+                                                    ${(facility.pricePerDay / 24).toFixed(2)}/hour
                                                 </Typography>
-                                                {getApprovedBookingsDisplay(facility)}
-                                            </Box>
-                                        </Stack>
-                                    </CardContent>
-                                </Card>
-                            </Grid>
-                        ))}
-                    </Grid>
-                );
-
-            case 1:
-                return (
-                    <Box>
-                        <Alert
-                            severity={bookingConflict ? 'error' : 'info'}
-                            sx={{ mb: 3 }}
-                        >
-                            {bookingConflict
-                                ? 'Selected time slot conflicts with existing bookings'
-                                : 'Please select your desired booking hours'}
-                        </Alert>
-                        <Grid container spacing={3}>
-                            <Grid item xs={12} sm={6}>
-                                <LocalizationProvider dateAdapter={AdapterDateFns}>
-                                    <DateTimePicker
-                                        label="Start Time"
-                                        value={formData.startTime}
-                                        onChange={(date) => setFormData(prev => ({
-                                            ...prev,
-                                            startTime: date
-                                        }))}
-                                        renderInput={(params) => <TextField {...params} fullWidth />}
-                                        minDate={new Date()}
-                                        minutesStep={60}
-                                    />
-                                </LocalizationProvider>
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <LocalizationProvider dateAdapter={AdapterDateFns}>
-                                    <DateTimePicker
-                                        label="End Time"
-                                        value={formData.endTime}
-                                        onChange={(date) => setFormData(prev => ({
-                                            ...prev,
-                                            endTime: date
-                                        }))}
-                                        renderInput={(params) => <TextField {...params} fullWidth />}
-                                        minDate={formData.startTime || new Date()}
-                                        minutesStep={60}
-                                    />
-                                </LocalizationProvider>
-                            </Grid>
-                            <Grid item xs={12}>
-                                <TextField
-                                    fullWidth
-                                    label="Purpose of Rental"
-                                    value={formData.purpose}
-                                    onChange={(e) => setFormData(prev => ({
-                                        ...prev,
-                                        purpose: e.target.value
-                                    }))}
-                                    multiline
-                                    rows={3}
-                                    required
-                                />
-                            </Grid>
-                            <Grid item xs={12}>
-                                <TextField
-                                    fullWidth
-                                    label="Special Requirements"
-                                    value={formData.specialRequirements}
-                                    onChange={(e) => setFormData(prev => ({
-                                        ...prev,
-                                        specialRequirements: e.target.value
-                                    }))}
-                                    multiline
-                                    rows={3}
-                                />
-                            </Grid>
+                                                {facility.features && (
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        Features: {facility.features}
+                                                    </Typography>
+                                                )}
+                                                <Divider />
+                                                <Box>
+                                                    <Typography variant="subtitle2" gutterBottom>
+                                                        Current Bookings:
+                                                    </Typography>
+                                                    {getApprovedBookingsDisplay(facility)}
+                                                </Box>
+                                            </Stack>
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+                            ))}
                         </Grid>
-                    </Box>
-                );
-
-            case 2:
-                return (
-                    <Box>
-                        <Typography variant="h6" gutterBottom>
-                            Review Booking Details
-                        </Typography>
-                        <Grid container spacing={2}>
-                            <Grid item xs={12}>
-                                <Paper sx={{ p: 2 }}>
-                                    <Typography variant="subtitle1" gutterBottom>
-                                        Selected Facility
-                                    </Typography>
-                                    <Typography variant="body1" color="primary">
-                                        {selectedFacility?.name} - {selectedFacility?.squareFootage} sq ft
-                                    </Typography>
-                                    <Typography variant="body2" color="text.secondary">
-                                        Type: {selectedFacility?.type}
-                                    </Typography>
-                                    <Typography variant="body2" color="text.secondary">
-                                        Location: {selectedFacility?.location}
-                                    </Typography>
-                                    <Typography variant="body2" color="text.secondary">
-                                        Hourly Rate: ${(selectedFacility?.pricePerDay / 24).toFixed(2)}
-                                    </Typography>
-                                </Paper>
+                    );
+    
+                case 1:
+                    return (
+                        <Box>
+                            <Alert
+                                severity={bookingConflict ? 'error' : 'info'}
+                                sx={{ mb: 3 }}
+                            >
+                                {bookingConflict
+                                    ? 'Selected time slot conflicts with existing bookings'
+                                    : 'Please select your desired booking hours'}
+                            </Alert>
+                            <Grid container spacing={3}>
+                                <Grid item xs={12} sm={6}>
+                                    <LocalizationProvider dateAdapter={AdapterDateFns}>
+                                        <DateTimePicker
+                                            label="Start Time"
+                                            value={formData.startTime}
+                                            onChange={(date) => setFormData(prev => ({
+                                                ...prev,
+                                                startTime: date
+                                            }))}
+                                            renderInput={(params) => <TextField {...params} fullWidth />}
+                                            minDate={new Date()}
+                                            minutesStep={60}
+                                        />
+                                    </LocalizationProvider>
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <LocalizationProvider dateAdapter={AdapterDateFns}>
+                                        <DateTimePicker
+                                            label="End Time"
+                                            value={formData.endTime}
+                                            onChange={(date) => setFormData(prev => ({
+                                                ...prev,
+                                                endTime: date
+                                            }))}
+                                            renderInput={(params) => <TextField {...params} fullWidth />}
+                                            minDate={formData.startTime || new Date()}
+                                            minutesStep={60}
+                                        />
+                                    </LocalizationProvider>
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <TextField
+                                        fullWidth
+                                        label="Purpose of Rental"
+                                        value={formData.purpose}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            purpose: e.target.value
+                                        }))}
+                                        multiline
+                                        rows={3}
+                                        required
+                                    />
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <TextField
+                                        fullWidth
+                                        label="Special Requirements"
+                                        value={formData.specialRequirements}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            specialRequirements: e.target.value
+                                        }))}
+                                        multiline
+                                        rows={3}
+                                    />
+                                </Grid>
                             </Grid>
-
-                            <Grid item xs={12}>
-                                <Paper sx={{ p: 2 }}>
-                                    <Typography variant="subtitle1" gutterBottom>
-                                        Booking Period
-                                    </Typography>
-                                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                                        <AccessTime color="primary" />
-                                        <Box>
-                                            <Typography variant="body2" color="text.secondary">
-                                                Start: {formData.startTime?.toLocaleString()}
-                                            </Typography>
-                                            <Typography variant="body2" color="text.secondary">
-                                                End: {formData.endTime?.toLocaleString()}
-                                            </Typography>
-                                            <Typography variant="body2" color="text.secondary">
-                                                Duration: {Math.ceil(
-                                                    (new Date(formData.endTime) - new Date(formData.startTime)) / 
-                                                    (1000 * 60 * 60)
-                                                )} hours
-                                            </Typography>
-                                        </Box>
-                                    </Box>
-                                </Paper>
-                            </Grid>
-
-                            <Grid item xs={12}>
-                                <Paper sx={{ p: 2 }}>
-                                    <Typography variant="subtitle1" gutterBottom>
-                                        Total Price
-                                    </Typography>
-                                    <Typography variant="h4" color="primary">
-                                        ${calculateTotalPrice().toFixed(2)}
-                                    </Typography>
-                                </Paper>
-                            </Grid>
-
-                            <Grid item xs={12}>
-                                <Paper sx={{ p: 2 }}>
-                                    <Typography variant="subtitle1" gutterBottom>
-                                        Purpose & Requirements
-                                    </Typography>
-                                    <Typography variant="body2" paragraph>
-                                        <strong>Purpose:</strong> {formData.purpose}
-                                    </Typography>
-                                    {formData.specialRequirements && (
-                                        <Typography variant="body2">
-                                            <strong>Special Requirements:</strong> {formData.specialRequirements}
+                        </Box>
+                    );
+    
+                case 2:
+                    return (
+                        <Box>
+                            <Typography variant="h6" gutterBottom>
+                                Review Booking Details
+                            </Typography>
+                            <Grid container spacing={2}>
+                                <Grid item xs={12}>
+                                    <Paper sx={{ p: 2 }}>
+                                        <Typography variant="subtitle1" gutterBottom>
+                                            Selected Warehouse
                                         </Typography>
-                                    )}
-                                </Paper>
+                                        <Typography variant="body1" color="primary">
+                                            {selectedFacility?.name} - {selectedFacility?.squareFootage} sq ft
+                                        </Typography>
+                                        {selectedFacility?.features && (
+                                            <Typography variant="body2" color="text.secondary">
+                                                Features: {selectedFacility.features}
+                                            </Typography>
+                                        )}
+                                    </Paper>
+                                </Grid>
+    
+                                <Grid item xs={12}>
+                                    <Paper sx={{ p: 2 }}>
+                                        <Typography variant="subtitle1" gutterBottom>
+                                            Booking Period
+                                        </Typography>
+                                        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                                            <AccessTime color="primary" />
+                                            <Box>
+                                                <Typography variant="body2" color="text.secondary">
+                                                    Start: {formData.startTime?.toLocaleString()}
+                                                </Typography>
+                                                <Typography variant="body2" color="text.secondary">
+                                                    End: {formData.endTime?.toLocaleString()}
+                                                </Typography>
+                                                <Typography variant="body2" color="text.secondary">
+                                                    Duration: {Math.ceil(
+                                                        (new Date(formData.endTime) - new Date(formData.startTime)) / 
+                                                        (1000 * 60 * 60)
+                                                    )} hours
+                                                </Typography>
+                                            </Box>
+                                        </Box>
+                                    </Paper>
+                                </Grid>
+    
+                                <Grid item xs={12}>
+                                    <Paper sx={{ p: 2 }}>
+                                        <Typography variant="subtitle1" gutterBottom>
+                                            Total Price
+                                        </Typography>
+                                        <Typography variant="h4" color="primary">
+                                            ${calculateTotalPrice().toFixed(2)}
+                                        </Typography>
+                                    </Paper>
+                                </Grid>
+    
+                                <Grid item xs={12}>
+                                    <Paper sx={{ p: 2 }}>
+                                        <Typography variant="subtitle1" gutterBottom>
+                                            Purpose & Requirements
+                                        </Typography>
+                                        <Typography variant="body2" paragraph>
+                                            <strong>Purpose:</strong> {formData.purpose}
+                                        </Typography>
+                                        {formData.specialRequirements && (
+                                            <Typography variant="body2">
+                                                <strong>Special Requirements:</strong> {formData.specialRequirements}
+                                            </Typography>
+                                        )}
+                                    </Paper>
+                                </Grid>
                             </Grid>
-                        </Grid>
+                        </Box>
+                    );
+    
+                default:
+                    return 'Unknown step';
+            }
+        };
+    
+        return (
+            <Container maxWidth="lg" sx={{ py: 4 }}>
+                <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
+                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+                        <Typography variant="h4">Warehouse Rental</Typography>
+                        <Button
+                            variant="contained"
+                            onClick={() => setOpenDialog(true)}
+                            startIcon={<Warehouse />}
+                        >
+                            Rent Warehouse
+                        </Button>
                     </Box>
-                );
-
-            default:
-                return 'Unknown step';
-        }
-    };
-
-    return (
-        <Container maxWidth="lg" sx={{ py: 4 }}>
-            <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
-                <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-                    <Typography variant="h4">Facility and Space Rental</Typography>
-                    <Button
-                        variant="contained"
-                        onClick={() => setOpenDialog(true)}
-                        startIcon={<Warehouse />}
-                    >
-                        Rent Facility
-                    </Button>
-                </Box>
-
-                <TableContainer>
-                    <Table>
-                        <TableHead>
-                            <TableRow>
-                                <TableCell>Facility</TableCell>
-                                <TableCell>Booking Period</TableCell>
-                                <TableCell>Duration</TableCell>
-                                <TableCell>Total Price</TableCell>
-                                <TableCell>Status</TableCell>
-                                <TableCell>Actions</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {loading ? (
+    
+                    <TableContainer>
+                        <Table>
+                            <TableHead>
                                 <TableRow>
-                                    <TableCell colSpan={6} align="center">
-                                        <CircularProgress />
-                                    </TableCell>
+                                    <TableCell>Warehouse</TableCell>
+                                    <TableCell>Booking Period</TableCell>
+                                    <TableCell>Duration</TableCell>
+                                    <TableCell>Total Price</TableCell>
+                                    <TableCell>Status</TableCell>
+                                    <TableCell>Actions</TableCell>
                                 </TableRow>
-                            ) : rentalRequests.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={6} align="center">
-                                        <Typography>No rental requests found</Typography>
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                rentalRequests.map((request) => (
-                                    <TableRow key={request.id}>
-                                        <TableCell>{request.facilityName}</TableCell>
-                                        <TableCell>
-                                            <Typography variant="body2">
-                                                {new Date(request.startTime).toLocaleString()}
-                                            </Typography>
-                                            <Typography variant="body2">
-                                                {new Date(request.endTime).toLocaleString()}
-                                            </Typography>
-                                        </TableCell>
-                                        <TableCell>
-                                            {Math.ceil(
-                                                (new Date(request.endTime) - new Date(request.startTime)) / 
-                                                (1000 * 60 * 60)
-                                            )} hours
-                                        </TableCell>
-                                        <TableCell>${request.totalPrice.toFixed(2)}</TableCell>
-                                        <TableCell>
-                                            <Chip
-                                                label={request.status}
-                                                color={
-                                                    request.status === 'Approved' ? 'success' :
-                                                    request.status === 'Rejected' ? 'error' : 'warning'
-                                                }
-                                                size="small"
-                                            />
-                                        </TableCell>
-                                        <TableCell>
-                                            <IconButton
-                                                size="small"
-                                                color="primary"
-                                                onClick={() => handleViewDetails(request)}
-                                            >
-                                                <Visibility />
-                                            </IconButton>
-                                            {request.status === 'Pending' && (
-                                                <IconButton
-                                                    size="small"
-                                                    color="error"
-                                                    onClick={() => handleCancelRequest(request.id)}
-                                                >
-                                                    <Cancel />
-                                                </IconButton>
-                                            )}
+                            </TableHead>
+                            <TableBody>
+                                {loading ? (
+                                    <TableRow>
+                                        <TableCell colSpan={6} align="center">
+                                            <CircularProgress />
                                         </TableCell>
                                     </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-            </Paper>
-
-            <Dialog
-                open={openDialog}
-                onClose={handleCloseDialog}
-                maxWidth="md"
-                fullWidth
-            >
-                <DialogTitle>
-                    <Box display="flex" justifyContent="space-between" alignItems="center">
-                        <Typography variant="h6">
-                            {viewMode ? 'Rental Request Details' : 'New Facility Rental'}
-                        </Typography>
-                        <IconButton
-                            onClick={handleCloseDialog}
-                            size="small"
-                        >
-                            <Close />
-                        </IconButton>
-                    </Box>
-                </DialogTitle>
-
-                <DialogContent>
-                    {!viewMode && (
-                        <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-                            {steps.map((label) => (
-                                <Step key={label}>
-                                    <StepLabel>{label}</StepLabel>
-                                </Step>
-                            ))}
-                        </Stepper>
-                    )}
-                    {getStepContent(activeStep)}
-                </DialogContent>
-
-                <DialogActions sx={{ p: 3 }}>
-                    <Button onClick={handleCloseDialog}>
-                        {viewMode ? 'Close' : 'Cancel'}
-                    </Button>
-                    {!viewMode && (
-                        <>
-                            <Button
-                                onClick={handleBack}
-                                disabled={activeStep === 0}
-                                startIcon={<ArrowBack />}
-                            >
-                                Back
-                            </Button>
-                            <Button
-                                variant="contained"
-                                onClick={handleNext}
-                                endIcon={activeStep === steps.length - 1 ? undefined : <ArrowForward />}
-                                disabled={loading || (activeStep === 1 && bookingConflict)}
-                            >
-                                {loading ? (
-                                    <CircularProgress size={24} />
-                                ) : activeStep === steps.length - 1 ? (
-                                    'Submit Request'
+                                ) : rentalRequests.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={6} align="center">
+                                            <Typography>No rental requests found</Typography>
+                                        </TableCell>
+                                    </TableRow>
                                 ) : (
-                                    'Next'
+                                    rentalRequests.map((request) => (
+                                        <TableRow key={request.id}>
+                                            <TableCell>{request.facilityName}</TableCell>
+                                            <TableCell>
+                                                <Typography variant="body2">
+                                                    {new Date(request.startTime).toLocaleString()}
+                                                </Typography>
+                                                <Typography variant="body2">
+                                                    {new Date(request.endTime).toLocaleString()}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell>
+                                                {Math.ceil(
+                                                    (new Date(request.endTime) - new Date(request.startTime)) / 
+                                                    (1000 * 60 * 60)
+                                                )} hours
+                                            </TableCell>
+                                            <TableCell>${request.totalPrice.toFixed(2)}</TableCell>
+                                            <TableCell>
+                                                <Chip
+                                                    label={request.status}
+                                                    color={
+                                                        request.status === 'Approved' ? 'success' :
+                                                        request.status === 'Rejected' ? 'error' : 'warning'
+                                                    }
+                                                    size="small"
+                                                />
+                                            </TableCell>
+                                            <TableCell>
+                                                <IconButton
+                                                    size="small"
+                                                    color="primary"
+                                                    onClick={() => handleViewDetails(request)}
+                                                >
+                                                    <Visibility />
+                                                </IconButton>
+                                                {request.status === 'Pending' && (
+                                                    <IconButton
+                                                        size="small"
+                                                        color="error"
+                                                        onClick={() => handleCancelRequest(request.id)}
+                                                    >
+                                                        <Cancel />
+                                                    </IconButton>
+                                                )}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
                                 )}
-                            </Button>
-                        </>
-                    )}
-                </DialogActions>
-            </Dialog>
-
-            <Snackbar
-                open={snackbar.open}
-                autoHideDuration={6000}
-                onClose={() => setSnackbar({ ...snackbar, open: false })}
-                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-            >
-                <Alert
-                    onClose={() => setSnackbar({ ...snackbar, open: false })}
-                    severity={snackbar.severity}
-                    sx={{ width: '100%' }}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </Paper>
+    
+                <Dialog
+                    open={openDialog}
+                    onClose={handleCloseDialog}
+                    maxWidth="md"
+                    fullWidth
                 >
-                    {snackbar.message}
-                </Alert>
-            </Snackbar>
-        </Container>
-    );
-};
-
-export default FacilityandSpaceRental;
+                    <DialogTitle>
+                        <Box display="flex" justifyContent="space-between" alignItems="center">
+                            <Typography variant="h6">
+                                {viewMode ? 'Rental Request Details' : 'New Warehouse Rental'}
+                            </Typography>
+                            <IconButton
+                                onClick={handleCloseDialog}
+                                size="small"
+                            >
+                                <Close />
+                            </IconButton>
+                        </Box>
+                    </DialogTitle>
+    
+                    <DialogContent>
+                        {!viewMode && (
+                            <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
+                                {steps.map((label) => (
+                                    <Step key={label}>
+                                        <StepLabel>{label}</StepLabel>
+                                    </Step>
+                                ))}
+                            </Stepper>
+                        )}
+                        {getStepContent(activeStep)}
+                    </DialogContent>
+    
+                    <DialogActions sx={{ p: 3 }}>
+                        <Button onClick={handleCloseDialog}>
+                            {viewMode ? 'Close' : 'Cancel'}
+                        </Button>
+                        {!viewMode && (
+                            <>
+                                <Button
+                                    onClick={handleBack}
+                                    disabled={activeStep === 0}
+                                    startIcon={<ArrowBack />}
+                                >
+                                    Back
+                                </Button>
+                                <Button
+                                    variant="contained"
+                                    onClick={handleNext}
+                                    endIcon={activeStep === steps.length - 1 ? undefined : <ArrowForward />}
+                                    disabled={loading || (activeStep === 1 && bookingConflict)}
+                                >
+                                    {loading ? (
+                                        <CircularProgress size={24} />
+                                    ) : activeStep === steps.length - 1 ? (
+                                        'Submit Request'
+                                    ) : (
+                                        'Next'
+                                    )}
+                                </Button>
+                            </>
+                        )}
+                    </DialogActions>
+                </Dialog>
+    
+                <Snackbar
+                    open={snackbar.open}
+                    autoHideDuration={6000}
+                    onClose={() => setSnackbar({ ...snackbar, open: false })}
+                    anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+                >
+                    <Alert
+                        onClose={() => setSnackbar({ ...snackbar, open: false })}
+                        severity={snackbar.severity}
+                        sx={{ width: '100%' }}
+                    >
+                        {snackbar.message}
+                    </Alert>
+                </Snackbar>
+            </Container>
+        );
+    };
+    
+    export default FacilityandSpaceRental;
