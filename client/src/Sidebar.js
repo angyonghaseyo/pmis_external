@@ -85,11 +85,12 @@ const Sidebar = ({ user }) => {
         { name: 'Container Requests List', accessRights: ['View Container Requests', 'Approve Container Requests'] },
         { name: 'Facility and Space Rental', accessRights: ['Create Facility Rental'] },
         { name: 'Cargo Sampling', accessRights: ['Create Sampling Request'] },
+        { name: 'Cargo Repacking', accessRights: ['Create Repacking Request'] },
 
       ],
       accessRights: ['Create Cargo Booking', 'Create Facility Rental', 'View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest',
         'Create Container Request', 'View Container Request', 'Create Container Pricings', 'View Container Pricings',
-        'Create Container Menu', 'View Container Menu', 'Register Truck', 'View Truck Registrations', 'View Container Requests', 'Approve Container Requests', 'Create Sampling Request']
+        'Create Container Menu', 'View Container Menu', 'Register Truck', 'View Truck Registrations', 'View Container Requests', 'Approve Container Requests', 'Create Sampling Request', 'Create Repacking Request']
     },
     {
       name: "Customs and Trade Documents",

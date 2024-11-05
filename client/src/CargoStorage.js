@@ -21,20 +21,25 @@ import {
     Tooltip,
     CircularProgress,
     Snackbar,
-    Alert
+    Alert,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions
 } from '@mui/material';
 import { Edit, Delete, Visibility, Search, Download } from '@mui/icons-material';
 import { collection, query, where, getDocs, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from './firebaseConfig';
-import CargoSamplingRequest from './CargoSamplingRequest';
+import CargoRepackingRequest from './CargoRepackingRequest';
 import { format } from 'date-fns';
 
 
-const CargoSampling = () => {
+const CargoStorage = () => {
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
     const [openDialog, setOpenDialog] = useState(false);
     const [editingId, setEditingId] = useState(null);
+    const [deleteConfirmation, setDeleteConfirmation] = useState(null);
     const [filters, setFilters] = useState({
         status: 'all',
         searchQuery: '',
@@ -49,7 +54,7 @@ const CargoSampling = () => {
     const fetchRequests = async () => {
         try {
             setLoading(true);
-            let q = query(collection(db, 'samplingRequests'), orderBy('createdAt', 'desc'));
+            let q = query(collection(db, 'repackingRequests'), orderBy('createdAt', 'desc'));
 
             if (filters.status !== 'all') {
                 q = query(q, where('status', '==', filters.status));
@@ -78,7 +83,7 @@ const CargoSampling = () => {
             console.error('Error fetching requests:', error);
             setSnackbar({
                 open: true,
-                message: 'Error fetching sampling requests',
+                message: 'Error fetching repacking requests',
                 severity: 'error'
             });
         } finally {
@@ -92,7 +97,7 @@ const CargoSampling = () => {
 
     const handleStatusChange = async (requestId, newStatus) => {
         try {
-            await updateDoc(doc(db, 'samplingRequests', requestId), {
+            await updateDoc(doc(db, 'repackingRequests', requestId), {
                 status: newStatus,
                 updatedAt: new Date()
             });
@@ -115,7 +120,7 @@ const CargoSampling = () => {
     const handleDelete = async (requestId) => {
         if (window.confirm('Are you sure you want to delete this request?')) {
             try {
-                await deleteDoc(doc(db, 'samplingRequests', requestId));
+                await deleteDoc(doc(db, 'repackingRequests', requestId));
                 await fetchRequests();
                 setSnackbar({
                     open: true,
@@ -174,7 +179,7 @@ const CargoSampling = () => {
     return (
         <Container maxWidth="xl" sx={{ mt: 4 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-                <Typography variant="h4">Cargo Sampling Requests</Typography>
+                <Typography variant="h4">Cargo Repacking Requests</Typography>
                 <Button
                     variant="contained"
                     onClick={() => {
@@ -182,7 +187,7 @@ const CargoSampling = () => {
                         setOpenDialog(true);
                     }}
                 >
-                    New Sampling Request
+                    New Repacking Request
                 </Button>
             </Box>
 
@@ -229,7 +234,7 @@ const CargoSampling = () => {
                             <TableCell>Request ID</TableCell>
                             <TableCell>Cargo Number</TableCell>
                             <TableCell>Cargo Type</TableCell>
-                            <TableCell>Sample Types</TableCell>
+                            <TableCell>Repackaging Requirements</TableCell>
                             <TableCell>Date Requested</TableCell>
                             <TableCell>Status</TableCell>
                             <TableCell>Actions</TableCell>
@@ -245,7 +250,7 @@ const CargoSampling = () => {
                         ) : requests.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={7} align="center">
-                                    No sampling requests found
+                                    No repacking requests found
                                 </TableCell>
                             </TableRow>
                         ) : (
@@ -255,7 +260,7 @@ const CargoSampling = () => {
                                     <TableCell>{request.cargoDetails.cargoNumber}</TableCell>
                                     <TableCell>{request.cargoDetails.cargoType}</TableCell>
                                     <TableCell>
-                                        {request.samplingDetails.sampleType.map((type) => (
+                                        {request.repackingDetails.requirements.map((type) => (
                                             <Chip
                                                 key={type}
                                                 label={type}
@@ -305,7 +310,7 @@ const CargoSampling = () => {
                                                 <IconButton
                                                     size="small"
                                                     color="error"
-                                                    onClick={() => handleDelete(request.id)}
+                                                    onClick={() => setDeleteConfirmation(request.id)}
                                                 >
                                                     <Delete />
                                                 </IconButton>
@@ -319,7 +324,7 @@ const CargoSampling = () => {
                 </Table>
             </TableContainer>
 
-            <CargoSamplingRequest
+            <CargoRepackingRequest
                 open={openDialog}
                 handleClose={() => {
                     setOpenDialog(false);
@@ -343,13 +348,36 @@ const CargoSampling = () => {
                     onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
                     severity={snackbar.severity}
                     elevation={6}
-                    variant="filled"
                 >
                     {snackbar.message}
                 </Alert>
             </Snackbar>
+
+            <Dialog
+                open={Boolean(deleteConfirmation)}
+                onClose={() => setDeleteConfirmation(null)}
+            >
+                <DialogTitle>Confirm Delete</DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        Are you sure you want to delete this cargo repacking request?
+                        This action cannot be undone.
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setDeleteConfirmation(null)}>Cancel</Button>
+                    <Button
+                        onClick={() => handleDelete(deleteConfirmation)}
+                        color="error"
+                        variant="contained"
+                    >
+                        Delete
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
         </Container>
     );
 };
 
-export default CargoSampling;
+export default CargoStorage;

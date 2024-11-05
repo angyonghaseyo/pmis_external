@@ -25,6 +25,7 @@ import TruckRegistration from './TruckRegistration';
 import ContainerRequestsList from './ContainerRequestsList';
 import FacilityandSpaceRental from './FacilityandSpaceRental';
 import CargoSampling from './CargoSampling';
+import CargoRepacking from './CargoRepacking';
 import { useAuth } from './AuthContext';
 import { jwtDecode } from "jwt-decode";
 
@@ -90,7 +91,6 @@ function App() {
               {hasAccessRights(['View Operator Requisitions', 'Create Operator Requisition']) && (
                 <Route path="/manpower/operator-requisition" element={<OperatorRequisition user={user} />} />
               )}
-
               <Route path="/settings/profile" element={<EditProfile user={user} />} />
               {hasAccessRights(['View Users List', 'Delete User', 'Invite User', 'Delete User Invitations', 'View Invitations List']) && (
                 <Route path="/settings/users" element={<SettingsUsers user={user} />} />
@@ -131,6 +131,9 @@ function App() {
               )}
               {hasAccessRights(['Create Sampling Request']) && (
                 <Route path="/cargos/cargo-sampling" element={<CargoSampling />} />
+              )}
+              {hasAccessRights(['Create Repacking Request']) && (
+                <Route path="/cargos/cargo-repacking" element={<CargoRepacking />} />
               )}
               <Route path="*" element={<Navigate to="/" replace />} />
             </>
