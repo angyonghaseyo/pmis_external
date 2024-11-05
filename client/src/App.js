@@ -91,6 +91,7 @@ function App() {
               {hasAccessRights(['View Operator Requisitions', 'Create Operator Requisition']) && (
                 <Route path="/manpower/operator-requisition" element={<OperatorRequisition user={user} />} />
               )}
+
               <Route path="/settings/profile" element={<EditProfile user={user} />} />
               {hasAccessRights(['View Users List', 'Delete User', 'Invite User', 'Delete User Invitations', 'View Invitations List']) && (
                 <Route path="/settings/users" element={<SettingsUsers user={user} />} />

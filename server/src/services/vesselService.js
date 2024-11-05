@@ -10,25 +10,29 @@ class VesselService {
     }
 
     async fetchConfirmedVesselVisitsWithoutManifests() {
-        // Access `cargo_manifests` collection and get IMO numbers
-        const manifestsRef = db.collection("cargo_manifests");
-        const manifestsSnapshot = await manifestsRef.get();
-        const existingManifestIMOs = new Set(
-            manifestsSnapshot.docs.map(doc => doc.data().imoNumber)
-        );
-
-        // Access `vesselVisitRequests` collection and query confirmed vessel visits
-        const vesselVisitRequestsRef = db.collection("vesselVisitRequests");
-        const q = vesselVisitRequestsRef.where("status", "==", "confirmed");
-        const querySnapshot = await q.get();
-
-        // Filter out vessels that already have manifests
-        return querySnapshot.docs
-            .map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }))
-            .filter(visit => !existingManifestIMOs.has(visit.imoNumber));
+        try {
+            // Get all cargo manifests to check existing IMO numbers
+            const manifestsRef = db.collection("cargo_manifests");
+            const manifestsSnapshot = await manifestsRef.get();
+            const existingManifestIMOs = new Set(
+              manifestsSnapshot.docs.map(doc => doc.data().imoNumber)
+            );
+        
+            // Get all confirmed vessel visits
+            const vesselVisitRequestsRef = db.collection("vesselVisitRequests");
+            const q = vesselVisitRequestsRef.where("status", "==", "confirmed");
+            const querySnapshot = await q.get();
+        
+            // Return all confirmed visits along with a flag indicating if they have a manifest
+            return querySnapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data(),
+              hasManifest: existingManifestIMOs.has(doc.data().imoNumber)
+            }));
+          } catch (error) {
+            console.error('Error fetching confirmed vessel visits:', error);
+            throw error;
+          }
     }
 
     async fetchVesselVisitsAdHocRequests() {

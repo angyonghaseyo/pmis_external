@@ -28,8 +28,8 @@ import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { db } from "./firebaseConfig";
-import { getUserData } from "./services/api";
-import { auth } from "./firebaseConfig";
+import { getUserUpdatedData } from "./services/api";
+import { useAuth } from './AuthContext';
 import { CircularProgress } from "@mui/material";
 import Papa from "papaparse";
 import {
@@ -51,8 +51,6 @@ import {
   listAll,
   deleteObject,
 } from "firebase/storage";
-
-// import firebase from './firebase'; // Assume Firebase is properly configured
 
 const VesselVisits = () => {
   const [openDialog, setOpenDialog] = useState(false);
@@ -110,23 +108,28 @@ const VesselVisits = () => {
   const [downloadURL, setDownloadURL] = useState("");
   const [deleteConfirmation, setDeleteConfirmation] = useState(null);
 
+  const { user } = useAuth();
+
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        await Promise.all([
-          fetchVesselVisits(),
-          fetchUserProfile(auth.currentUser.uid),
-        ]);
+        if (user) {  // Change from auth.currentUser to user
+          await Promise.all([
+            fetchVesselVisits(),
+            fetchUserProfile(user.email),  // Change from auth.currentUser.uid to user.email
+          ]);
+        } else {
+          setError('No authenticated user found');
+        }
       } catch (error) {
         console.error("Error fetching data:", error);
-        // Optionally set an error state here
       } finally {
         setIsLoading(false);
       }
     };
     fetchData();
-  }, []);
+  }, [user]);
 
   const fetchVesselVisits = async () => {
     const querySnapshot = await getDocs(collection(db, "vesselVisitRequests"));
@@ -1055,9 +1058,9 @@ const VesselVisits = () => {
     setTabValue(newValue);
   };
 
-  const fetchUserProfile = async (userId) => {
+  const fetchUserProfile = async (userEmail) => {
     try {
-      const profileData = await getUserData(userId);
+      const profileData = await getUserUpdatedData(userEmail);
       setUserProfile(profileData);
     } catch (error) {
       console.error("Error fetching user profile:", error);

@@ -22,15 +22,13 @@ import {
   Alert,
   Grid,
   FormControlLabel,
-  Switch
+  Switch,
 } from '@mui/material';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
 import { submitCargoManifest, updateCargoManifest, deleteCargoManifest } from './services/api';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from './firebaseConfig';
 
 const CargoManifest = () => {
   const [manifests, setManifests] = useState([]);
@@ -62,6 +60,7 @@ const CargoManifest = () => {
     cargoSummary: false,
     specialInstructions: false
   });
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -92,6 +91,7 @@ const CargoManifest = () => {
       setError('Failed to fetch cargo manifests');
     }
   };
+
   const fetchVesselVisits = async () => {
     try {
       const response = await fetch('http://localhost:5001/vessel-visits-confirmed-without-manifests');
@@ -104,7 +104,7 @@ const CargoManifest = () => {
       console.error('Error fetching vessel visits:', err);
       setError('Failed to fetch vessel visits');
     }
-  }
+  };
 
   const handleInputChange = (event) => {
     const { name, value, checked, type } = event.target;
@@ -120,6 +120,15 @@ const CargoManifest = () => {
 
   const handleDateChange = (name) => (date) => {
     setFormData({ ...formData, [name]: date });
+  };
+
+  const getImoOptions = () => {
+    if (currentManifest) {
+      // When editing, show all confirmed vessel visits
+      return vesselVisits;
+    }
+    // When creating new, only show vessels without manifests
+    return vesselVisits.filter(visit => !visit.hasManifest);
   };
 
   const handleImoNumberChange = (event) => {
@@ -247,6 +256,7 @@ const CargoManifest = () => {
         <Button variant="contained" onClick={() => handleOpenDialog()} sx={{ mb: 2 }}>
           Submit New Cargo Manifest
         </Button>
+
         <TableContainer component={Paper}>
           <Table>
             <TableHead>
@@ -300,17 +310,19 @@ const CargoManifest = () => {
                   value={formData.imoNumber}
                   onChange={handleImoNumberChange}
                   margin="normal"
+                  disabled={!!currentManifest}
                   InputLabelProps={{
                     style: { color: 'black' },
                   }}
                 >
-                  {vesselVisits.map((visit) => (
+                  {getImoOptions().map((visit) => (
                     <MenuItem key={visit.imoNumber} value={visit.imoNumber}>
                       {visit.imoNumber}
                     </MenuItem>
                   ))}
                 </TextField>
               </Grid>
+
               <Grid item xs={12} sm={6}>
                 <TextField
                   name="vesselName"
@@ -324,6 +336,7 @@ const CargoManifest = () => {
                   }}
                 />
               </Grid>
+
               <Grid item xs={12} sm={6}>
                 <TextField
                   name="cargoVolume"
