@@ -1323,6 +1323,10 @@ const VesselVisits = () => {
               <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
                 Voyage Details
               </Typography>
+              <Typography variant="h7" gutterBottom sx={{ mb: 2 }}>
+                (Starting from the voyage that includes Oceania Port)
+              </Typography>
+
               {formData.voyages.map((voyage, index) => (
                 <Box key={index} sx={{ mb: 2 }}>
                   <Grid container spacing={2}>
