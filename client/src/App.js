@@ -26,6 +26,7 @@ import ContainerRequestsList from './ContainerRequestsList';
 import FacilityandSpaceRental from './FacilityandSpaceRental';
 import { useAuth } from './AuthContext';
 import { jwtDecode } from "jwt-decode";
+import ElectronicTradeDocuments from './ElectronicTradeDocument';
 
 const drawerWidth = 240;
 
@@ -128,6 +129,7 @@ function App() {
                 {hasAccessRights(['Create Facility Rental']) && (
                   <Route path="/cargos/facility-and-space-rental" element={<FacilityandSpaceRental/>} />
                 )}
+                <Route path="/customs-and-trade-documents/electronic-trade-documents" element={<ElectronicTradeDocuments/>} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </>
             ) : (
