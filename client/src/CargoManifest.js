@@ -38,9 +38,11 @@ const CargoManifest = () => {
   const [currentManifest, setCurrentManifest] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [vesselVisits, setVesselVisits] = useState([]);
+  const [selectedVesselVoyages, setSelectedVesselVoyages] = useState([]);
   const [formData, setFormData] = useState({
     vesselName: '',
     imoNumber: '',
+    voyageNumber: '',
     departureDate: null,
     arrivalDate: null,
     originPort: '',
@@ -124,10 +126,8 @@ const CargoManifest = () => {
 
   const getImoOptions = () => {
     if (currentManifest) {
-      // When editing, show all confirmed vessel visits
       return vesselVisits;
     }
-    // When creating new, only show vessels without manifests
     return vesselVisits.filter(visit => !visit.hasManifest);
   };
 
@@ -144,7 +144,25 @@ const CargoManifest = () => {
         arrivalDate: new Date(selectedVessel.eta),
         containersOffloaded: selectedVessel.containersOffloaded,
         containersOnloaded: selectedVessel.containersOnloaded,
-        cargoVolume: selectedVessel.cargoVolume || ''
+        cargoVolume: selectedVessel.cargoVolume || '',
+        voyageNumber: '', // Reset voyage number when vessel changes
+      });
+      setSelectedVesselVoyages(selectedVessel.voyages || []);
+    }
+  };
+
+  const handleVoyageNumberChange = (event) => {
+    const selectedVoyageNumber = event.target.value;
+    const selectedVoyage = selectedVesselVoyages.find(
+      voyage => voyage.voyageNumber === selectedVoyageNumber
+    );
+
+    if (selectedVoyage) {
+      setFormData({
+        ...formData,
+        voyageNumber: selectedVoyageNumber,
+        originPort: selectedVoyage.departurePort,
+        destinationPort: selectedVoyage.arrivalPort
       });
     }
   };
@@ -209,11 +227,18 @@ const CargoManifest = () => {
         departureDate: manifest.departureDate ? new Date(manifest.departureDate) : null,
         arrivalDate: manifest.arrivalDate ? new Date(manifest.arrivalDate) : null,
       });
+      
+      // Find and set the voyages for the selected vessel
+      const vesselVisit = vesselVisits.find(visit => visit.imoNumber === manifest.imoNumber);
+      if (vesselVisit) {
+        setSelectedVesselVoyages(vesselVisit.voyages || []);
+      }
     } else {
       setCurrentManifest(null);
       setFormData({
         vesselName: '',
         imoNumber: '',
+        voyageNumber: '',
         departureDate: null,
         arrivalDate: null,
         originPort: '',
@@ -227,23 +252,9 @@ const CargoManifest = () => {
         specialInstructions: '',
         status: 'Pending'
       });
+      setSelectedVesselVoyages([]);
     }
     setOpenDialog(true);
-  };
-
-  const generateVoyageNumber = (manifest) => {
-    let datePart = 'YYYYMMDD';
-    if (manifest.departureDate) {
-      try {
-        const date = new Date(manifest.departureDate);
-        if (!isNaN(date.getTime())) {
-          datePart = date.toISOString().split('T')[0].replace(/-/g, '');
-        }
-      } catch (error) {
-        console.error('Invalid date:', manifest.departureDate);
-      }
-    }
-    return `${manifest.imoNumber}-${datePart}-${manifest.originPort.slice(0, 3).toUpperCase()}`;
   };
 
   if (loading) return <CircularProgress />;
@@ -275,7 +286,7 @@ const CargoManifest = () => {
             <TableBody>
               {manifests.map((manifest) => (
                 <TableRow key={manifest.id}>
-                  <TableCell>{generateVoyageNumber(manifest)}</TableCell>
+                  <TableCell>{manifest.voyageNumber}</TableCell>
                   <TableCell>{manifest.originPort}</TableCell>
                   <TableCell>{manifest.destinationPort}</TableCell>
                   <TableCell>{manifest.arrivalDate ? new Date(manifest.arrivalDate).toLocaleString() : 'N/A'}</TableCell>
@@ -301,7 +312,7 @@ const CargoManifest = () => {
           <DialogTitle>{currentManifest ? 'Edit Cargo Manifest' : 'Submit Cargo Manifest'}</DialogTitle>
           <DialogContent>
             <Grid container spacing={2}>
-              <Grid item xs={12}>
+              <Grid item xs={12} sm={6}>
                 <TextField
                   select
                   name="imoNumber"
@@ -318,6 +329,27 @@ const CargoManifest = () => {
                   {getImoOptions().map((visit) => (
                     <MenuItem key={visit.imoNumber} value={visit.imoNumber}>
                       {visit.imoNumber}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  select
+                  name="voyageNumber"
+                  label="Voyage Number"
+                  fullWidth
+                  value={formData.voyageNumber}
+                  onChange={handleVoyageNumberChange}
+                  margin="normal"
+                  disabled={!!currentManifest || !formData.imoNumber}
+                  InputLabelProps={{
+                    style: { color: 'black' },
+                  }}
+                >
+                  {selectedVesselVoyages.map((voyage) => (
+                    <MenuItem key={voyage.voyageNumber} value={voyage.voyageNumber}>
+                      {voyage.voyageNumber} ({voyage.departurePort} → {voyage.arrivalPort})
                     </MenuItem>
                   ))}
                 </TextField>
@@ -408,6 +440,9 @@ const CargoManifest = () => {
                   margin="normal"
                   error={formErrors.originPort}
                   helperText={formErrors.originPort ? 'Origin Port is required' : ''}
+                  InputProps={{
+                    readOnly: true,
+                  }}
                   InputLabelProps={{
                     style: { color: 'black' },
                   }}
@@ -424,6 +459,9 @@ const CargoManifest = () => {
                   margin="normal"
                   error={formErrors.destinationPort}
                   helperText={formErrors.destinationPort ? 'Destination Port is required' : ''}
+                  InputProps={{
+                    readOnly: true,
+                  }}
                   InputLabelProps={{
                     style: { color: 'black' },
                   }}
