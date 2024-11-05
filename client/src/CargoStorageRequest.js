@@ -44,22 +44,12 @@ const VisuallyHiddenInput = styled('input')`
 `;
 
 
-const repackingRequirements = [
-    'Temperature Controlled',
-    'Humidity Controlled',
-    'Special Handling',
-    'Heavy Equipment Required',
-    'Hazmat Certified'
+const warehouseRequirements = [
+    'Regular Warehouse',
+    'Cold Storage Warehouse',
+    'Humidity Controlled Warehouse'
 ];
 
-const packagingTypes = [
-    'Cardboard',
-    'Bagged',
-    'Wooden Crates',
-    'Steel Drums',
-    'Bales',
-    'Pallets'
-];
 
 const StyledPaper = styled(Paper)(({ theme }) => ({
     padding: theme.spacing(2),
@@ -71,7 +61,7 @@ const StyledPaper = styled(Paper)(({ theme }) => ({
     }
 }));
 
-const steps = ['Overview', 'Cargo Details', 'Repacking Requirements', 'Schedule & Documents'];
+const steps = ['Overview', 'Cargo Details', 'Storage Requirements', 'Schedule & Documents'];
 
 const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSuccess }) => {
     const [formData, setFormData] = useState({
@@ -80,18 +70,14 @@ const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSucc
             cargoType: '',
             quantity: '',
             unit: 'CBM',
-            currentPackaging: '',
-            desiredPackaging: ''
         },
-        repackingDetails: {
-            requirements: [],
-        },
+        warehouseRequirement: '',
         schedule: {
-            preferredDate: null,
-            alternateDate: null
+            startDate: null,
+            endDate: null
         },
         documents: {
-            repackagingChecklist: []
+            storageChecklist: []
         },
         specialInstructions: '',
         status: 'Pending'
@@ -157,7 +143,7 @@ const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSucc
     const fetchRequestData = async () => {
         try {
             setLoading(true);
-            const docRef = doc(db, 'repackingRequests', editingId);
+            const docRef = doc(db, 'storageRequests', editingId);
             const docSnap = await getDoc(docRef);
 
             if (docSnap.exists()) {
@@ -182,6 +168,16 @@ const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSucc
             }));
             return;
         }
+
+        if (section === 'warehouseRequirement') {
+            // Handle special instructions directly since it's not nested
+            setFormData(prev => ({
+                ...prev,
+                warehouseRequirement: value
+            }));
+            return;
+        }
+
 
         setFormData(prev => {
             if (section in prev) {
@@ -239,7 +235,7 @@ const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSucc
         <Grid container spacing={3}>
             <Grid item xs={12}>
                 <Typography variant="h6" gutterBottom>
-                    Cargo Repacking Service Request
+                    Cargo Storage Service Request
                 </Typography>
 
                 <StyledPaper>
@@ -256,7 +252,7 @@ const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSucc
                                 <li>Valid cargo number</li>
                                 <li>Current packaging details</li>
                                 <li>Desired packaging specifications</li>
-                                <li>Estimated repacking duration</li>
+                                <li>Estimated storage duration</li>
                             </ul>
                         </Grid>
                         <Grid item xs={12} md={6}>
@@ -275,21 +271,14 @@ const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSucc
                     </Typography>
                     <Grid container spacing={2}>
                         <Grid item xs={12} md={6}>
-                            <Typography variant="subtitle2">Packaging Types:</Typography>
+                            <Typography variant="subtitle2">Warehouse Types:</Typography>
                             <ul>
-                                {packagingTypes.map((type) => (
+                                {warehouseRequirements.map((type) => (
                                     <li key={type}>{type}</li>
                                 ))}
                             </ul>
                         </Grid>
-                        <Grid item xs={12} md={6}>
-                            <Typography variant="subtitle2">Repacking Requirements:</Typography>
-                            <ul>
-                                {repackingRequirements.map((req) => (
-                                    <li key={req}>{req}</li>
-                                ))}
-                            </ul>
-                        </Grid>
+
                     </Grid>
                 </StyledPaper>
 
@@ -376,16 +365,16 @@ const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSucc
         <Grid container spacing={3}>
             <Grid item xs={12}>
                 <Typography variant="subtitle1" gutterBottom>
-                    Repacking Requirements
+                    Warehouse Requirements
                 </Typography>
                 <StyledPaper>
 
                     <FormControl fullWidth sx={{ mb: 3 }}>
-                        <InputLabel>Current Packaging</InputLabel>
+                        <InputLabel>Warehouse Request</InputLabel>
                         <Select
                             required
-                            value={formData.cargoDetails.currentPackaging}
-                            onChange={(e) => handleInputChange('cargoDetails', 'currentPackaging', e.target.value)}
+                            value={formData.warehouseRequirement}
+                            onChange={(e) => handleInputChange('warehouseRequirement', '', e.target.value)}
                             input={<OutlinedInput label="Current Packaging" />}
                             renderValue={(selected) => (
                                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
@@ -395,60 +384,13 @@ const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSucc
                                 </Box>
                             )}
                         >
-                            {packagingTypes.map((type) => (
+                            {warehouseRequirements.map((type) => (
                                 <MenuItem key={type} value={type}>
                                     {type}
                                 </MenuItem>
                             ))}
                         </Select>
                     </FormControl>
-
-                    <FormControl fullWidth sx={{ mb: 3 }}>
-                        <InputLabel>Desired Packaging</InputLabel>
-                        <Select
-                            required
-                            value={formData.cargoDetails.desiredPackaging}
-                            onChange={(e) => handleInputChange('cargoDetails', 'desiredPackaging', e.target.value)}
-                            input={<OutlinedInput label="Current Packaging" />}
-                            renderValue={(selected) => (
-                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-
-                                    <Typography> {selected} </Typography>
-
-                                </Box>
-                            )}
-                        >
-                            {packagingTypes.map((type) => (
-                                <MenuItem key={type} value={type}>
-                                    {type}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-
-                    <FormControl fullWidth sx={{ mb: 3 }}>
-                        <InputLabel>Repacking Requirements</InputLabel>
-                        <Select
-                            multiple
-                            value={formData.repackingDetails.requirements}
-                            onChange={(e) => handleInputChange('repackingDetails', 'requirements', e.target.value)}
-                            input={<OutlinedInput label="Repacking Requirements" />}
-                            renderValue={(selected) => (
-                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                                    {selected.map((value) => (
-                                        <Chip key={value} label={value} />
-                                    ))}
-                                </Box>
-                            )}
-                        >
-                            {repackingRequirements.map((type) => (
-                                <MenuItem key={type} value={type}>
-                                    {type}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-
 
                 </StyledPaper>
             </Grid>
@@ -468,15 +410,15 @@ const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSucc
                             <Grid item xs={6}>
                                 <DateTimePicker
                                     label="Start Date & Time"
-                                    value={formData.schedule.preferredDate}
-                                    onChange={(newValue) => handleInputChange('schedule', 'preferredDate', newValue)}
+                                    value={formData.schedule.startDate}
+                                    onChange={(newValue) => handleInputChange('schedule', 'startDate', newValue)}
                                     renderInput={(params) => (
                                         <TextField
                                             {...params}
                                             fullWidth
                                             required
-                                            error={!!errors.preferredDate}
-                                            helperText={errors.preferredDate}
+                                            error={!!errors.startDate}
+                                            helperText={errors.startDate}
                                         />
                                     )}
                                     minDate={new Date()}
@@ -485,15 +427,15 @@ const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSucc
                             <Grid item xs={6}>
                                 <DateTimePicker
                                     label="End Date & Time"
-                                    value={formData.schedule.preferredEndDate}
-                                    onChange={(newValue) => handleInputChange('schedule', 'alternateDate', newValue)}
+                                    value={formData.schedule.endDate}
+                                    onChange={(newValue) => handleInputChange('schedule', 'endDate', newValue)}
                                     renderInput={(params) => (
                                         <TextField
                                             {...params}
                                             fullWidth
                                             required
-                                            error={!!errors.preferredEndDate}
-                                            helperText={errors.preferredEndDate}
+                                            error={!!errors.endDate}
+                                            helperText={errors.endDate}
                                         />
                                     )}
                                     minDate={new Date()}
@@ -515,20 +457,20 @@ const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSucc
                                 fullWidth
                                 sx={{ mb: 1 }}
                             >
-                                Upload Repackaging Checklist*
+                                Upload Additional Storage Sheet
                                 <VisuallyHiddenInput
                                     type="file"
                                     accept=".pdf,.jpg,.jpeg,.png"
-                                    onChange={(e) => handleInputChange('documents', 'repackagingChecklist', e.target.files[0])}
+                                    onChange={(e) => handleInputChange('documents', 'storageChecklist', e.target.files[0])}
                                 />
                             </Button>
-                            {formData.documents.repackagingChecklist && (
+                            {formData.documents.storageChecklist && (
                                 <Typography variant="body2" color="textSecondary" gutterBottom>
-                                    Selected: {formData.documents.repackagingChecklist.name}
+                                    Selected: {formData.documents.storageChecklist.name}
                                 </Typography>
                             )}
-                            <FormHelperText error={!!errors.repackagingChecklist}>
-                                {errors.repackagingChecklist || 'PDF, JPEG, or PNG (max 5MB)'}
+                            <FormHelperText error={!!errors.storageChecklist}>
+                                {errors.storageChecklist || 'PDF, JPEG, or PNG (max 5MB)'}
                             </FormHelperText>
                         </Grid>
 
@@ -582,15 +524,15 @@ const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSucc
             };
 
             if (editingId) {
-                await setDoc(doc(db, 'repackingRequests', editingId), requestData);
+                await setDoc(doc(db, 'storageRequests', editingId), requestData);
             } else {
-                const docRef = await addDoc(collection(db, 'repackingRequests'), requestData);
+                const docRef = await addDoc(collection(db, 'storageRequests'), requestData);
                 await setDoc(docRef, { id: docRef.id }, { merge: true });
             }
 
             onSubmitSuccess?.();
             handleClose();
-            setSnackbar({ open: true, message: 'Repacking Request created successfully', severity: 'success' });
+            setSnackbar({ open: true, message: 'Storage Request created successfully', severity: 'success' });
         } catch (error) {
             console.error('Error submitting request:', error);
             setSnackbar({ open: true, message: 'Failed to submit request. Please try again.', severity: 'error' });
@@ -602,10 +544,10 @@ const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSucc
     const uploadFiles = async () => {
         const uploads = {};
 
-        if (formData.documents.repackagingChecklist) {
-            uploads.repackagingChecklist = await uploadFile(
-                formData.documents.repackagingChecklist,
-                'repackaging-checlist'
+        if (formData.documents.storageChecklist) {
+            uploads.storageChecklist = await uploadFile(
+                formData.documents.storageChecklist,
+                'storage-checlist'
             );
         }
 
@@ -614,7 +556,7 @@ const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSucc
 
     const uploadFile = async (file, path) => {
         if (!file) return null;
-        const storageRef = ref(storage, `repackaging-requests/${path}/${Date.now()}_${file.name}`);
+        const storageRef = ref(storage, `storage-requests/${path}/${Date.now()}_${file.name}`);
         await uploadBytes(storageRef, file);
         return await getDownloadURL(storageRef);
     };
@@ -634,7 +576,7 @@ const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSucc
                 <DialogTitle>
                     <Box display="flex" alignItems="center" justifyContent="space-between">
                         <Typography variant="h6">
-                            {editingId ? 'Edit Repackaging Request' : 'New Repackaging Request'}
+                            {editingId ? 'Edit Storage Request' : 'New Storage Request'}
                         </Typography>
                         <IconButton onClick={handleClose} size="small">
                             <CloseIcon />

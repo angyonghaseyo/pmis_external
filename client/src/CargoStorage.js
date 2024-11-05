@@ -30,7 +30,7 @@ import {
 import { Edit, Delete, Visibility, Search, Download } from '@mui/icons-material';
 import { collection, query, where, getDocs, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from './firebaseConfig';
-import CargoRepackingRequest from './CargoRepackingRequest';
+import CargoStorageRequest from './CargoStorageRequest';
 import { format } from 'date-fns';
 
 
@@ -54,7 +54,7 @@ const CargoStorage = () => {
     const fetchRequests = async () => {
         try {
             setLoading(true);
-            let q = query(collection(db, 'repackingRequests'), orderBy('createdAt', 'desc'));
+            let q = query(collection(db, 'storageRequests'), orderBy('createdAt', 'desc'));
 
             if (filters.status !== 'all') {
                 q = query(q, where('status', '==', filters.status));
@@ -83,7 +83,7 @@ const CargoStorage = () => {
             console.error('Error fetching requests:', error);
             setSnackbar({
                 open: true,
-                message: 'Error fetching repacking requests',
+                message: 'Error fetching storage requests',
                 severity: 'error'
             });
         } finally {
@@ -97,7 +97,7 @@ const CargoStorage = () => {
 
     const handleStatusChange = async (requestId, newStatus) => {
         try {
-            await updateDoc(doc(db, 'repackingRequests', requestId), {
+            await updateDoc(doc(db, 'storageRequests', requestId), {
                 status: newStatus,
                 updatedAt: new Date()
             });
@@ -118,24 +118,25 @@ const CargoStorage = () => {
     };
 
     const handleDelete = async (requestId) => {
-        if (window.confirm('Are you sure you want to delete this request?')) {
-            try {
-                await deleteDoc(doc(db, 'repackingRequests', requestId));
-                await fetchRequests();
-                setSnackbar({
-                    open: true,
-                    message: 'Request deleted successfully',
-                    severity: 'success'
-                });
-            } catch (error) {
-                console.error('Error deleting request:', error);
-                setSnackbar({
-                    open: true,
-                    message: 'Error deleting request',
-                    severity: 'error'
-                });
-            }
+
+        try {
+            await deleteDoc(doc(db, 'storageRequests', requestId));
+            await fetchRequests();
+            setSnackbar({
+                open: true,
+                message: 'Request deleted successfully',
+                severity: 'success'
+            });
+            setDeleteConfirmation(null)
+        } catch (error) {
+            console.error('Error deleting request:', error);
+            setSnackbar({
+                open: true,
+                message: 'Error deleting request',
+                severity: 'error'
+            });
         }
+
     };
 
     const getStatusColor = (status) => {
@@ -179,7 +180,7 @@ const CargoStorage = () => {
     return (
         <Container maxWidth="xl" sx={{ mt: 4 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-                <Typography variant="h4">Cargo Repacking Requests</Typography>
+                <Typography variant="h4">Cargo Storage Requests</Typography>
                 <Button
                     variant="contained"
                     onClick={() => {
@@ -187,7 +188,7 @@ const CargoStorage = () => {
                         setOpenDialog(true);
                     }}
                 >
-                    New Repacking Request
+                    New Storage Request
                 </Button>
             </Box>
 
@@ -234,7 +235,6 @@ const CargoStorage = () => {
                             <TableCell>Request ID</TableCell>
                             <TableCell>Cargo Number</TableCell>
                             <TableCell>Cargo Type</TableCell>
-                            <TableCell>Repackaging Requirements</TableCell>
                             <TableCell>Date Requested</TableCell>
                             <TableCell>Status</TableCell>
                             <TableCell>Actions</TableCell>
@@ -250,7 +250,7 @@ const CargoStorage = () => {
                         ) : requests.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={7} align="center">
-                                    No repacking requests found
+                                    No storage requests found
                                 </TableCell>
                             </TableRow>
                         ) : (
@@ -259,16 +259,7 @@ const CargoStorage = () => {
                                     <TableCell>{request.id.slice(0, 8)}</TableCell>
                                     <TableCell>{request.cargoDetails.cargoNumber}</TableCell>
                                     <TableCell>{request.cargoDetails.cargoType}</TableCell>
-                                    <TableCell>
-                                        {request.repackingDetails.requirements.map((type) => (
-                                            <Chip
-                                                key={type}
-                                                label={type}
-                                                size="small"
-                                                sx={{ mr: 0.5, mb: 0.5 }}
-                                            />
-                                        ))}
-                                    </TableCell>
+
                                     <TableCell>
                                         {format(request.createdAt, 'dd/MM/yyyy HH:mm')}
                                     </TableCell>
@@ -324,7 +315,7 @@ const CargoStorage = () => {
                 </Table>
             </TableContainer>
 
-            <CargoRepackingRequest
+            <CargoStorageRequest
                 open={openDialog}
                 handleClose={() => {
                     setOpenDialog(false);
@@ -360,7 +351,7 @@ const CargoStorage = () => {
                 <DialogTitle>Confirm Delete</DialogTitle>
                 <DialogContent>
                     <Typography>
-                        Are you sure you want to delete this cargo repacking request?
+                        Are you sure you want to delete this cargo storage request?
                         This action cannot be undone.
                     </Typography>
                 </DialogContent>

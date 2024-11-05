@@ -86,8 +86,8 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
             sampleUnit: 'grams'
         },
         schedule: {
-            preferredDate: null,
-            alternateDate: null
+            startDate: null,
+            endDate: null
         },
         documents: {
             safetyDataSheet: null,
@@ -477,16 +477,16 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
                         <Grid container spacing={3}>
                             <Grid item xs={12}>
                                 <DateTimePicker
-                                    label="Preferred Sampling Date & Time"
-                                    value={formData.schedule.preferredDate}
-                                    onChange={(newValue) => handleInputChange('schedule', 'preferredDate', newValue)}
+                                    label="Start Date & Time"
+                                    value={formData.schedule.startDate}
+                                    onChange={(newValue) => handleInputChange('schedule', 'startDate', newValue)}
                                     renderInput={(params) => (
                                         <TextField
                                             {...params}
                                             fullWidth
                                             required
-                                            error={!!errors.preferredDate}
-                                            helperText={errors.preferredDate}
+                                            error={!!errors.startDate}
+                                            helperText={errors.startDate}
                                         />
                                     )}
                                     minDate={new Date()}
@@ -494,15 +494,15 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
                             </Grid>
                             <Grid item xs={12}>
                                 <DateTimePicker
-                                    label="Alternate Date & Time (Optional)"
-                                    value={formData.schedule.alternateDate}
-                                    onChange={(newValue) => handleInputChange('schedule', 'alternateDate', newValue)}
+                                    label="End Date & Time"
+                                    value={formData.schedule.endDate}
+                                    onChange={(newValue) => handleInputChange('schedule', 'endDate', newValue)}
                                     renderInput={(params) => (
                                         <TextField
                                             {...params}
                                             fullWidth
-                                            error={!!errors.alternateDate}
-                                            helperText={errors.alternateDate}
+                                            error={!!errors.endDate}
+                                            helperText={errors.endDate}
                                         />
                                     )}
                                     minDate={new Date()}

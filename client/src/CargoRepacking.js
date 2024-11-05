@@ -118,24 +118,24 @@ const CargoRepacking = () => {
     };
 
     const handleDelete = async (requestId) => {
-        if (window.confirm('Are you sure you want to delete this request?')) {
-            try {
-                await deleteDoc(doc(db, 'repackingRequests', requestId));
-                await fetchRequests();
-                setSnackbar({
-                    open: true,
-                    message: 'Request deleted successfully',
-                    severity: 'success'
-                });
-            } catch (error) {
-                console.error('Error deleting request:', error);
-                setSnackbar({
-                    open: true,
-                    message: 'Error deleting request',
-                    severity: 'error'
-                });
-            }
+
+        try {
+            await deleteDoc(doc(db, 'repackingRequests', requestId));
+            await fetchRequests();
+            setSnackbar({
+                open: true,
+                message: 'Request deleted successfully',
+                severity: 'success'
+            });
+        } catch (error) {
+            console.error('Error deleting request:', error);
+            setSnackbar({
+                open: true,
+                message: 'Error deleting request',
+                severity: 'error'
+            });
         }
+
     };
 
     const getStatusColor = (status) => {

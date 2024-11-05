@@ -21,7 +21,11 @@ import {
     Tooltip,
     CircularProgress,
     Snackbar,
-    Alert
+    Alert,
+    Dialog,
+    DialogContent,
+    DialogTitle,
+    DialogActions,
 } from '@mui/material';
 import { Edit, Delete, Visibility, Search, Download } from '@mui/icons-material';
 import { collection, query, where, getDocs, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore';
@@ -35,6 +39,7 @@ const CargoSampling = () => {
     const [loading, setLoading] = useState(true);
     const [openDialog, setOpenDialog] = useState(false);
     const [editingId, setEditingId] = useState(null);
+    const [deleteConfirmation, setDeleteConfirmation] = useState(null);
     const [filters, setFilters] = useState({
         status: 'all',
         searchQuery: '',
@@ -113,24 +118,24 @@ const CargoSampling = () => {
     };
 
     const handleDelete = async (requestId) => {
-        if (window.confirm('Are you sure you want to delete this request?')) {
-            try {
-                await deleteDoc(doc(db, 'samplingRequests', requestId));
-                await fetchRequests();
-                setSnackbar({
-                    open: true,
-                    message: 'Request deleted successfully',
-                    severity: 'success'
-                });
-            } catch (error) {
-                console.error('Error deleting request:', error);
-                setSnackbar({
-                    open: true,
-                    message: 'Error deleting request',
-                    severity: 'error'
-                });
-            }
+
+        try {
+            await deleteDoc(doc(db, 'samplingRequests', requestId));
+            await fetchRequests();
+            setSnackbar({
+                open: true,
+                message: 'Request deleted successfully',
+                severity: 'success'
+            });
+        } catch (error) {
+            console.error('Error deleting request:', error);
+            setSnackbar({
+                open: true,
+                message: 'Error deleting request',
+                severity: 'error'
+            });
         }
+
     };
 
     const getStatusColor = (status) => {
@@ -305,7 +310,7 @@ const CargoSampling = () => {
                                                 <IconButton
                                                     size="small"
                                                     color="error"
-                                                    onClick={() => handleDelete(request.id)}
+                                                    onClick={() => setDeleteConfirmation(request.id)}
                                                 >
                                                     <Delete />
                                                 </IconButton>
@@ -348,6 +353,29 @@ const CargoSampling = () => {
                     {snackbar.message}
                 </Alert>
             </Snackbar>
+            <Dialog
+                open={Boolean(deleteConfirmation)}
+                onClose={() => setDeleteConfirmation(null)}
+            >
+                <DialogTitle>Confirm Delete</DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        Are you sure you want to delete this cargo storage request?
+                        This action cannot be undone.
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setDeleteConfirmation(null)}>Cancel</Button>
+                    <Button
+                        onClick={() => handleDelete(deleteConfirmation)}
+                        color="error"
+                        variant="contained"
+                    >
+                        Delete
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
         </Container>
     );
 };

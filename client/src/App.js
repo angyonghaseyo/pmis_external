@@ -26,6 +26,7 @@ import ContainerRequestsList from './ContainerRequestsList';
 import FacilityandSpaceRental from './FacilityandSpaceRental';
 import CargoSampling from './CargoSampling';
 import CargoRepacking from './CargoRepacking';
+import CargoStorage from './CargoStorage';
 import { useAuth } from './AuthContext';
 import { jwtDecode } from "jwt-decode";
 
@@ -135,6 +136,9 @@ function App() {
               )}
               {hasAccessRights(['Create Repacking Request']) && (
                 <Route path="/cargos/cargo-repacking" element={<CargoRepacking />} />
+              )}
+              {hasAccessRights(['Create Storage Request']) && (
+                <Route path="/cargos/cargo-storage" element={<CargoStorage />} />
               )}
               <Route path="*" element={<Navigate to="/" replace />} />
             </>

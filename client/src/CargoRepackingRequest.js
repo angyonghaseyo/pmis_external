@@ -87,8 +87,8 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
             requirements: [],
         },
         schedule: {
-            preferredDate: null,
-            alternateDate: null
+            startDate: null,
+            endDate: null
         },
         documents: {
             repackagingChecklist: []
@@ -468,15 +468,15 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
                             <Grid item xs={6}>
                                 <DateTimePicker
                                     label="Start Date & Time"
-                                    value={formData.schedule.preferredDate}
-                                    onChange={(newValue) => handleInputChange('schedule', 'preferredDate', newValue)}
+                                    value={formData.schedule.startDate}
+                                    onChange={(newValue) => handleInputChange('schedule', 'startDate', newValue)}
                                     renderInput={(params) => (
                                         <TextField
                                             {...params}
                                             fullWidth
                                             required
-                                            error={!!errors.preferredDate}
-                                            helperText={errors.preferredDate}
+                                            error={!!errors.startDate}
+                                            helperText={errors.startDate}
                                         />
                                     )}
                                     minDate={new Date()}
@@ -485,15 +485,15 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
                             <Grid item xs={6}>
                                 <DateTimePicker
                                     label="End Date & Time"
-                                    value={formData.schedule.preferredEndDate}
-                                    onChange={(newValue) => handleInputChange('schedule', 'alternateDate', newValue)}
+                                    value={formData.schedule.endDate}
+                                    onChange={(newValue) => handleInputChange('schedule', 'endDate', newValue)}
                                     renderInput={(params) => (
                                         <TextField
                                             {...params}
                                             fullWidth
                                             required
-                                            error={!!errors.preferredEndDate}
-                                            helperText={errors.preferredEndDate}
+                                            error={!!errors.endDate}
+                                            helperText={errors.endDate}
                                         />
                                     )}
                                     minDate={new Date()}
