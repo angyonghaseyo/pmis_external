@@ -32,6 +32,7 @@ import { collection, query, where, getDocs, orderBy, deleteDoc, doc, updateDoc }
 import { db } from './firebaseConfig';
 import CargoRepackingRequest from './CargoRepackingRequest';
 import { format } from 'date-fns';
+import InventoryIcon from '@mui/icons-material/Inventory';
 
 
 const CargoRepacking = () => {
@@ -71,8 +72,10 @@ const CargoRepacking = () => {
             const filteredData = requestData.filter(request => {
                 if (filters.searchQuery) {
                     return (
-                        request.cargoDetails.containerNumber.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
-                        request.cargoDetails.cargoType.toLowerCase().includes(filters.searchQuery.toLowerCase())
+                        request.cargoDetails.cargoNumber.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
+                        request.cargoDetails.cargoType.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
+                        request.id.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
+                        request.status.toLowerCase().includes(filters.searchQuery.toLowerCase())
                     );
                 }
                 return true;
@@ -186,6 +189,7 @@ const CargoRepacking = () => {
                         setEditingId(null);
                         setOpenDialog(true);
                     }}
+                    startIcon={<InventoryIcon />}
                 >
                     New Repacking Request
                 </Button>
@@ -195,7 +199,7 @@ const CargoRepacking = () => {
 
             <Paper sx={{ p: 2, mb: 3 }}>
                 <Grid container spacing={2} alignItems="center">
-                    <Grid item xs={12} sm={4}>
+                    <Grid item xs={12} sm={12}>
                         <TextField
                             fullWidth
                             label="Search"
@@ -207,22 +211,6 @@ const CargoRepacking = () => {
                                 startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />
                             }}
                         />
-                    </Grid>
-                    <Grid item xs={12} sm={4}>
-                        <TextField
-                            select
-                            fullWidth
-                            label="Status"
-                            size="small"
-                            value={filters.status}
-                            onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-                        >
-                            <MenuItem value="all">All Status</MenuItem>
-                            <MenuItem value="Pending">Pending</MenuItem>
-                            <MenuItem value="In Progress">In Progress</MenuItem>
-                            <MenuItem value="Completed">Completed</MenuItem>
-                            <MenuItem value="Rejected">Rejected</MenuItem>
-                        </TextField>
                     </Grid>
                 </Grid>
             </Paper>
