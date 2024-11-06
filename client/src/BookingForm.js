@@ -720,6 +720,7 @@ const BookingForm = ({ user }) => {
                 onChange={handleChange}
                 fullWidth
                 required
+                disabled
               />
             </Grid>
             <Grid item xs={6}>
@@ -730,6 +731,7 @@ const BookingForm = ({ user }) => {
                 onChange={handleChange}
                 fullWidth
                 required
+                disabled
               />
             </Grid>
             <Grid item xs={6}>
