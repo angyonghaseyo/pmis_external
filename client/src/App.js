@@ -27,6 +27,7 @@ import FacilityandSpaceRental from './FacilityandSpaceRental';
 import CargoSampling from './CargoSampling';
 import CargoRepacking from './CargoRepacking';
 import CargoStorage from './CargoStorage';
+import CargoTransloading from './CargoTransloading';
 import { useAuth } from './AuthContext';
 import { jwtDecode } from "jwt-decode";
 
@@ -139,6 +140,9 @@ function App() {
               )}
               {hasAccessRights(['Create Storage Request']) && (
                 <Route path="/cargos/cargo-storage" element={<CargoStorage />} />
+              )}
+              {hasAccessRights(['Create Transloading Request']) && (
+                <Route path="/cargos/cargo-transloading" element={<CargoTransloading />} />
               )}
               <Route path="*" element={<Navigate to="/" replace />} />
             </>

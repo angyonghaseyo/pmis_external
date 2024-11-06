@@ -44,22 +44,19 @@ const VisuallyHiddenInput = styled('input')`
 `;
 
 
-const repackingRequirements = [
-    'Temperature Controlled',
-    'Humidity Controlled',
-    'Special Handling',
-    'Heavy Equipment Required',
-    'Hazmat Certified'
+const destination = [
+    'Intermodal Transfer Area A',
+    'Intermodal Transfer Area B',
+    'Intermodal Transfer Area C',
+    'Container Yard T',
+    'Container Yard U',
+    'Container Yard W',
+    'Container Yard X',
+    'Container Yard Y',
+    'Container Yard 1',
+    'Container Yard 2'
 ];
 
-const packagingTypes = [
-    'Cardboard',
-    'Bagged',
-    'Wooden Crates',
-    'Steel Drums',
-    'Bales',
-    'Pallets'
-];
 
 const StyledPaper = styled(Paper)(({ theme }) => ({
     padding: theme.spacing(2),
@@ -71,27 +68,23 @@ const StyledPaper = styled(Paper)(({ theme }) => ({
     }
 }));
 
-const steps = ['Overview', 'Cargo Details', 'Repacking Requirements', 'Schedule & Documents'];
+const steps = ['Overview', 'Cargo Details', 'Transloading Requirements', 'Schedule & Documents'];
 
-const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSuccess }) => {
+const CargoTransloadingRequest = ({ open, handleClose, editingId = null, onSubmitSuccess }) => {
     const [formData, setFormData] = useState({
         cargoDetails: {
             cargoNumber: '',
             cargoType: '',
             quantity: '',
             unit: 'CBM',
-            currentPackaging: '',
-            desiredPackaging: ''
         },
-        repackingDetails: {
-            requirements: [],
-        },
-        schedule: {
+        destinationArea: '',
+        transloadingTimeWindow: {
             startDate: null,
             endDate: null
         },
         documents: {
-            repackagingChecklist: []
+            transloadingSheet: []
         },
         specialInstructions: '',
         status: 'Pending'
@@ -157,7 +150,7 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
     const fetchRequestData = async () => {
         try {
             setLoading(true);
-            const docRef = doc(db, 'repackingRequests', editingId);
+            const docRef = doc(db, 'transloadingRequests', editingId);
             const docSnap = await getDoc(docRef);
 
             if (docSnap.exists()) {
@@ -166,9 +159,9 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
                 // Convert Firestore Timestamps to JavaScript Date objects
                 const formattedData = {
                     ...data,
-                    schedule: {
-                        startDate: data.schedule?.startDate?.toDate() || null,
-                        endDate: data.schedule?.endDate?.toDate() || null
+                    transloadingTimeWindow: {
+                        startDate: data.transloadingTimeWindow?.startDate?.toDate() || null,
+                        endDate: data.transloadingTimeWindow?.endDate?.toDate() || null
                     }
                 };
 
@@ -192,6 +185,16 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
             }));
             return;
         }
+
+        if (section === 'destinationArea') {
+            // Handle special instructions directly since it's not nested
+            setFormData(prev => ({
+                ...prev,
+                destinationArea: value
+            }));
+            return;
+        }
+
 
         setFormData(prev => {
             if (section in prev) {
@@ -249,7 +252,7 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
         <Grid container spacing={3}>
             <Grid item xs={12}>
                 <Typography variant="h6" gutterBottom>
-                    Cargo Repacking Service Request
+                    Cargo Transloading Service Request
                 </Typography>
 
                 <StyledPaper>
@@ -266,7 +269,7 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
                                 <li>Valid cargo number</li>
                                 <li>Current packaging details</li>
                                 <li>Desired packaging specifications</li>
-                                <li>Estimated repacking duration</li>
+                                <li>Estimated transloading duration</li>
                             </ul>
                         </Grid>
                         <Grid item xs={12} md={6}>
@@ -281,25 +284,18 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
 
                 <StyledPaper>
                     <Typography variant="subtitle1" color="primary" gutterBottom>
-                        Available Services
+                        Transloading Destination Areas
                     </Typography>
                     <Grid container spacing={2}>
                         <Grid item xs={12} md={6}>
-                            <Typography variant="subtitle2">Packaging Types:</Typography>
+                            <Typography variant="subtitle2">Areas Available:</Typography>
                             <ul>
-                                {packagingTypes.map((type) => (
+                                {destination.map((type) => (
                                     <li key={type}>{type}</li>
                                 ))}
                             </ul>
                         </Grid>
-                        <Grid item xs={12} md={6}>
-                            <Typography variant="subtitle2">Repacking Requirements:</Typography>
-                            <ul>
-                                {repackingRequirements.map((req) => (
-                                    <li key={req}>{req}</li>
-                                ))}
-                            </ul>
-                        </Grid>
+
                     </Grid>
                 </StyledPaper>
 
@@ -386,16 +382,16 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
         <Grid container spacing={3}>
             <Grid item xs={12}>
                 <Typography variant="subtitle1" gutterBottom>
-                    Repacking Requirements
+                    Transloading Requirements
                 </Typography>
                 <StyledPaper>
 
                     <FormControl fullWidth sx={{ mb: 3 }}>
-                        <InputLabel>Current Packaging</InputLabel>
+                        <InputLabel>Destination Area</InputLabel>
                         <Select
                             required
-                            value={formData.cargoDetails.currentPackaging}
-                            onChange={(e) => handleInputChange('cargoDetails', 'currentPackaging', e.target.value)}
+                            value={formData.destinationArea}
+                            onChange={(e) => handleInputChange('destinationArea', '', e.target.value)}
                             input={<OutlinedInput label="Current Packaging" />}
                             renderValue={(selected) => (
                                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
@@ -405,60 +401,13 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
                                 </Box>
                             )}
                         >
-                            {packagingTypes.map((type) => (
+                            {destination.map((type) => (
                                 <MenuItem key={type} value={type}>
                                     {type}
                                 </MenuItem>
                             ))}
                         </Select>
                     </FormControl>
-
-                    <FormControl fullWidth sx={{ mb: 3 }}>
-                        <InputLabel>Desired Packaging</InputLabel>
-                        <Select
-                            required
-                            value={formData.cargoDetails.desiredPackaging}
-                            onChange={(e) => handleInputChange('cargoDetails', 'desiredPackaging', e.target.value)}
-                            input={<OutlinedInput label="Current Packaging" />}
-                            renderValue={(selected) => (
-                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-
-                                    <Typography> {selected} </Typography>
-
-                                </Box>
-                            )}
-                        >
-                            {packagingTypes.map((type) => (
-                                <MenuItem key={type} value={type}>
-                                    {type}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-
-                    <FormControl fullWidth sx={{ mb: 3 }}>
-                        <InputLabel>Repacking Requirements</InputLabel>
-                        <Select
-                            multiple
-                            value={formData.repackingDetails.requirements}
-                            onChange={(e) => handleInputChange('repackingDetails', 'requirements', e.target.value)}
-                            input={<OutlinedInput label="Repacking Requirements" />}
-                            renderValue={(selected) => (
-                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                                    {selected.map((value) => (
-                                        <Chip key={value} label={value} />
-                                    ))}
-                                </Box>
-                            )}
-                        >
-                            {repackingRequirements.map((type) => (
-                                <MenuItem key={type} value={type}>
-                                    {type}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-
 
                 </StyledPaper>
             </Grid>
@@ -469,7 +418,7 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
         <Grid container spacing={3}>
             <Grid item xs={12}>
                 <Typography variant="subtitle1" gutterBottom>
-                    Schedule & Documentation
+                    Transloading Time Window & Documentation
                 </Typography>
                 <StyledPaper>
                     <LocalizationProvider dateAdapter={AdapterDateFns}>
@@ -478,8 +427,8 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
                             <Grid item xs={6}>
                                 <DateTimePicker
                                     label="Start Date & Time"
-                                    value={formData.schedule.startDate}
-                                    onChange={(newValue) => handleInputChange('schedule', 'startDate', newValue)}
+                                    value={formData.transloadingTimeWindow.startDate}
+                                    onChange={(newValue) => handleInputChange('transloadingTimeWindow', 'startDate', newValue)}
                                     renderInput={(params) => (
                                         <TextField
                                             {...params}
@@ -495,8 +444,8 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
                             <Grid item xs={6}>
                                 <DateTimePicker
                                     label="End Date & Time"
-                                    value={formData.schedule.endDate}
-                                    onChange={(newValue) => handleInputChange('schedule', 'endDate', newValue)}
+                                    value={formData.transloadingTimeWindow.endDate}
+                                    onChange={(newValue) => handleInputChange('transloadingTimeWindow', 'endDate', newValue)}
                                     renderInput={(params) => (
                                         <TextField
                                             {...params}
@@ -525,20 +474,20 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
                                 fullWidth
                                 sx={{ mb: 1 }}
                             >
-                                Upload Repackaging Checklist*
+                                Upload Additional Transloading Sheet
                                 <VisuallyHiddenInput
                                     type="file"
                                     accept=".pdf,.jpg,.jpeg,.png"
-                                    onChange={(e) => handleInputChange('documents', 'repackagingChecklist', e.target.files[0])}
+                                    onChange={(e) => handleInputChange('documents', 'transloadingSheet', e.target.files[0])}
                                 />
                             </Button>
-                            {formData.documents.repackagingChecklist && (
+                            {formData.documents.transloadingSheet && (
                                 <Typography variant="body2" color="textSecondary" gutterBottom>
-                                    Selected: {formData.documents.repackagingChecklist.name}
+                                    Selected: {formData.documents.transloadingSheet.name}
                                 </Typography>
                             )}
-                            <FormHelperText error={!!errors.repackagingChecklist}>
-                                {errors.repackagingChecklist || 'PDF, JPEG, or PNG (max 5MB)'}
+                            <FormHelperText error={!!errors.transloadingSheet}>
+                                {errors.transloadingSheet || 'PDF, JPEG, or PNG (max 5MB)'}
                             </FormHelperText>
                         </Grid>
 
@@ -592,15 +541,15 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
             };
 
             if (editingId) {
-                await setDoc(doc(db, 'repackingRequests', editingId), requestData);
+                await setDoc(doc(db, 'transloadingRequests', editingId), requestData);
             } else {
-                const docRef = await addDoc(collection(db, 'repackingRequests'), requestData);
+                const docRef = await addDoc(collection(db, 'transloadingRequests'), requestData);
                 await setDoc(docRef, { id: docRef.id }, { merge: true });
             }
 
             onSubmitSuccess?.();
             handleClose();
-            setSnackbar({ open: true, message: 'Repacking Request created successfully', severity: 'success' });
+            setSnackbar({ open: true, message: 'Transloading Request created successfully', severity: 'success' });
         } catch (error) {
             console.error('Error submitting request:', error);
             setSnackbar({ open: true, message: 'Failed to submit request. Please try again.', severity: 'error' });
@@ -612,10 +561,10 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
     const uploadFiles = async () => {
         const uploads = {};
 
-        if (formData.documents.repackagingChecklist) {
-            uploads.repackagingChecklist = await uploadFile(
-                formData.documents.repackagingChecklist,
-                'repackaging-checlist'
+        if (formData.documents.transloadingRequests) {
+            uploads.transloadingRequests = await uploadFile(
+                formData.documents.transloadingRequests,
+                'transloading-checlist'
             );
         }
 
@@ -624,7 +573,7 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
 
     const uploadFile = async (file, path) => {
         if (!file) return null;
-        const storageRef = ref(storage, `repackaging-requests/${path}/${Date.now()}_${file.name}`);
+        const storageRef = ref(storage, `transloading-requests/${path}/${Date.now()}_${file.name}`);
         await uploadBytes(storageRef, file);
         return await getDownloadURL(storageRef);
     };
@@ -644,7 +593,7 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
                 <DialogTitle>
                     <Box display="flex" alignItems="center" justifyContent="space-between">
                         <Typography variant="h6">
-                            {editingId ? 'Edit Repackaging Request' : 'New Repackaging Request'}
+                            {editingId ? 'Edit Transloading Request' : 'New Transloading Request'}
                         </Typography>
                         <IconButton onClick={handleClose} size="small">
                             <CloseIcon />
@@ -712,4 +661,4 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
     );
 };
 
-export default CargoRepackingRequest;
+export default CargoTransloadingRequest;

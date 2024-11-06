@@ -154,7 +154,17 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
 
             if (docSnap.exists()) {
                 const data = docSnap.data();
-                setFormData(data);
+
+                // Convert Firestore Timestamps to JavaScript Date objects
+                const formattedData = {
+                    ...data,
+                    schedule: {
+                        startDate: data.schedule?.startDate?.toDate() || null,
+                        endDate: data.schedule?.endDate?.toDate() || null
+                    }
+                };
+
+                setFormData(formattedData);
             }
         } catch (error) {
             console.error('Error fetching request:', error);

@@ -147,8 +147,20 @@ const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSucc
             const docSnap = await getDoc(docRef);
 
             if (docSnap.exists()) {
-                const data = docSnap.data();
-                setFormData(data);
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+
+                    // Convert Firestore Timestamps to JavaScript Date objects
+                    const formattedData = {
+                        ...data,
+                        schedule: {
+                            startDate: data.schedule?.startDate?.toDate() || null,
+                            endDate: data.schedule?.endDate?.toDate() || null
+                        }
+                    };
+
+                    setFormData(formattedData);
+                }
             }
         } catch (error) {
             console.error('Error fetching request:', error);
