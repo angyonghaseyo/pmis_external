@@ -76,17 +76,19 @@ const Sidebar = ({ user }) => {
       icon: <Package />,
       path: "/cargos",
       children: [
-        { name: 'Booking Form', accessRights: ['abc'] },
+        { name: 'Booking Form', accessRights: ['Create Cargo Booking'] },
         { name: 'Container Request', accessRights: ['Create Container Request', 'View Container Request'] },
         { name: 'Truck Registration', accessRights: ['Register Truck', 'View Truck Registrations'] },
         { name: 'Cargo Manifest', accessRights: ['View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest'] },
         { name: 'Container Pricing Manager', accessRights: ['Create Container Pricings', 'View Container Pricings'] },
         { name: 'Container Menu', accessRights: ['Create Container Menu', 'View Container Menu'] },
+        { name: 'Container Requests List', accessRights: ['View Container Requests', 'Approve Container Requests'] },
+        { name: 'Facility and Space Rental', accessRights: ['Create Facility Rental'] }
 
       ],
-      accessRights: ['abc', 'View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest',
+      accessRights: ['Create Cargo Booking', 'Create Facility Rental', 'View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest',
         'Create Container Request', 'View Container Request', 'Create Container Pricings', 'View Container Pricings',
-        'Create Container Menu', 'View Container Menu', 'Register Truck', 'View Truck Registrations']
+        'Create Container Menu', 'View Container Menu', 'Register Truck', 'View Truck Registrations', 'View Container Requests', 'Approve Container Requests']
     },
     {
       name: "Customs and Trade Documents",

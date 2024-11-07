@@ -49,8 +49,9 @@ import AttachFileIcon from "@mui/icons-material/AttachFile";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorIcon from "@mui/icons-material/Error";
 import UploadFileIcon from '@mui/icons-material/UploadFile';
+import CancelIcon from '@mui/icons-material/Cancel';
 
-const BookingForm = () => {
+const BookingForm = ({ user }) => {
   const [openDialog, setOpenDialog] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
@@ -66,6 +67,9 @@ const BookingForm = () => {
   });
   const [bookingData, setBookingData] = useState([]);
   const [uploadStatus, setUploadStatus] = useState({});
+  const [vesselVisits, setVesselVisits] = useState([]);
+  const [selectedVessel, setSelectedVessel] = useState('');
+  const [availableVoyages, setAvailableVoyages] = useState([]);
 
   const cargoTypes = [
     "General Cargo",
@@ -92,6 +96,48 @@ const BookingForm = () => {
     };
     fetchBookings();
   }, []);
+
+  useEffect(() => {
+    const fetchVesselVisits = async () => {
+      const querySnapshot = await getDocs(collection(db, "vesselVisitRequests"));
+      const visits = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setVesselVisits(visits);
+    };
+    fetchVesselVisits();
+  }, []);
+
+  const handleVesselChange = (event) => {
+    const selectedVesselName = event.target.value;
+    setSelectedVessel(selectedVesselName);
+
+    // Find the selected vessel's voyages
+    const selectedVesselData = vesselVisits.find(visit => visit.vesselName === selectedVesselName);
+    setAvailableVoyages(selectedVesselData?.voyages || []);
+
+    setFormData(prev => ({
+      ...prev,
+      vesselName: selectedVesselName,
+      voyageNumber: '',
+      portLoading: '',
+      portDestination: ''
+    }));
+  };
+
+  const handleVoyageChange = (event) => {
+    const selectedVoyageNumber = event.target.value;
+    const selectedVoyage = availableVoyages.find(v => v.voyageNumber === selectedVoyageNumber);
+
+    setFormData(prev => ({
+      ...prev,
+      voyageNumber: selectedVoyageNumber,
+      portLoading: selectedVoyage?.departurePort || '',
+      portDestination: selectedVoyage?.arrivalPort || ''
+    }));
+  };
+
 
   const handleOpenDialog = (booking = null) => {
     if (booking) {
@@ -131,6 +177,7 @@ const BookingForm = () => {
     console.log("Submitting formData: ", formData); //debugging
     const newBooking = {
       ...formData, // Contains cargo as a map
+      userEmail: user.email
     };
 
     try {
@@ -247,6 +294,24 @@ const BookingForm = () => {
           <Typography variant="subtitle1" gutterBottom fontWeight="medium">
             Required Documents
           </Typography>
+          {!formData.cargo[cargoId].isDocumentsChecked && (
+            <Alert
+              severity="error"
+              sx={{ mt: 2, mb: 2, borderRadius: '8px' }}
+              icon={<CancelIcon fontSize="small" />}
+            >
+              Please Submit All Documents
+            </Alert>
+          )}
+          {formData.cargo[cargoId].isDocumentsChecked && (
+            <Alert
+              severity="success"
+              sx={{ mt: 2, mb: 2, borderRadius: '8px' }}
+              icon={<CheckCircleIcon fontSize="small" />}
+            >
+              All required documents have been uploaded and verified
+            </Alert>
+          )}
           <Stack spacing={2}>
             {documents.map(({ type, label }) => (
               <Box key={type}>
@@ -299,15 +364,7 @@ const BookingForm = () => {
               </Box>
             ))}
           </Stack>
-          {formData.cargo[cargoId].isDocumentsChecked && (
-            <Alert
-              severity="success"
-              sx={{ mt: 2, borderRadius: '8px' }}
-              icon={<CheckCircleIcon fontSize="small" />}
-            >
-              All required documents have been uploaded and verified
-            </Alert>
-          )}
+
         </Paper>
       </Grid>
     );
@@ -513,6 +570,12 @@ const BookingForm = () => {
                           </Grid>
                           <Grid item xs={6}>
                             <Typography>
+                              <strong>Free Time (days):</strong>{" "}
+                              {booking.freeTime}
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={6}>
+                            <Typography>
                               <strong>Port of Loading:</strong>{" "}
                               {booking.portLoading}
                             </Typography>
@@ -523,12 +586,7 @@ const BookingForm = () => {
                               {booking.portDestination}
                             </Typography>
                           </Grid>
-                          <Grid item xs={6}>
-                            <Typography>
-                              <strong>Cut-off Deadline:</strong>{" "}
-                              {booking.cutoffDeadline}
-                            </Typography>
-                          </Grid>
+
                           <Grid item xs={6}>
                             <Typography>
                               <strong>ETA:</strong> {booking.eta}
@@ -541,10 +599,11 @@ const BookingForm = () => {
                           </Grid>
                           <Grid item xs={6}>
                             <Typography>
-                              <strong>Free Time (days):</strong>{" "}
-                              {booking.freeTime}
+                              <strong>Cut-off Deadline:</strong>{" "}
+                              {booking.cutoffDeadline}
                             </Typography>
                           </Grid>
+
 
                           <Grid item xs={12}>
                             <Typography variant="h6" gutterBottom>
@@ -604,7 +663,7 @@ const BookingForm = () => {
         </Table>
       </TableContainer>
 
-      {/* Dialog for creating or editing bookings */}
+
       <Dialog
         open={openDialog}
         onClose={handleCloseDialog}
@@ -616,17 +675,43 @@ const BookingForm = () => {
         </DialogTitle>
         <DialogContent>
           <Grid container spacing={2}>
+
             <Grid item xs={6}>
-              <TextField
-                label="Pickup Date"
-                name="pickupDate"
-                type="date"
-                value={formData.pickupDate}
-                onChange={handleChange}
-                fullWidth
-                required
-              />
+              <FormControl fullWidth required>
+                <InputLabel>Vessel Name</InputLabel>
+                <Select
+                  value={selectedVessel}
+                  onChange={handleVesselChange}
+                  label="Vessel Name"
+                >
+                  {vesselVisits.map((visit) => (
+                    <MenuItem key={visit.vesselName} value={visit.vesselName}>
+                      {visit.vesselName}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </Grid>
+            <Grid item xs={6}>
+              <FormControl fullWidth required disabled={!selectedVessel}>
+                <InputLabel>Voyage Number</InputLabel>
+                <Select
+                  value={formData.voyageNumber || ''}
+                  onChange={handleVoyageChange}
+                  label="Voyage Number"
+                >
+                  {availableVoyages.map((voyage) => (
+                    <MenuItem
+                      key={voyage.voyageNumber}
+                      value={voyage.voyageNumber}
+                    >
+                      {voyage.voyageNumber} ({voyage.departurePort} → {voyage.arrivalPort})
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+
             <Grid item xs={6}>
               <TextField
                 label="Port of Loading"
@@ -649,34 +734,13 @@ const BookingForm = () => {
             </Grid>
             <Grid item xs={6}>
               <TextField
-                label="Cut-off Deadline"
-                name="cutoffDeadline"
-                type="datetime-local"
-                value={formData.cutoffDeadline}
+                label="Pickup Date"
+                name="pickupDate"
+                type="date"
+                value={formData.pickupDate}
                 onChange={handleChange}
                 fullWidth
-                required
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                label="ETA"
-                name="eta"
-                type="datetime-local"
-                value={formData.eta}
-                onChange={handleChange}
-                fullWidth
-                required
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                label="ETD"
-                name="etd"
-                type="datetime-local"
-                value={formData.etd}
-                onChange={handleChange}
-                fullWidth
+                InputLabelProps={{ shrink: true }}
                 required
               />
             </Grid>
@@ -691,6 +755,44 @@ const BookingForm = () => {
                 required
               />
             </Grid>
+
+            <Grid item xs={6}>
+              <TextField
+                label="ETA"
+                name="eta"
+                type="datetime-local"
+                value={formData.eta}
+                onChange={handleChange}
+                InputLabelProps={{ shrink: true }}
+                fullWidth
+                required
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                label="ETD"
+                name="etd"
+                type="datetime-local"
+                value={formData.etd}
+                onChange={handleChange}
+                InputLabelProps={{ shrink: true }}
+                fullWidth
+                required
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                label="Cut-off Deadline"
+                name="cutoffDeadline"
+                type="datetime-local"
+                value={formData.cutoffDeadline}
+                onChange={handleChange}
+                InputLabelProps={{ shrink: true }}
+                fullWidth
+                required
+              />
+            </Grid>
+
 
             {/* Cargo Details */}
             <Grid item xs={12}>
@@ -825,7 +927,8 @@ const BookingForm = () => {
 
                     </Grid>
                   </Grid>
-                  {renderDocumentUpload(cargoId)}
+                  {editingId && renderDocumentUpload(cargoId)}
+
                 </Paper>
               </Grid>
             ))}
@@ -851,6 +954,7 @@ const BookingForm = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
     </Container>
   );
 };

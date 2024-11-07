@@ -14,11 +14,10 @@ import {
   Container
 } from '@mui/material';
 import PhotoCamera from '@mui/icons-material/PhotoCamera';
-import { doc, getDoc } from 'firebase/firestore';
-import { db, auth } from './firebaseConfig';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from './firebaseConfig';
-import { getCompanyInfo, updateCompanyInfo, getUserData } from './services/api';
+import { getCompanyInfo, updateCompanyInfo } from './services/api';
+import { useAuth } from './AuthContext';
 
 const currencies = [
   { value: 'USD', label: '$ - US Dollar' },
@@ -43,60 +42,40 @@ const CompanyInfo = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-  const [userProfile, setUserProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuth();
 
   const fetchCompanyData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const user = auth.currentUser;
       if (!user) throw new Error('No authenticated user');
+      if (!user.company) throw new Error('User company not found');
 
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      const userData = userDoc.data();
-      if (!userData || !userData.company) throw new Error('User company not found');
-
-      const companyInfo = await getCompanyInfo(userData.company);
-      setCompanyData({ ...companyInfo, name: userData.company });
+      const companyInfo = await getCompanyInfo(user.company);
+      setCompanyData({ ...companyInfo, name: user.company });
     } catch (err) {
       console.error('Error fetching company data:', err);
       setError('Failed to load company information: ' + err.message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
-  const fetchUserProfile = async (userId) => {
-    try {
-      const profileData = await getUserData(userId);
-      setUserProfile(profileData);
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-      setError('Failed to fetch user profile. Please try again later.');
-    }
-  };
 
   const hasRole = (requiredRoles) => {
-    if (!userProfile || !Array.isArray(userProfile.accessRights)) return false;
-    const hasRequiredRole = requiredRoles.some(role => userProfile.accessRights.includes(role));
-    return hasRequiredRole || userProfile.role === 'Admin';
+    if (!user || !Array.isArray(user.accessRights)) return false;
+    const hasRequiredRole = requiredRoles.some(role => user.accessRights.includes(role));
+    return hasRequiredRole || user.role === 'Admin';
   };
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!auth.currentUser) {
-        setError('Please log in to view this page.');
-        setIsLoading(false);
-        return;
-      }
-
       try {
         setIsLoading(true);
         setError(null);
         await Promise.all([
           fetchCompanyData(),
-          fetchUserProfile(auth.currentUser.uid)
         ]);
       } catch (error) {
         console.error('Error fetching data:', error);

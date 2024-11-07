@@ -26,17 +26,15 @@ import {
   Container
 } from '@mui/material';
 import { Edit, Reply } from '@mui/icons-material';
-import { getUserInquiriesFeedback, createInquiryFeedback, updateInquiryFeedback, getUserData } from './services/api';
-import { auth } from './firebaseConfig';
+import { getUserInquiriesFeedback, createInquiryFeedback, updateInquiryFeedback } from './services/api';
 import { format } from 'date-fns';
+import { useAuth } from './AuthContext';
 
-
-const InquiryFeedback = ({ userType }) => {
-  const [user, setUser] = useState(null);
+const InquiryFeedback = () => {
+  const { user } = useAuth();
   const [inquiries, setInquiries] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [formData, setFormData] = useState({
-    incrementalId: '',
     type: 'Inquiry',
     subject: '',
     description: '',
@@ -52,47 +50,44 @@ const InquiryFeedback = ({ userType }) => {
   const [replyDialogOpen, setReplyDialogOpen] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
-  const [userProfile, setUserProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = async (currentUser) => {
-      if (currentUser) {
+    const fetchData = async () => {
+      if (user) {
         try {
-          await Promise.all([
-            fetchUserProfile(currentUser.uid),
-            fetchInquiriesFeedback(),
-
-          ]);
+          await fetchInquiriesFeedback();
         } catch (error) {
           console.error('Error fetching data:', error);
-          // Optionally set an error state here
         }
-      } else {
-        setUserProfile(null);
-        // Optionally, you might want to clear other data here as well
       }
       setIsLoading(false);
     };
 
-    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
-      setUser(currentUser);
-      setIsLoading(true); // Set loading to true when auth state changes
-      fetchData(currentUser);
-    });
-
-    return () => unsubscribe();
-  }, []);
+    fetchData();
+  }, [user]);
 
   const fetchInquiriesFeedback = async () => {
     try {
       setLoading(true);
-      const data = await getUserInquiriesFeedback();
-      setInquiries(data);
-      setLoading(false);
+      if (!user) {
+        setError('No authenticated user found');
+        setLoading(false);
+        return;
+      }
+      const data = await getUserInquiriesFeedback(user.email);
+      // Sort by date and assign sequential IDs
+      const sortedData = data.sort((a, b) => {
+        return new Date(a.createdAt) - new Date(b.createdAt);
+      }).map((item, index) => ({
+        ...item,
+        id: index + 1 // Assign sequential IDs starting from 1
+      }));
+      setInquiries(sortedData);
     } catch (err) {
       console.error('Error fetching inquiries and feedback:', err);
       setError('Failed to fetch inquiries and feedback. Please try again later.');
+    } finally {
       setLoading(false);
     }
   };
@@ -101,7 +96,6 @@ const InquiryFeedback = ({ userType }) => {
     if (inquiry) {
       setEditingInquiry(inquiry);
       setFormData({
-        incrementalId: inquiry.incrementalId,
         type: inquiry.type,
         subject: inquiry.subject,
         description: inquiry.description,
@@ -112,7 +106,6 @@ const InquiryFeedback = ({ userType }) => {
     } else {
       setEditingInquiry(null);
       setFormData({
-        incrementalId: '',
         type: 'Inquiry',
         subject: '',
         description: '',
@@ -160,17 +153,18 @@ const InquiryFeedback = ({ userType }) => {
           description: formData.description,
           status: 'Pending',
           urgency: formData.urgency,
+          email: user.email,
           file: formData.file instanceof File ? formData.file : null
         };
 
         if (editingInquiry) {
-          await updateInquiryFeedback(editingInquiry.incrementalId, submissionData);
+          await updateInquiryFeedback(editingInquiry.id, submissionData);
         } else {
           await createInquiryFeedback(submissionData);
         }
 
         handleDialogClose();
-        fetchInquiriesFeedback();
+        await fetchInquiriesFeedback();
         setSnackbar({ open: true, message: 'Submission successful', severity: 'success' });
       } catch (err) {
         console.error('Error submitting inquiry/feedback:', err);
@@ -196,11 +190,11 @@ const InquiryFeedback = ({ userType }) => {
   const handleReplySubmit = async () => {
     try {
       setLoading(true);
-      await updateInquiryFeedback(editingInquiry.incrementalId, {
+      await updateInquiryFeedback(editingInquiry.id, {
         userReply: replyText,
       });
       handleReplyClose();
-      fetchInquiriesFeedback();
+      await fetchInquiriesFeedback();
       setSnackbar({ open: true, message: 'Reply submitted successfully', severity: 'success' });
     } catch (err) {
       console.error('Error submitting reply:', err);
@@ -218,26 +212,16 @@ const InquiryFeedback = ({ userType }) => {
   };
 
   const hasRole = (requiredRoles) => {
-    if (!userProfile || !Array.isArray(userProfile.accessRights)) return false;
-
-    // Check if the user has any of the required roles
-    const hasRequiredRole = requiredRoles.some(role => userProfile.accessRights.includes(role));
-
-    // Return true if the user has a required role or is an Admin
-    return hasRequiredRole || userProfile.role === 'Admin';
+    if (!user || !Array.isArray(user.accessRights)) return false;
+    return requiredRoles.some(role => user.accessRights.includes(role));
   };
 
-  const fetchUserProfile = async (userId) => {
-    try {
-      const profileData = await getUserData(userId);
-      setUserProfile(profileData);
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-      setError('Failed to fetch user profile. Please try again later.');
-    }
-  };
+  if (loading) return (
+    <Box display="flex" justifyContent="center" alignItems="center" height="100vh">
+      <CircularProgress />
+    </Box>
+  );
 
-  if (loading) return <Box display="flex" justifyContent="center" alignItems="center" height="100vh"><CircularProgress /></Box>;
   if (error) return <Typography color="error" align="center">{error}</Typography>;
 
   if (isLoading) {
@@ -252,11 +236,11 @@ const InquiryFeedback = ({ userType }) => {
     <Box sx={{ p: 3 }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4" component="h2">Inquiries & Feedback</Typography>
-        {hasRole(["Create Inquiries and Feedback"]) &&
+        {hasRole(["Create Inquiries and Feedback"]) && (
           <Button variant="contained" color="primary" onClick={() => handleDialogOpen()}>
             Create New Inquiry / Feedback
           </Button>
-        }
+        )}
       </Box>
 
       <Grid container spacing={3} mb={3}>
@@ -297,13 +281,13 @@ const InquiryFeedback = ({ userType }) => {
           </TableHead>
           <TableBody>
             {inquiries.map((inquiry) => (
-              <TableRow key={inquiry.incrementalId}>
-                <TableCell>{inquiry.incrementalId}</TableCell>
+              <TableRow key={inquiry.id}>
+                <TableCell>{inquiry.id}</TableCell>
                 <TableCell>{inquiry.type}</TableCell>
                 <TableCell>{inquiry.subject}</TableCell>
                 <TableCell>{inquiry.status}</TableCell>
                 <TableCell>
-                  {inquiry.createdAt ? format(inquiry.createdAt.toDate(), 'yyyy-MM-dd HH:mm') : 'N/A'}
+                  {format(new Date(inquiry.createdAt), 'yyyy-MM-dd HH:mm:ss')}
                 </TableCell>
                 <TableCell>{inquiry.urgency}</TableCell>
                 <TableCell>
@@ -427,7 +411,12 @@ const InquiryFeedback = ({ userType }) => {
         </DialogActions>
       </Dialog>
 
-      <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={handleSnackbarClose} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={6000} 
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
         <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ width: '100%' }}>
           {snackbar.message}
         </Alert>

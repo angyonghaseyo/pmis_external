@@ -22,7 +22,6 @@ import {
   Tab,
   Snackbar,
   Alert,
-  Container,
   FormControl,
   InputLabel,
   Select,
@@ -30,14 +29,20 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import { Close } from '@mui/icons-material';
-import { getOperatorRequisitions, createOperatorRequisition, updateOperatorRequisition, deleteOperatorRequisition, getUserData } from './services/api';
-import { auth, db } from './firebaseConfig';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { 
+  getOperatorRequisitions,
+  createOperatorRequisition, 
+  updateOperatorRequisition, 
+  deleteOperatorRequisition,
+  getActiveVesselVisits 
+} from './services/api';
+import { useAuth } from './AuthContext';
 
 const operatorSkills = ['Tugboat Operator', 'Pilot Operator'];
 const durations = ['1 Hour', '2 Hours', '3 Hours', '4 Hours'];
 
 const OperatorRequisition = () => {
+  const { user } = useAuth();
   const [pendingRequests, setPendingRequests] = useState([]);
   const [resolvedRequests, setResolvedRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -55,54 +60,18 @@ const OperatorRequisition = () => {
   const [isEditing, setIsEditing] = useState(null);
   const [tabValue, setTabValue] = useState(0);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
-  const [userProfile, setUserProfile] = useState(null);
+  const [activeVesselVisits, setActiveVesselVisits] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [vesselVisits, setVesselVisits] = useState([]);
-
-  // Fetch vessel visits that are not completed and not past ETD
-  const fetchVesselVisits = async () => {
-    try {
-      const vesselVisitsRef = collection(db, 'vesselVisitRequests');
-      const q = query(vesselVisitsRef, where('status', '!=', 'completed'));
-      const querySnapshot = await getDocs(q);
-      
-      const currentTime = new Date().getTime();
-      const visits = querySnapshot.docs
-        .map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }))
-        .filter(visit => {
-          // Filter out visits where:
-          // 1. ETD is already past
-          // 2. Status is "pending user intervention" (active visits)
-          // 3. Has valid eta/etd dates
-          const etd = new Date(visit.etd).getTime();
-          const eta = new Date(visit.eta).getTime();
-          return etd > currentTime && 
-                 visit.status === "pending user intervention" && 
-                 !isNaN(eta) && 
-                 !isNaN(etd);
-        })
-        .sort((a, b) => new Date(a.eta).getTime() - new Date(b.eta).getTime()); // Sort by ETA
-      
-      setVesselVisits(visits);
-    } catch (err) {
-      console.error('Error fetching vessel visits:', err);
-      setError('Failed to fetch vessel visits');
-    }
-  };
 
   const fetchRequisitions = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const user = auth.currentUser;
-      if (!user) {
+      if (!user || !user.email) {
         setError('No authenticated user found');
         return;
       }
-      const requisitions = await getOperatorRequisitions(user.uid);
+      const requisitions = await getOperatorRequisitions(user.email);
 
       const pending = requisitions.filter(req => req.status === 'Pending');
       const resolved = requisitions.filter(req => ['Approved', 'Rejected'].includes(req.status));
@@ -114,18 +83,27 @@ const OperatorRequisition = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
+
+  const fetchActiveVessels = async () => {
+    try {
+      const visits = await getActiveVesselVisits();
+      setActiveVesselVisits(visits);
+    } catch (error) {
+      console.error('Error fetching active vessels:', error);
+      setError('Failed to fetch vessel visits');
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async (user) => {
+    const fetchData = async () => {
       if (user) {
         try {
           setIsLoading(true);
           setError(null);
           await Promise.all([
             fetchRequisitions(),
-            fetchUserProfile(user.uid),
-            fetchVesselVisits()
+            fetchActiveVessels()
           ]);
         } catch (error) {
           console.error('Error fetching data:', error);
@@ -135,42 +113,24 @@ const OperatorRequisition = () => {
         }
       } else {
         setError('Please log in to view requisitions.');
-        setUserProfile(null);
         setIsLoading(false);
       }
     };
 
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      fetchData(user);
-    });
-
-    return () => unsubscribe();
-  }, [fetchRequisitions]);
-
-  const fetchUserProfile = async (userId) => {
-    try {
-      const profileData = await getUserData(userId);
-      setUserProfile(profileData);
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-      setError('Failed to fetch user profile. Please try again later.');
-    }
-  };
+    fetchData();
+  }, [user, fetchRequisitions]);
 
   const hasRole = (requiredRoles) => {
-    if (!userProfile || !Array.isArray(userProfile.accessRights)) return false;
-    const hasRequiredRole = requiredRoles.some(role => userProfile.accessRights.includes(role));
-    return hasRequiredRole || userProfile.role === 'Admin';
+    if (!user || !Array.isArray(user.accessRights)) return false;
+    return requiredRoles.some(role => user.accessRights.includes(role));
   };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     
     if (name === 'imoNumber') {
-      // Find the selected vessel visit
-      const selectedVisit = vesselVisits.find(visit => visit.imoNumber === value);
+      const selectedVisit = activeVesselVisits.find(visit => visit.imoNumber === value);
       if (selectedVisit) {
-        // Extract date and time from eta
         const etaDate = new Date(selectedVisit.eta);
         setFormData(prev => ({
           ...prev,
@@ -185,7 +145,7 @@ const OperatorRequisition = () => {
   };
 
   const handleOpenDialog = () => {
-    if (vesselVisits.length === 0) {
+    if (activeVesselVisits.length === 0) {
       setSnackbar({
         open: true,
         message: 'No active vessel visits available for operator requisition',
@@ -211,7 +171,6 @@ const OperatorRequisition = () => {
 
   const handleSubmit = async () => {
     try {
-      const user = auth.currentUser;
       if (!user) throw new Error('No authenticated user');
 
       if (!formData.time || !formData.imoNumber) {
@@ -226,8 +185,7 @@ const OperatorRequisition = () => {
         return;
       }
 
-      // Check if the selected vessel visit is still valid
-      const selectedVisit = vesselVisits.find(visit => visit.imoNumber === formData.imoNumber);
+      const selectedVisit = activeVesselVisits.find(visit => visit.imoNumber === formData.imoNumber);
       if (!selectedVisit) {
         setSnackbar({ 
           open: true, 
@@ -238,13 +196,13 @@ const OperatorRequisition = () => {
       }
 
       if (isEditing !== null) {
-        await updateOperatorRequisition(isEditing, { ...formData, userId: user.uid });
+        await updateOperatorRequisition(isEditing, { ...formData, email: user.email });
       } else {
         const quantity = parseInt(formData.quantity, 10);
         const createPromises = Array(quantity).fill().map(() => 
           createOperatorRequisition({
             ...formData,
-            userId: user.uid,
+            email: user.email,
             status: 'Pending',
             quantity: 1
           })
@@ -296,6 +254,14 @@ const OperatorRequisition = () => {
       <Box display="flex" flexDirection="column" justifyContent="center" alignItems="center" height="100vh">
         <Typography color="error" align="center" gutterBottom>{error}</Typography>
         <Button variant="contained" color="primary" onClick={fetchRequisitions}>Retry</Button>
+      </Box>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" height="100vh">
+        <CircularProgress />
       </Box>
     );
   }
@@ -427,7 +393,7 @@ const OperatorRequisition = () => {
               onChange={handleInputChange}
               disabled={isEditing}
             >
-              {vesselVisits.map((visit) => (
+              {activeVesselVisits.map((visit) => (
                 <MenuItem key={visit.imoNumber} value={visit.imoNumber}>
                   {visit.imoNumber}
                 </MenuItem>

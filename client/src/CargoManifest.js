@@ -22,15 +22,13 @@ import {
   Alert,
   Grid,
   FormControlLabel,
-  Switch
+  Switch,
 } from '@mui/material';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
-import { getCargoManifests, submitCargoManifest, updateCargoManifest, deleteCargoManifest } from './services/api';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from './firebaseConfig';
+import { submitCargoManifest, updateCargoManifest, deleteCargoManifest } from './services/api';
 
 const CargoManifest = () => {
   const [manifests, setManifests] = useState([]);
@@ -40,9 +38,11 @@ const CargoManifest = () => {
   const [currentManifest, setCurrentManifest] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [vesselVisits, setVesselVisits] = useState([]);
+  const [selectedVesselVoyages, setSelectedVesselVoyages] = useState([]);
   const [formData, setFormData] = useState({
     vesselName: '',
     imoNumber: '',
+    voyageNumber: '',
     departureDate: null,
     arrivalDate: null,
     originPort: '',
@@ -64,57 +64,55 @@ const CargoManifest = () => {
   });
 
   useEffect(() => {
-    fetchManifests();
-    fetchVesselVisits();
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([
+          fetchManifests(),
+          fetchVesselVisits(),
+        ]);
+      } catch (err) {
+        setError('Failed to fetch data');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
   }, []);
 
   const fetchManifests = async () => {
     try {
-      setLoading(true);
-      const data = await getCargoManifests();
+      const response = await fetch('http://localhost:5001/cargo-manifests');
+      if (!response.ok) {
+        throw new Error('Failed to fetch cargo manifests');
+      }
+      const data = await response.json();
       setManifests(data);
     } catch (err) {
+      console.error('Error fetching cargo manifests:', err);
       setError('Failed to fetch cargo manifests');
-    } finally {
-      setLoading(false);
     }
   };
 
   const fetchVesselVisits = async () => {
     try {
-      // First, get all cargo manifests to check which vessels already have manifests
-      const manifestsRef = collection(db, "cargo_manifests");
-      const manifestsSnapshot = await getDocs(manifestsRef);
-      const existingManifestIMOs = new Set(
-        manifestsSnapshot.docs.map(doc => doc.data().imoNumber)
-      );
-  
-      // Then fetch confirmed vessel visits
-      const vesselVisitRequestsRef = collection(db, "vesselVisitRequests");
-      const q = query(vesselVisitRequestsRef, where("status", "==", "confirmed"));
-      const querySnapshot = await getDocs(q);
-      
-      // Filter out vessels that already have manifests
-      const vesselVisitsData = querySnapshot.docs
-        .map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }))
-        .filter(visit => !existingManifestIMOs.has(visit.imoNumber));
-  
-      setVesselVisits(vesselVisitsData);
+      const response = await fetch('http://localhost:5001/vessel-visits-confirmed-without-manifests');
+      if (!response.ok) {
+        throw new Error('Failed to fetch vessel visits');
+      }
+      const data = await response.json();
+      setVesselVisits(data);
     } catch (err) {
-      console.error('Error fetching confirmed vessel visits:', err);
-      setError('Failed to fetch confirmed vessel visits');
+      console.error('Error fetching vessel visits:', err);
+      setError('Failed to fetch vessel visits');
     }
   };
-  
 
   const handleInputChange = (event) => {
     const { name, value, checked, type } = event.target;
-    setFormData({ 
-      ...formData, 
-      [name]: type === 'checkbox' ? checked : value 
+    setFormData({
+      ...formData,
+      [name]: type === 'checkbox' ? checked : value
     });
     setFormErrors({
       ...formErrors,
@@ -126,10 +124,17 @@ const CargoManifest = () => {
     setFormData({ ...formData, [name]: date });
   };
 
+  const getImoOptions = () => {
+    if (currentManifest) {
+      return vesselVisits;
+    }
+    return vesselVisits.filter(visit => !visit.hasManifest);
+  };
+
   const handleImoNumberChange = (event) => {
     const selectedImoNumber = event.target.value;
     const selectedVessel = vesselVisits.find(visit => visit.imoNumber === selectedImoNumber);
-    
+
     if (selectedVessel) {
       setFormData({
         ...formData,
@@ -139,7 +144,25 @@ const CargoManifest = () => {
         arrivalDate: new Date(selectedVessel.eta),
         containersOffloaded: selectedVessel.containersOffloaded,
         containersOnloaded: selectedVessel.containersOnloaded,
-        cargoVolume: selectedVessel.cargoVolume || ''
+        cargoVolume: selectedVessel.cargoVolume || '',
+        voyageNumber: '', // Reset voyage number when vessel changes
+      });
+      setSelectedVesselVoyages(selectedVessel.voyages || []);
+    }
+  };
+
+  const handleVoyageNumberChange = (event) => {
+    const selectedVoyageNumber = event.target.value;
+    const selectedVoyage = selectedVesselVoyages.find(
+      voyage => voyage.voyageNumber === selectedVoyageNumber
+    );
+
+    if (selectedVoyage) {
+      setFormData({
+        ...formData,
+        voyageNumber: selectedVoyageNumber,
+        originPort: selectedVoyage.departurePort,
+        destinationPort: selectedVoyage.arrivalPort
       });
     }
   };
@@ -181,7 +204,6 @@ const CargoManifest = () => {
       }
       setOpenDialog(false);
       fetchManifests();
-      await fetchVesselVisits(); 
     } catch (err) {
       setSnackbar({ open: true, message: 'Error processing cargo manifest', severity: 'error' });
     }
@@ -205,11 +227,18 @@ const CargoManifest = () => {
         departureDate: manifest.departureDate ? new Date(manifest.departureDate) : null,
         arrivalDate: manifest.arrivalDate ? new Date(manifest.arrivalDate) : null,
       });
+      
+      // Find and set the voyages for the selected vessel
+      const vesselVisit = vesselVisits.find(visit => visit.imoNumber === manifest.imoNumber);
+      if (vesselVisit) {
+        setSelectedVesselVoyages(vesselVisit.voyages || []);
+      }
     } else {
       setCurrentManifest(null);
       setFormData({
         vesselName: '',
         imoNumber: '',
+        voyageNumber: '',
         departureDate: null,
         arrivalDate: null,
         originPort: '',
@@ -223,23 +252,9 @@ const CargoManifest = () => {
         specialInstructions: '',
         status: 'Pending'
       });
+      setSelectedVesselVoyages([]);
     }
     setOpenDialog(true);
-  };
-
-  const generateVoyageNumber = (manifest) => {
-    let datePart = 'YYYYMMDD';
-    if (manifest.departureDate) {
-      try {
-        const date = new Date(manifest.departureDate);
-        if (!isNaN(date.getTime())) {
-          datePart = date.toISOString().split('T')[0].replace(/-/g, '');
-        }
-      } catch (error) {
-        console.error('Invalid date:', manifest.departureDate);
-      }
-    }
-    return `${manifest.imoNumber}-${datePart}-${manifest.originPort.slice(0, 3).toUpperCase()}`;
   };
 
   if (loading) return <CircularProgress />;
@@ -252,6 +267,7 @@ const CargoManifest = () => {
         <Button variant="contained" onClick={() => handleOpenDialog()} sx={{ mb: 2 }}>
           Submit New Cargo Manifest
         </Button>
+
         <TableContainer component={Paper}>
           <Table>
             <TableHead>
@@ -270,7 +286,7 @@ const CargoManifest = () => {
             <TableBody>
               {manifests.map((manifest) => (
                 <TableRow key={manifest.id}>
-                  <TableCell>{generateVoyageNumber(manifest)}</TableCell>
+                  <TableCell>{manifest.voyageNumber}</TableCell>
                   <TableCell>{manifest.originPort}</TableCell>
                   <TableCell>{manifest.destinationPort}</TableCell>
                   <TableCell>{manifest.arrivalDate ? new Date(manifest.arrivalDate).toLocaleString() : 'N/A'}</TableCell>
@@ -296,7 +312,7 @@ const CargoManifest = () => {
           <DialogTitle>{currentManifest ? 'Edit Cargo Manifest' : 'Submit Cargo Manifest'}</DialogTitle>
           <DialogContent>
             <Grid container spacing={2}>
-              <Grid item xs={12}>
+              <Grid item xs={12} sm={6}>
                 <TextField
                   select
                   name="imoNumber"
@@ -305,17 +321,40 @@ const CargoManifest = () => {
                   value={formData.imoNumber}
                   onChange={handleImoNumberChange}
                   margin="normal"
+                  disabled={!!currentManifest}
                   InputLabelProps={{
                     style: { color: 'black' },
                   }}
                 >
-                  {vesselVisits.map((visit) => (
+                  {getImoOptions().map((visit) => (
                     <MenuItem key={visit.imoNumber} value={visit.imoNumber}>
                       {visit.imoNumber}
                     </MenuItem>
                   ))}
                 </TextField>
               </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  select
+                  name="voyageNumber"
+                  label="Voyage Number"
+                  fullWidth
+                  value={formData.voyageNumber}
+                  onChange={handleVoyageNumberChange}
+                  margin="normal"
+                  disabled={!!currentManifest || !formData.imoNumber}
+                  InputLabelProps={{
+                    style: { color: 'black' },
+                  }}
+                >
+                  {selectedVesselVoyages.map((voyage) => (
+                    <MenuItem key={voyage.voyageNumber} value={voyage.voyageNumber}>
+                      {voyage.voyageNumber} ({voyage.departurePort} → {voyage.arrivalPort})
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+
               <Grid item xs={12} sm={6}>
                 <TextField
                   name="vesselName"
@@ -329,6 +368,7 @@ const CargoManifest = () => {
                   }}
                 />
               </Grid>
+
               <Grid item xs={12} sm={6}>
                 <TextField
                   name="cargoVolume"
@@ -400,6 +440,9 @@ const CargoManifest = () => {
                   margin="normal"
                   error={formErrors.originPort}
                   helperText={formErrors.originPort ? 'Origin Port is required' : ''}
+                  InputProps={{
+                    readOnly: true,
+                  }}
                   InputLabelProps={{
                     style: { color: 'black' },
                   }}
@@ -416,6 +459,9 @@ const CargoManifest = () => {
                   margin="normal"
                   error={formErrors.destinationPort}
                   helperText={formErrors.destinationPort ? 'Destination Port is required' : ''}
+                  InputProps={{
+                    readOnly: true,
+                  }}
                   InputLabelProps={{
                     style: { color: 'black' },
                   }}
@@ -448,7 +494,7 @@ const CargoManifest = () => {
                   error={formErrors.cargoSummary}
                   helperText={formErrors.cargoSummary ? 'Cargo Summary is required' : ''}
                   InputLabelProps={{
-                    style: {color: 'black' },
+                    style: { color: 'black' },
                   }}
                 />
               </Grid>

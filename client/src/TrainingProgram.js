@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, Button, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, CircularProgress, Snackbar, Alert, Tabs, Tab } from '@mui/material';
-import { getTrainingPrograms, registerForProgram, withdrawFromProgram, getUserData } from './services/api';
-import { auth } from './firebaseConfig';
+import { getTrainingPrograms, registerForProgram, withdrawFromProgram, getUserUpdatedData } from './services/api';
+import { useAuth } from './AuthContext';
 
 function TrainingProgram() {
   const [loading, setLoading] = useState(true);
@@ -9,36 +9,43 @@ function TrainingProgram() {
   const [enrolledPrograms, setEnrolledPrograms] = useState([]);
   const [availablePrograms, setAvailablePrograms] = useState([]);
   const [completedPrograms, setCompletedPrograms] = useState([]);
+  const [programsData, setProgramsData] = useState({});
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [tabValue, setTabValue] = useState(0);
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        fetchTrainingPrograms();
-      } else {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        await fetchTrainingPrograms();
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        setError("Failed to load training programs. Please try again later.");
+      } finally {
         setLoading(false);
-        setError('Please log in to view training programs.');
       }
-    });
-
-    return () => unsubscribe();
+    };
+    fetchData();
   }, []);
 
   const fetchTrainingPrograms = async () => {
     try {
       setLoading(true);
-      const user = auth.currentUser;
       if (!user) {
         setError('No authenticated user found');
         setLoading(false);
         return;
       }
 
-      const userData = await getUserData(user.uid);
-      const allPrograms = await getTrainingPrograms();
+      // Fetch both training programs and updated user data
+      const [allPrograms, userData] = await Promise.all([
+        getTrainingPrograms(),
+        getUserUpdatedData(user.email)
+      ]);
+
+      console.log('User Data:', userData);
+      console.log('All Programs:', allPrograms);
 
       const now = new Date();
       const enrolled = [];
@@ -46,20 +53,47 @@ function TrainingProgram() {
       const completed = [];
 
       allPrograms.forEach((program) => {
-        const startDate = program.startDate.toDate();
-        const endDate = program.endDate.toDate();
+        const startDate = new Date(program.startDate);
+        const endDate = new Date(program.endDate);
         const userEnrollment = userData.enrolledPrograms?.find(ep => ep.programId === program.id);
 
+        console.log('Program:', program.name, 'User Enrollment:', userEnrollment);
+
+        // Store program data for access to current registration numbers
+        setProgramsData(prev => ({
+          ...prev,
+          [program.id]: {
+            numberOfCurrentRegistrations: program.numberOfCurrentRegistrations,
+            participantCapacity: program.participantCapacity
+          }
+        }));
+
         if (userEnrollment) {
+          // Convert Firestore timestamp to Date object if it exists
+          const enrollmentDate = userEnrollment.enrollmentDate?.toDate?.() || 
+                               new Date(userEnrollment.enrollmentDate);
+
+          console.log('Enrollment Date:', enrollmentDate);
+
           if (now <= endDate) {
-            enrolled.push({ ...program, enrollmentDate: userEnrollment.enrollmentDate });
+            enrolled.push({ 
+              ...program, 
+              enrollmentDate: enrollmentDate
+            });
           } else {
-            completed.push({ ...program, enrollmentDate: userEnrollment.enrollmentDate });
+            completed.push({ 
+              ...program, 
+              enrollmentDate: enrollmentDate
+            });
           }
         } else if (now < startDate && program.numberOfCurrentRegistrations < program.participantCapacity) {
           available.push(program);
         }
       });
+
+      console.log('Enrolled Programs:', enrolled);
+      console.log('Available Programs:', available);
+      console.log('Completed Programs:', completed);
 
       setEnrolledPrograms(enrolled);
       setAvailablePrograms(available);
@@ -74,31 +108,53 @@ function TrainingProgram() {
 
   const handleRegisterClick = async (programId) => {
     try {
-      const user = auth.currentUser;
       if (!user) {
         setSnackbar({ open: true, message: 'You must be logged in to register', severity: 'error' });
         return;
       }
-      await registerForProgram(programId, user.uid);
+      
+      await registerForProgram(programId, user.email);
       setSnackbar({ open: true, message: 'Successfully registered for the program', severity: 'success' });
-      fetchTrainingPrograms(); // Refresh the programs list
+      
+      // Update local state immediately for better UX
+      setProgramsData(prev => ({
+        ...prev,
+        [programId]: {
+          ...prev[programId],
+          numberOfCurrentRegistrations: prev[programId].numberOfCurrentRegistrations + 1
+        }
+      }));
+      
+      // Fetch updated data
+      await fetchTrainingPrograms();
     } catch (error) {
-      setSnackbar({ open: true, message: 'Failed to register for the program', severity: 'error' });
+      setSnackbar({ open: true, message: error.message || 'Failed to register for the program', severity: 'error' });
     }
   };
 
   const handleWithdrawClick = async (programId) => {
     try {
-      const user = auth.currentUser;
       if (!user) {
         setSnackbar({ open: true, message: 'You must be logged in to withdraw', severity: 'error' });
         return;
       }
-      await withdrawFromProgram(programId, user.uid);
+      
+      await withdrawFromProgram(programId, user.email);
       setSnackbar({ open: true, message: 'Successfully withdrawn from the program', severity: 'success' });
-      fetchTrainingPrograms(); // Refresh the programs list
+      
+      // Update local state immediately for better UX
+      setProgramsData(prev => ({
+        ...prev,
+        [programId]: {
+          ...prev[programId],
+          numberOfCurrentRegistrations: prev[programId].numberOfCurrentRegistrations - 1
+        }
+      }));
+      
+      // Fetch updated data
+      await fetchTrainingPrograms();
     } catch (error) {
-      setSnackbar({ open: true, message: 'Failed to withdraw from the program', severity: 'error' });
+      setSnackbar({ open: true, message: error.message || 'Failed to withdraw from the program', severity: 'error' });
     }
   };
 
@@ -111,6 +167,33 @@ function TrainingProgram() {
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
+  };
+
+  const formatDate = (date) => {
+    if (!date) return '';
+    
+    // If date is a Firestore Timestamp
+    if (date.toDate) {
+      date = date.toDate();
+    }
+    
+    // If date is a string, convert to Date object
+    if (typeof date === 'string') {
+      date = new Date(date);
+    }
+
+    // Check if the date is valid before formatting
+    if (!(date instanceof Date) || isNaN(date)) {
+      return 'Invalid date';
+    }
+
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   if (loading) {
@@ -157,10 +240,10 @@ function TrainingProgram() {
                   <TableRow key={program.id}>
                     <TableCell>{program.name}</TableCell>
                     <TableCell>{program.description}</TableCell>
-                    <TableCell>{program.startDate.toDate().toLocaleDateString()}</TableCell>
-                    <TableCell>{program.endDate.toDate().toLocaleDateString()}</TableCell>
+                    <TableCell>{formatDate(program.startDate)}</TableCell>
+                    <TableCell>{formatDate(program.endDate)}</TableCell>
                     <TableCell>{program.mode}</TableCell>
-                    <TableCell>{program.enrollmentDate.toDate().toLocaleDateString()}</TableCell>
+                    <TableCell>{formatDate(program.enrollmentDate)}</TableCell>
                     <TableCell>
                       <Button
                         variant="contained"
@@ -202,15 +285,18 @@ function TrainingProgram() {
                   <TableRow key={program.id}>
                     <TableCell>{program.name}</TableCell>
                     <TableCell>{program.description}</TableCell>
-                    <TableCell>{program.startDate.toDate().toLocaleDateString()}</TableCell>
-                    <TableCell>{program.endDate.toDate().toLocaleDateString()}</TableCell>
+                    <TableCell>{formatDate(program.startDate)}</TableCell>
+                    <TableCell>{formatDate(program.endDate)}</TableCell>
                     <TableCell>{program.mode}</TableCell>
-                    <TableCell>{program.participantCapacity - program.numberOfCurrentRegistrations}</TableCell>
+                    <TableCell>
+                      {program.participantCapacity - (programsData[program.id]?.numberOfCurrentRegistrations || program.numberOfCurrentRegistrations)}
+                    </TableCell>
                     <TableCell>
                       <Button
                         variant="contained"
                         color="primary"
                         onClick={() => handleRegisterClick(program.id)}
+                        disabled={programsData[program.id]?.numberOfCurrentRegistrations >= program.participantCapacity}
                       >
                         Register
                       </Button>
@@ -246,10 +332,10 @@ function TrainingProgram() {
                   <TableRow key={program.id}>
                     <TableCell>{program.name}</TableCell>
                     <TableCell>{program.description}</TableCell>
-                    <TableCell>{program.startDate.toDate().toLocaleDateString()}</TableCell>
-                    <TableCell>{program.endDate.toDate().toLocaleDateString()}</TableCell>
+                    <TableCell>{formatDate(program.startDate)}</TableCell>
+                    <TableCell>{formatDate(program.endDate)}</TableCell>
                     <TableCell>{program.mode}</TableCell>
-                    <TableCell>{program.enrollmentDate.toDate().toLocaleDateString()}</TableCell>
+                    <TableCell>{formatDate(program.enrollmentDate)}</TableCell>
                   </TableRow>
                 ))
               )}
@@ -258,13 +344,18 @@ function TrainingProgram() {
         </TableContainer>
       )}
 
-      <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={6000} 
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
         <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
           {snackbar.message}
         </Alert>
       </Snackbar>
     </Box>
   );
-};
+}
 
 export default TrainingProgram;

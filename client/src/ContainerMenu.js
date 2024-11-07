@@ -20,26 +20,21 @@ import {
     ToggleButtonGroup,
     Snackbar,
     Alert,
-    MenuItem,
     IconButton,
     CircularProgress
 } from '@mui/material';
 import {
-    doc,
-    setDoc,
-    getDoc,
-    onSnapshot
-} from "firebase/firestore";
-import {
-    ref,
-    uploadBytes,
-    getDownloadURL,
-    deleteObject
-} from "firebase/storage";
-import { Add, GridView, ViewList, CloudUpload, Delete } from '@mui/icons-material';
-import { db, auth, storage } from "./firebaseConfig";
+    Add,
+    GridView,
+    ViewList,
+    CloudUpload,
+    Delete
+} from '@mui/icons-material';
+import { useAuth } from './AuthContext';
+import { getContainerTypes, addContainerType } from './services/api';
 
-const ContainerMenuManager = () => {
+const ContainerMenu = () => {
+    const { user } = useAuth();
     const [containers, setContainers] = useState([]);
     const [newSize, setNewSize] = useState('');
     const [newPrice, setNewPrice] = useState('');
@@ -54,27 +49,44 @@ const ContainerMenuManager = () => {
         message: '',
         severity: 'info'
     });
-    const getCompany = async () => {
-        try {
-            const userDocRef = doc(db, "users", auth.currentUser.uid);
-            const userDoc = await getDoc(userDocRef);
+    const [loading, setLoading] = useState(true);
 
-            if (userDoc.exists()) {
-                const userData = userDoc.data();
-                setCompany(userData.company);
-                return userData.company;
+    useEffect(() => {
+        const initializeData = async () => {
+            if (!user?.company) {
+                setSnackbar({
+                    open: true,
+                    message: "Company information not available",
+                    severity: 'error'
+                });
+                return;
             }
-            return null;
-        } catch (error) {
-            console.error("Error fetching user data:", error);
-            return null;
+
+            setLoading(true);
+            try {
+                setCompany(user.company);
+                const containerTypes = await getContainerTypes(user.company);
+                setContainers(containerTypes);
+            } catch (error) {
+                console.error("Error loading container types:", error);
+                setSnackbar({
+                    open: true,
+                    message: "Error loading container types",
+                    severity: 'error'
+                });
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (user) {
+            initializeData();
         }
-    };
+    }, [user]);
 
     const handleImageChange = (event) => {
         const file = event.target.files[0];
         if (file) {
-            // Validate file type
             if (!file.type.startsWith('image/')) {
                 setSnackbar({
                     open: true,
@@ -84,7 +96,6 @@ const ContainerMenuManager = () => {
                 return;
             }
 
-            // Validate file size (max 5MB)
             if (file.size > 5 * 1024 * 1024) {
                 setSnackbar({
                     open: true,
@@ -103,83 +114,54 @@ const ContainerMenuManager = () => {
         }
     };
 
-    const uploadImage = async () => {
-        if (!imageFile) return null;
-
-        const fileExtension = imageFile.name.split('.').pop();
-        const fileName = `${company}_${Date.now()}.${fileExtension}`;
-        const storageRef = ref(storage, `container_images/${fileName}`);
+    const handleAddContainer = async () => {
+        if (!newName || !newSize || !newPrice) {
+            setSnackbar({
+                open: true,
+                message: "Please fill in all required fields",
+                severity: 'warning'
+            });
+            return;
+        }
 
         try {
             setUploading(true);
-            const snapshot = await uploadBytes(storageRef, imageFile);
-            const downloadURL = await getDownloadURL(snapshot.ref);
-            return downloadURL;
-        } catch (error) {
-            console.error("Error uploading image:", error);
-            throw error;
-        } finally {
-            setUploading(false);
-        }
-    };
-
-    const handleAddContainer = async () => {
-        try {
-            const companyDocRef = doc(db, "container_menu", company);
-            const companyDoc = await getDoc(companyDocRef);
-
-            let existingContainers = companyDoc.exists() ? companyDoc.data().container_types : [];
-
-            // Check for duplicate size and price combination
-            const isDuplicate = existingContainers.some(
-                container => container.size === parseInt(newSize) &&
-                    container.price === parseFloat(newPrice)
-            );
-
-            if (isDuplicate) {
-                setSnackbar({
-                    open: true,
-                    message: "A container with this size and price combination already exists.",
-                    severity: 'error'
-                });
-                return;
-            }
-
-            let imageUrl = null;
-            if (imageFile) {
-                imageUrl = await uploadImage();
-            }
-
-            const newContainer = {
-                size: parseInt(newSize),
-                price: parseFloat(newPrice),
+            
+            const containerData = {
+                company,
+                size: newSize,
+                price: newPrice,
                 name: newName,
-                imageUrl: imageUrl
+                imageFile: imageFile
             };
 
-            await setDoc(companyDocRef, {
-                container_types: [...existingContainers, newContainer]
-            }, { merge: true });
-
+            await addContainerType(company, containerData);
+            
             setSnackbar({
                 open: true,
                 message: 'Container type added successfully.',
                 severity: 'success'
             });
 
-            // Clear input fields
+            // Reset form
             setNewSize('');
             setNewPrice('');
             setNewName('');
             setImageFile(null);
             setImagePreview(null);
+
+            // Refresh container list
+            const updatedContainers = await getContainerTypes(company);
+            setContainers(updatedContainers);
         } catch (error) {
             console.error("Error adding container:", error);
             setSnackbar({
                 open: true,
-                message: "Error adding container. Please try again.",
+                message: error.message || "Error adding container. Please try again.",
                 severity: 'error'
             });
+        } finally {
+            setUploading(false);
         }
     };
 
@@ -188,33 +170,8 @@ const ContainerMenuManager = () => {
         setImagePreview(null);
     };
 
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const userCompany = await getCompany();
-                if (userCompany) {
-                    const companyDocRef = doc(db, "container_menu", userCompany);
-                    const unsubscribe = onSnapshot(companyDocRef, (docSnapshot) => {
-                        if (docSnapshot.exists()) {
-                            setContainers(docSnapshot.data().container_types || []);
-                        } else {
-                            setContainers([]);
-                        }
-                    });
-                    return () => unsubscribe();
-                }
-            } catch (error) {
-                console.error("Error setting up real-time listener:", error);
-            }
-        };
-
-        fetchData();
-    }, []);
-
     const handleCloseSnackbar = (event, reason) => {
-        if (reason === 'clickaway') {
-            return;
-        }
+        if (reason === 'clickaway') return;
         setSnackbar({ ...snackbar, open: false });
     };
 
@@ -223,6 +180,14 @@ const ContainerMenuManager = () => {
             setView(newView);
         }
     };
+
+    if (loading) {
+        return (
+            <Box display="flex" justifyContent="center" alignItems="center" height="100vh">
+                <CircularProgress />
+            </Box>
+        );
+    }
 
     return (
         <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -236,6 +201,7 @@ const ContainerMenuManager = () => {
                     {snackbar.message}
                 </Alert>
             </Snackbar>
+
             <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
                 <Typography variant="h4" gutterBottom>
                     Container Menu Management
@@ -248,6 +214,7 @@ const ContainerMenuManager = () => {
                             value={newName}
                             onChange={(e) => setNewName(e.target.value)}
                             size="small"
+                            required
                         />
                         <TextField
                             label="Container Size (ft)"
@@ -255,6 +222,7 @@ const ContainerMenuManager = () => {
                             value={newSize}
                             onChange={(e) => setNewSize(e.target.value)}
                             size="small"
+                            required
                         />
                         <TextField
                             label="Price (USD)"
@@ -262,8 +230,8 @@ const ContainerMenuManager = () => {
                             value={newPrice}
                             onChange={(e) => setNewPrice(e.target.value)}
                             size="small"
+                            required
                         />
-
                     </Box>
 
                     <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
@@ -271,7 +239,6 @@ const ContainerMenuManager = () => {
                             component="label"
                             variant="outlined"
                             startIcon={<CloudUpload />}
-                            sx={{ mt: 1 }}
                         >
                             Upload Image
                             <input
@@ -344,7 +311,7 @@ const ContainerMenuManager = () => {
                                         component="img"
                                         height="200"
                                         image={container.imageUrl || '/api/placeholder/400/320'}
-                                        alt={`${container.name}`}
+                                        alt={container.name}
                                         sx={{
                                             objectFit: 'cover',
                                             bgcolor: '#f5f5f5',
@@ -411,4 +378,4 @@ const ContainerMenuManager = () => {
     );
 };
 
-export default ContainerMenuManager;
+export default ContainerMenu;

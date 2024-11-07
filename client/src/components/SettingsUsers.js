@@ -36,11 +36,13 @@ import { getUsers, updateUser, deleteUser, inviteUser, getCurrentUser, cancelInv
 import { doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../firebaseConfig';
 import Pagination from '@mui/material/Pagination';
+import { useAuth } from '../AuthContext'
 
 
 const RECORDS_PER_PAGE = 10;
 
 const SettingsUsers = () => {
+  const { user } = useAuth();
   const [users, setUsers] = useState([]);
   const [allCompanyUsers, setAllCompanyUsers] = useState([]);
   const [filteredAllUsers, setFilteredAllUsers] = useState([]);
@@ -97,18 +99,16 @@ const SettingsUsers = () => {
     "View Invitations List",
     "View Company Information",
     "Edit Company Information",
-    "abc",
   ];
 
   useEffect(() => {
     const fetchData = async () => {
+      setCurrentUserCompany(user.company)
       try {
         setIsLoading(true);
         await Promise.all([
           fetchUsers(),
-          fetchCurrentUserCompany(),
           fetchUsersInCompany(),
-          fetchUserProfile(auth.currentUser.uid)
         ])
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -154,7 +154,7 @@ const SettingsUsers = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const fetchedUsers = await getUsers();
+      const fetchedUsers = await getUsers(user.email);
       setUsers(fetchedUsers);
       setFilteredStatusUsers(fetchedUsers);
       setLoading(false);
@@ -168,7 +168,7 @@ const SettingsUsers = () => {
   const fetchUsersInCompany = async () => {
     try {
       setLoading(true);
-      const companyUsers = await getAllUsersInCompany();
+      const companyUsers = await getAllUsersInCompany(user.email);
 
       setAllCompanyUsers(companyUsers);
       setFilteredAllUsers(companyUsers);
@@ -180,15 +180,6 @@ const SettingsUsers = () => {
     }
   };
 
-  const fetchCurrentUserCompany = async () => {
-    try {
-      const user = await getCurrentUser();
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      setCurrentUserCompany(userDoc.data().company);
-    } catch (err) {
-      console.error('Error fetching current user company:', err);
-    }
-  };
 
   const handleUpdateUser = async (userId, updatedData) => {
     try {
@@ -217,6 +208,7 @@ const SettingsUsers = () => {
   };
 
   const handleDeleteUser = async (userId, status) => {
+
     try {
       if (status === 'Pending') {
         await cancelInvitation(userId);
@@ -224,8 +216,8 @@ const SettingsUsers = () => {
         await deleteUser(userId);
       }
 
-      const updatedUsers = users.filter(user => user.id !== userId);
-      const updatedAllCompanyUsers = allCompanyUsers.filter(user => user.id !== userId);
+      const updatedUsers = users.filter(user => user.email !== userId);
+      const updatedAllCompanyUsers = allCompanyUsers.filter(user => user.email !== userId);
 
       setUsers(updatedUsers);
       setFilteredAllUsers(updatedAllCompanyUsers);
@@ -330,23 +322,14 @@ const SettingsUsers = () => {
   const indexOfFirstStatusUser = indexOfLastStatusUser - RECORDS_PER_PAGE;
   const currentStatusUsers = filteredByStatus.slice(indexOfFirstStatusUser, indexOfLastStatusUser);
 
-  const fetchUserProfile = async (userId) => {
-    try {
-      const profileData = await getUserData(userId);
-      setUserProfile(profileData);
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-      setError('Failed to fetch user profile. Please try again later.');
-    }
-  };
   const hasRole = (requiredRoles) => {
-    if (!userProfile || !Array.isArray(userProfile.accessRights)) return false;
+    if (!user || !Array.isArray(user.accessRights)) return false;
 
     // Check if the user has any of the required roles
-    const hasRequiredRole = requiredRoles.some(role => userProfile.accessRights.includes(role));
+    const hasRequiredRole = requiredRoles.some(role => user.accessRights.includes(role));
 
     // Return true if the user has a required role or is an Admin
-    return hasRequiredRole || userProfile.role === 'Admin';
+    return hasRequiredRole || user.role === 'Admin';
   };
 
   if (loading) return <Box display="flex" justifyContent="center" alignItems="center" height="100vh"><CircularProgress /></Box>;
@@ -563,7 +546,7 @@ const SettingsUsers = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteConfirmation(null)}>Cancel</Button>
-          <Button onClick={() => handleDeleteUser(deleteConfirmation.id, deleteConfirmation.status)} color="error">
+          <Button onClick={() => handleDeleteUser(deleteConfirmation.email, deleteConfirmation.status)} color="error">
             {deleteConfirmation?.status === 'Pending' ? 'Cancel Invitation' : 'Delete'}
           </Button>
         </DialogActions>

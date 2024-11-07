@@ -20,28 +20,22 @@ import {
     Stepper,
     Step,
     StepLabel,
-    Chip,
     IconButton,
     Divider,
+    Chip,
+    Stack,
     Table,
-    TableCell,
-    TableRow,
-    TableHead,
     TableBody,
-    TableContainer
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    LinearProgress
 } from '@mui/material';
-import { List } from '@mui/icons-material';
-import {
-    doc,
-    setDoc,
-    getDoc,
-    onSnapshot,
-    query,
-    getDocs,
-    collection
-} from "firebase/firestore";
-import { Add, Close, ArrowBack, ArrowForward } from '@mui/icons-material';
-import { db, auth } from "./firebaseConfig";
+import { Add, Close, ArrowBack, ArrowForward, List } from '@mui/icons-material';
+import { doc, getDoc, collection, query, getDocs } from "firebase/firestore";
+import { db } from "./firebaseConfig";
+import { useAuth } from './AuthContext';
 
 const ContainerPricingManager = () => {
     const [menuContainers, setMenuContainers] = useState([]);
@@ -60,21 +54,77 @@ const ContainerPricingManager = () => {
     const [openList, setOpenList] = useState(false);
     const [containers, setContainers] = useState([]);
     const steps = ['Select Number of Containers', 'Enter Equipment IDs'];
+    const { user } = useAuth();
 
-    const getCompany = async () => {
-        try {
-            const userDocRef = doc(db, "users", auth.currentUser.uid);
-            const userDoc = await getDoc(userDocRef);
-
-            if (userDoc.exists()) {
-                const userData = userDoc.data();
-                setCompany(userData.company);
-                return userData.company;
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                if (!user?.company) {
+                    setSnackbar({
+                        open: true,
+                        message: "Company information not available",
+                        severity: 'error'
+                    });
+                    return;
+                }
+                setCompany(user.company);
+                const menuDocRef = doc(db, "container_menu", user.company);
+                const menuDoc = await getDoc(menuDocRef);
+                if (menuDoc.exists()) {
+                    setMenuContainers(menuDoc.data().container_types || []);
+                }
+            } catch (error) {
+                console.error("Error setting up real-time listener:", error);
+                setSnackbar({
+                    open: true,
+                    message: "Error loading container menu",
+                    severity: 'error'
+                });
             }
-            return null;
+        };
+
+        if (user) {
+            fetchData();
+        }
+    }, [user]);
+
+    useEffect(() => {
+        if (openList && company) {
+            const unsubscribe = fetchContainers();
+            return () => unsubscribe;
+        }
+    }, [openList, company]);
+
+    const handleCloseDialog = () => {
+        setOpenDialog(false);
+        setSelectedContainer(null);
+        setNumberOfContainers(1);
+        setEquipmentIds([]);
+        setCurrentEquipmentId('');
+        setActiveStep(0);
+    };
+
+    const handleCloseSnackbar = (event, reason) => {
+        if (reason === 'clickaway') return;
+        setSnackbar({ ...snackbar, open: false });
+    };
+
+    const fetchContainers = async () => {
+        try {
+            const carrierDocRef = doc(db, "carrier_container_prices", company);
+            const docSnapshot = await getDoc(carrierDocRef);
+            if (docSnapshot.exists()) {
+                setContainers(docSnapshot.data().containers || []);
+            } else {
+                setContainers([]);
+            }
         } catch (error) {
-            console.error("Error fetching user data:", error);
-            return null;
+            console.error("Error fetching containers:", error);
+            setSnackbar({
+                open: true,
+                message: "Error loading containers",
+                severity: 'error'
+            });
         }
     };
 
@@ -102,12 +152,6 @@ const ContainerPricingManager = () => {
         }
 
         try {
-            const companyDocRef = doc(db, "carrier_container_prices", company);
-            const companyDoc = await getDoc(companyDocRef);
-
-            let existingContainers = companyDoc.exists() ? companyDoc.data().containers : [];
-
-            // Check for unique Equipment IDs
             const allContainersQuery = query(collection(db, "carrier_container_prices"));
             const allContainersSnapshot = await getDocs(allContainersQuery);
             const allContainers = allContainersSnapshot.docs.flatMap(doc => doc.data().containers || []);
@@ -123,6 +167,9 @@ const ContainerPricingManager = () => {
                 }
             }
 
+            const companyDocRef = doc(db, "carrier_container_prices", company);
+            const companyDoc = await getDoc(companyDocRef);
+            let existingContainers = companyDoc.exists() ? companyDoc.data().containers : [];
             let updatedContainers = [...existingContainers];
 
             for (let i = 0; i < numberOfContainers; i++) {
@@ -138,8 +185,7 @@ const ContainerPricingManager = () => {
                 updatedContainers.push(newContainer);
             }
 
-            await setDoc(companyDocRef, { containers: updatedContainers }, { merge: true });
-
+            await companyDocRef.set({ containers: updatedContainers }, { merge: true });
             setSnackbar({
                 open: true,
                 message: `${numberOfContainers} containers added successfully.`,
@@ -147,6 +193,7 @@ const ContainerPricingManager = () => {
             });
 
             handleCloseDialog();
+            await fetchContainers();
         } catch (error) {
             console.error("Error adding containers: ", error);
             setSnackbar({
@@ -155,45 +202,6 @@ const ContainerPricingManager = () => {
                 severity: 'error'
             });
         }
-    };
-
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const userCompany = await getCompany();
-                if (userCompany) {
-                    const menuDocRef = doc(db, "container_menu", userCompany);
-                    const unsubscribe = onSnapshot(menuDocRef, (docSnapshot) => {
-                        if (docSnapshot.exists()) {
-                            setMenuContainers(docSnapshot.data().container_types || []);
-                        } else {
-                            setMenuContainers([]);
-                        }
-                    });
-                    return () => unsubscribe();
-                }
-            } catch (error) {
-                console.error("Error setting up real-time listener:", error);
-            }
-        };
-
-        fetchData();
-    }, []);
-
-    const handleCloseDialog = () => {
-        setOpenDialog(false);
-        setSelectedContainer(null);
-        setNumberOfContainers(1);
-        setEquipmentIds([]);
-        setCurrentEquipmentId('');
-        setActiveStep(0);
-    };
-
-    const handleCloseSnackbar = (event, reason) => {
-        if (reason === 'clickaway') {
-            return;
-        }
-        setSnackbar({ ...snackbar, open: false });
     };
 
     const handleAddEquipmentId = (e) => {
@@ -214,11 +222,11 @@ const ContainerPricingManager = () => {
     };
 
     const handleNext = () => {
-        setActiveStep((prevStep) => prevStep + 1);
+        setActiveStep(prevStep => prevStep + 1);
     };
 
     const handleBack = () => {
-        setActiveStep((prevStep) => prevStep - 1);
+        setActiveStep(prevStep => prevStep - 1);
     };
 
     const getStepContent = (step) => {
@@ -301,30 +309,9 @@ const ContainerPricingManager = () => {
                 return 'Unknown step';
         }
     };
+
     const handleOpenList = () => setOpenList(true);
     const handleCloseList = () => setOpenList(false);
-
-    useEffect(() => {
-        if (openList && company) {
-            // Set up real-time listener for containers
-            const unsubscribe = onSnapshot(
-                doc(db, "carrier_container_prices", company),
-                (doc) => {
-                    if (doc.exists()) {
-                        setContainers(doc.data().containers || []);
-                    } else {
-                        setContainers([]);
-                    }
-                },
-                (error) => {
-                    console.error("Error fetching containers:", error);
-                }
-            );
-
-            return () => unsubscribe();
-        }
-    }, [openList, company]);
-
 
     return (
         <>
@@ -379,7 +366,8 @@ const ContainerPricingManager = () => {
                     <Button onClick={handleCloseList}>Close</Button>
                 </DialogActions>
             </Dialog>
-            <Container maxWidth="lg" sx={{ py: 4 }}>
+
+            <Container maxWidth="lg" sx={{ p: 3 }}>
                 <Snackbar
                     open={snackbar.open}
                     autoHideDuration={6000}
@@ -398,15 +386,13 @@ const ContainerPricingManager = () => {
                         alignItems="center"
                         mb={3}
                     >
-
-                        <Typography variant="h4" gutterBottom>
-                            Container Pricing Management
+                        <Typography variant="h4" component="h1">
+                            Container Marketplace
                         </Typography>
                         <Button
                             variant="contained"
                             startIcon={<List />}
                             onClick={handleOpenList}
-                            sx={{ mt: 2 }}
                         >
                             View Container List
                         </Button>
@@ -460,63 +446,63 @@ const ContainerPricingManager = () => {
                             </Grid>
                         ))}
                     </Grid>
-
-                    <Dialog
-                        open={openDialog}
-                        onClose={handleCloseDialog}
-                        fullWidth
-                        maxWidth="sm"
-                    >
-                        <DialogTitle sx={{ pb: 1 }}>
-                            <Box display="flex" alignItems="center" justifyContent="space-between">
-                                <Typography variant="h6">Add Containers</Typography>
-                                <IconButton onClick={handleCloseDialog} size="small">
-                                    <Close />
-                                </IconButton>
-                            </Box>
-                        </DialogTitle>
-                        <DialogContent sx={{ pt: 2 }}>
-                            <Stepper activeStep={activeStep} sx={{ mb: 3 }}>
-                                {steps.map((label) => (
-                                    <Step key={label}>
-                                        <StepLabel>{label}</StepLabel>
-                                    </Step>
-                                ))}
-                            </Stepper>
-                            {getStepContent(activeStep)}
-                        </DialogContent>
-                        <DialogActions sx={{ px: 3, pb: 2 }}>
-                            <Button onClick={handleCloseDialog}>Cancel</Button>
-                            <Box sx={{ flex: '1 1 auto' }} />
-                            <Button
-                                disabled={activeStep === 0}
-                                onClick={handleBack}
-                                startIcon={<ArrowBack />}
-                            >
-                                Back
-                            </Button>
-                            {activeStep === steps.length - 1 ? (
-                                <Button
-                                    variant="contained"
-                                    onClick={handleAddContainers}
-                                    disabled={equipmentIds.length !== numberOfContainers}
-                                    startIcon={<Add />}
-                                >
-                                    Create Containers
-                                </Button>
-                            ) : (
-                                <Button
-                                    variant="contained"
-                                    onClick={handleNext}
-                                    disabled={numberOfContainers < 1}
-                                    endIcon={<ArrowForward />}
-                                >
-                                    Next
-                                </Button>
-                            )}
-                        </DialogActions>
-                    </Dialog>
                 </Paper>
+
+                <Dialog
+                    open={openDialog}
+                    onClose={handleCloseDialog}
+                    maxWidth="sm"
+                    fullWidth
+                >
+                    <DialogTitle sx={{ pb: 1 }}>
+                        <Box display="flex" alignItems="center" justifyContent="space-between">
+                            <Typography variant="h6">Add Containers</Typography>
+                            <IconButton onClick={handleCloseDialog} size="small">
+                                <Close />
+                            </IconButton>
+                        </Box>
+                    </DialogTitle>
+                    <DialogContent sx={{ pt: 2 }}>
+                        <Stepper activeStep={activeStep} sx={{ mb: 3 }}>
+                            {steps.map((label) => (
+                                <Step key={label}>
+                                    <StepLabel>{label}</StepLabel>
+                                </Step>
+                            ))}
+                        </Stepper>
+                        {getStepContent(activeStep)}
+                    </DialogContent>
+                    <DialogActions sx={{ px: 3, pb: 2 }}>
+                        <Button onClick={handleCloseDialog}>Cancel</Button>
+                        <Box sx={{ flex: '1 1 auto' }} />
+                        <Button
+                            disabled={activeStep === 0}
+                            onClick={handleBack}
+                            startIcon={<ArrowBack />}
+                        >
+                            Back
+                        </Button>
+                        {activeStep === steps.length - 1 ? (
+                            <Button
+                                variant="contained"
+                                onClick={handleAddContainers}
+                                disabled={equipmentIds.length !== numberOfContainers}
+                                startIcon={<Add />}
+                            >
+                                Create Containers
+                            </Button>
+                        ) : (
+                            <Button
+                                variant="contained"
+                                onClick={handleNext}
+                                disabled={numberOfContainers < 1}
+                                endIcon={<ArrowForward />}
+                            >
+                                Next
+                            </Button>
+                        )}
+                    </DialogActions>
+                </Dialog>
             </Container>
         </>
     );

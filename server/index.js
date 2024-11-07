@@ -1,17 +1,55 @@
 const express = require('express');
+const bodyParser = require('body-parser');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const admin = require('firebase-admin');
+const serviceAccount = require('./config/serviceAccountKey.json');
 const cors = require('cors');
-const authMiddleware = require('./middleware/auth');
-const userWorkspaceRoutes = require('./routes/userWorkspace');
-const userAccountManagementRoutes = require('./routes/userAccountManagement');
+const { Storage } = require('@google-cloud/storage');
+const path = require('path');
+const multer = require('multer');
+const { captureRejectionSymbol } = require('events');
+const upload = multer({ storage: multer.memoryStorage() });
+const userRoutes = require('./src/routes/userRoutes');
+const vesselRoutes = require('./src/routes/vesselRoutes');
+const cargoRoutes = require('./src/routes/cargoRoutes');
+const operatorRoutes = require('./src/routes/operatorRoutes');
+const facilityRoutes = require('./src/routes/facilityRoutes');
+const inquiryRoutes = require('./src/routes/inquiryRoutes');
+const trainingRoutes = require('./src/routes/trainingRoutes');
+const companyRoutes = require('./src/routes/companyRoutes');
+const adHocResourceRequestRoutes = require('./src/routes/adHocResourceRequestRoutes');
+const containerMenuRoutes = require('./src/routes/containerMenuRoutes');
 
+require('./src/config/firebase');
+
+const storage = new Storage({
+    projectId: 'your-project-id',
+    keyFilename: path.join(__dirname, './config/serviceAccountKey.json')
+});
+
+
+const bucket = storage.bucket('pmis-47493.appspot.com');
 const app = express();
 
-app.use(cors());
-app.use(express.json());
+app.use(bodyParser.json());
+app.use(cors()); // Enable CORS for all routes
 
-app.use('/api', authMiddleware);
-app.use('/api', userWorkspaceRoutes);
-app.use('/api', userAccountManagementRoutes);
+const JWT_SECRET = 'your_jwt_secret';
 
-const PORT = process.env.PORT || 5001;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.use('/', userRoutes);
+app.use('/', vesselRoutes);
+app.use('/', cargoRoutes);
+app.use('/', operatorRoutes);
+app.use('/', facilityRoutes);
+app.use('/', inquiryRoutes);
+app.use('/', trainingRoutes);
+app.use('/', companyRoutes);
+app.use('/', adHocResourceRequestRoutes);
+app.use('/', containerMenuRoutes);
+
+
+app.listen(5001, () => {
+    console.log('Server is running on port 5001');
+});
+
