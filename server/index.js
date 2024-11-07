@@ -10,18 +10,18 @@ const path = require('path');
 const multer = require('multer');
 const { captureRejectionSymbol } = require('events');
 const upload = multer({ storage: multer.memoryStorage() });
-const userRoutes = require('./src/routes/userRoutes');
-const vesselRoutes = require('./src/routes/vesselRoutes');
-const cargoRoutes = require('./src/routes/cargoRoutes');
-const operatorRoutes = require('./src/routes/operatorRoutes');
-const facilityRoutes = require('./src/routes/facilityRoutes');
-const inquiryRoutes = require('./src/routes/inquiryRoutes');
-const trainingRoutes = require('./src/routes/trainingRoutes');
-const companyRoutes = require('./src/routes/companyRoutes');
-const adHocResourceRequestRoutes = require('./src/routes/adHocResourceRequestRoutes');
-const containerMenuRoutes = require('./src/routes/containerMenuRoutes');
+const userRoutes = require('./routes/userRoutes');
+const vesselRoutes = require('./routes/vesselRoutes');
+const cargoRoutes = require('./routes/cargoRoutes');
+const operatorRoutes = require('./routes/operatorRoutes');
+const facilityRoutes = require('./routes/facilityRoutes');
+const inquiryRoutes = require('./routes/inquiryRoutes');
+const trainingRoutes = require('./routes/trainingRoutes');
+const companyRoutes = require('./routes/companyRoutes');
+const adHocResourceRequestRoutes = require('./routes/adHocResourceRequestRoutes');
+const containerMenuRoutes = require('./routes/containerMenuRoutes');
 
-require('./src/config/firebase');
+require('./config/firebase');
 
 const storage = new Storage({
     projectId: 'your-project-id',
