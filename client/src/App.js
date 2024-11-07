@@ -29,7 +29,6 @@ import { jwtDecode } from "jwt-decode";
 import ElectronicTradeDocuments from './ElectronicTradeDocument';
 import CustomsPreview from './CustomsPreview';
 
-
 const drawerWidth = 240;
 
 function App() {
