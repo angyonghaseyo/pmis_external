@@ -243,7 +243,7 @@ function App() {
               )}
               {hasAccessRights(['Manage Documents']) && (
                 <Route
-                  path="/customs-and-trade-documents/something"
+                  path="/customs-and-trade-documents/document-manager"
                   element={<CustomsPreview />}
                 />
               )}

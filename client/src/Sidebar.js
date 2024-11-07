@@ -93,8 +93,11 @@ const Sidebar = ({ user }) => {
     {
       name: "Customs and Trade Documents",
       icon: <FileText />,
-      path: "/documents",
-      children: ['Subitem 1', 'Subitem 2'],
+      path: "/customs-and-trade-documents",
+      children: [
+        { name: 'Electronic Trade Documents', accessRights: ['View Documents'] },
+        { name: 'Document Manager', accessRights: ['Manage Documents'] }
+      ],
       accessRights: ['View Documents', 'Manage Documents']
     },
     {
