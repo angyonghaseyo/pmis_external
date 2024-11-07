@@ -33,6 +33,14 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { getAdHocResourceRequests, submitAdHocResourceRequest, updateAdHocResourceRequest, getVesselVisitRequestsAdHocRequest } from './services/api';
 
+// Helper function to format date as dd/MM/yyyy, HH:mm:ss
+const formatDate = (dateString) => {
+  const { _seconds, _nanoseconds } = dateString;
+  const milliseconds = _seconds * 1000 + Math.floor(_nanoseconds / 1_000_000);
+  const date = new Date(milliseconds);
+  return date.toLocaleDateString('en-GB') + ', ' + date.toLocaleTimeString('en-GB');
+};
+
 const AdHocResourceRequest = () => {
   const [open, setOpen] = useState(false);
   const [vesselVisits, setVesselVisits] = useState([]);
@@ -199,9 +207,9 @@ const AdHocResourceRequest = () => {
   const handleEdit = (request) => {
     setFormData({
       ...request,
-      preferredTime: new Date(request.preferredTime),
-      startTime: request.startTime ? new Date(request.startTime) : new Date(),
-      endTime: request.endTime ? new Date(request.endTime) : new Date(),
+      preferredTime: request.preferredTime,
+      startTime: request.startTime || new Date(),
+      endTime: request.endTime || new Date(),
     });
     setEditMode(true);
     setEditRequestId(request.id);
@@ -211,9 +219,9 @@ const AdHocResourceRequest = () => {
   const handleView = (request) => {
     setFormData({
       ...request,
-      preferredTime: new Date(request.preferredTime),
-      startTime: request.startTime ? new Date(request.startTime) : new Date(),
-      endTime: request.endTime ? new Date(request.endTime) : new Date(),
+      preferredTime: request.preferredTime,
+      startTime: request.startTime || new Date(),
+      endTime: request.endTime || new Date(),
     });
     setViewMode(true);
     setOpen(true);
@@ -265,7 +273,7 @@ const AdHocResourceRequest = () => {
                   <TableCell>{request.resourceType}</TableCell>
                   <TableCell>{request.description}</TableCell>
                   <TableCell>
-                    {new Date(request.preferredTime).toLocaleString()}
+                    {formatDate(request.preferredTime)}
                   </TableCell>
                   <TableCell>
                     <Chip 
