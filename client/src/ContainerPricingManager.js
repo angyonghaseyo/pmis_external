@@ -34,6 +34,7 @@ import {
 } from '@mui/material';
 import { Add, Close, ArrowBack, ArrowForward, List } from '@mui/icons-material';
 import { doc, getDoc, collection, query, getDocs } from "firebase/firestore";
+import { getContainerTypes } from './services/api';
 import { db } from "./firebaseConfig";
 import { useAuth } from './AuthContext';
 
@@ -68,13 +69,11 @@ const ContainerPricingManager = () => {
                     return;
                 }
                 setCompany(user.company);
-                const menuDocRef = doc(db, "container_menu", user.company);
-                const menuDoc = await getDoc(menuDocRef);
-                if (menuDoc.exists()) {
-                    setMenuContainers(menuDoc.data().container_types || []);
-                }
+                const containerTypes = await getContainerTypes(user.company);
+                setMenuContainers(containerTypes);
+                
             } catch (error) {
-                console.error("Error setting up real-time listener:", error);
+                console.error("Error fetching container types:", error);
                 setSnackbar({
                     open: true,
                     message: "Error loading container menu",
@@ -87,6 +86,7 @@ const ContainerPricingManager = () => {
             fetchData();
         }
     }, [user]);
+
 
     useEffect(() => {
         if (openList && company) {
