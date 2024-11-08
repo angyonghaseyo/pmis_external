@@ -5,7 +5,7 @@ class ContainerPricingService {
         this.db = db;
     }
 
-    async fetchCarrierContainerPrices(company) {
+    async getCarrierContainerPrices(company) {
         try {
             const carrierContainerRef = this.db.collection('carrier_container_prices').doc(company);
             const snapshot = await carrierContainerRef.get();
