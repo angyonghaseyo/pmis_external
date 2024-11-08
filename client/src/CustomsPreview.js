@@ -1,277 +1,295 @@
-import React, { useState } from 'react';
-import CustomsTradeManager from './CustomsTradeManager';
+import React, { useState, useEffect } from "react";
 import {
-  Button,
-  Paper,
+  Box,
+  Stepper,
+  Step,
+  StepLabel,
   Typography,
+  Paper,
   Card,
   CardContent,
-  CardHeader,
-  Box
-} from '@mui/material';
+  Grid,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Chip,
+  Alert,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+} from "@mui/material";
 import {
-  Timeline,
-  TimelineItem,
-  TimelineSeparator,
-  TimelineConnector,
-  TimelineContent,
-  TimelineDot
-} from '@mui/lab';
-import {
-  LocalShipping,
-  Description,
-  Inventory,
-  CheckCircle
-} from '@mui/icons-material';
+  CheckCircle,
+  Warning,
+  PendingActions,
+  Pets,
+  LocalFlorist,
+  Medication,
+} from "@mui/icons-material";
+import { HSCodeCategories, ProcessStatus } from "./CustomsTradeManager";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "./firebaseConfig";
+import DocumentStatusTracker from "./DocumentStatusTracker";
 
-// Import shipment status constants
-const shipmentStatus = {
-  DOCUMENTS_PREPARATION: 'DOCUMENTS_PREPARATION',
-  CUSTOMS_CLEARANCE: 'CUSTOMS_CLEARANCE',
-  PORT_HANDLING: 'PORT_HANDLING',
-  DELIVERY: 'DELIVERY',
-  COMPLETED: 'COMPLETED'
+const CategoryIcon = ({ category }) => {
+  switch (category) {
+    case "LIVE_ANIMALS":
+      return <Pets />;
+    case "FRESH_FRUITS":
+      return <LocalFlorist />;
+    case "PHARMACEUTICALS":
+      return <Medication />;
+    default:
+      return null;
+  }
 };
 
-const CustomsPreview = () => {
-  const [shipmentId, setShipmentId] = useState(null);
-  const [timeline, setTimeline] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const manager = new CustomsTradeManager();
-
-  // Helper function to update timeline
-  const updateTimelineState = async (id) => {
-    const updatedTimeline = await manager.getShipmentTimeline(id);
-    console.log('Updated timeline:', updatedTimeline);
-    setTimeline(updatedTimeline);
-    return updatedTimeline;
-  };
-
-  const simulateImport = async () => {
-    setLoading(true);
-    try {
-      console.log('Starting import process...');
-      
-      // Create shipment
-      const newShipmentId = await manager.createShipment({
-        importer: 'LuxeFurnish SG',
-        goods: 'Designer Sofas',
-        quantity: 5,
-        origin: 'Italy',
-        containerNumber: 'MSKU1234567',
-        vessel: 'Maersk Victoria'
-      });
-      console.log('Shipment created with ID:', newShipmentId);
-      
-      setShipmentId(newShipmentId);
-      
-      // Upload documents
-      console.log('Uploading documents...');
-      await manager.uploadDocument(newShipmentId, 'COMMERCIAL_INVOICE', {
-        invoiceNumber: 'INV-2024-001',
-        supplier: 'Italian Luxury Furniture',
-        value: 50000
-      });
-
-      await manager.uploadDocument(newShipmentId, 'CERTIFICATE_OF_ORIGIN', {
-        certificateNumber: 'CO-IT-2024-001',
-        issuingAuthority: 'Italian Chamber of Commerce'
-      });
-
-      // Update timeline at the end
-      await updateTimelineState(newShipmentId);
-      
-    } catch (error) {
-      console.error('Error in simulation:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const submitCustomsDeclaration = async () => {
-    if (!shipmentId) return;
-    setLoading(true);
-    try {
-      console.log('Submitting customs declaration...');
-      await manager.submitCustomsDeclaration(shipmentId, {
-        hsCode: '9401.61',
-        value: 50000,
-        description: 'Upholstered wooden frame sofas',
-        quantity: 5
-      });
-      await updateTimelineState(shipmentId);
-    } catch (error) {
-      console.error('Error submitting customs declaration:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const processArrival = async () => {
-    if (!shipmentId) return;
-    setLoading(true);
-    try {
-      console.log('Processing arrival...');
-      await manager.processContainerArrival(shipmentId, {
-        arrivalTime: new Date(),
-        location: 'CFS Station A',
-        condition: 'Good'
-      });
-      await updateTimelineState(shipmentId);
-    } catch (error) {
-      console.error('Error processing arrival:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const completeDelivery = async () => {
-    if (!shipmentId) return;
-    setLoading(true);
-    try {
-      console.log('Completing delivery...');
-      await manager.completeDelivery(shipmentId, {
-        driver: 'John Doe',
-        vehicle: 'GA1234B',
-        timestamp: new Date(),
-        receivedBy: 'LuxeFurnish Warehouse Manager'
-      });
-      await updateTimelineState(shipmentId);
-    } catch (error) {
-      console.error('Error completing delivery:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getTimelineDotColor = (status) => {
+const StatusChip = ({ status }) => {
+  const getStatusColor = () => {
     switch (status) {
-      case shipmentStatus.DOCUMENTS_PREPARATION:
-        return 'info';
-      case shipmentStatus.CUSTOMS_CLEARANCE:
-        return 'warning';
-      case shipmentStatus.PORT_HANDLING:
-        return 'secondary';
-      case shipmentStatus.COMPLETED:
-        return 'success';
+      case ProcessStatus.COMPLETED:
+        return "success";
+      case ProcessStatus.IN_PROGRESS:
+        return "primary";
+      case ProcessStatus.REJECTED:
+        return "error";
       default:
-        return 'grey';
+        return "default";
     }
   };
-
-  // Log current state whenever it changes
-  React.useEffect(() => {
-    console.log('State updated:', {
-      shipmentId,
-      timeline: timeline,
-      timelineLength: timeline.length,
-      loading,
-      buttonStates: {
-        customsDeclaration: loading || !shipmentId || timeline.length < 2,
-        processArrival: loading || !shipmentId || timeline.length < 3,
-        completeDelivery: loading || !shipmentId || timeline.length < 4
-      }
-    });
-  }, [shipmentId, timeline, loading]);
 
   return (
-    <Box sx={{ maxWidth: '1200px', margin: 'auto', padding: 4 }}>
-      <Paper elevation={3} sx={{ padding: 3, marginBottom: 4 }}>
-        <Typography variant="h4" gutterBottom>
-          Customs & Trade Documents Management
-        </Typography>
-        
-        <Box sx={{ display: 'flex', gap: 2, marginBottom: 4, flexWrap: 'wrap' }}>
-          <Button
-            variant="contained"
-            startIcon={<Description />}
-            onClick={simulateImport}
-            disabled={Boolean(loading || shipmentId)}
-          >
-            Start Import Process
-          </Button>
-          
-          <Button
-            variant="contained"
-            startIcon={<Inventory />}
-            onClick={submitCustomsDeclaration}
-            disabled={Boolean(loading || !shipmentId || timeline.length < 2)}
-            sx={{ backgroundColor: loading || !shipmentId || timeline.length < 2 ? 'grey.400' : 'primary.main' }}
-          >
-            Submit Customs Declaration
-            {loading || !shipmentId || timeline.length < 2 ? 
-              ` (Needs ${2 - timeline.length} more events)` : ''}
-          </Button>
-          
-          <Button
-            variant="contained"
-            startIcon={<LocalShipping />}
-            onClick={processArrival}
-            disabled={Boolean(loading || !shipmentId || timeline.length < 3)}
-            sx={{ backgroundColor: loading || !shipmentId || timeline.length < 3 ? 'grey.400' : 'primary.main' }}
-          >
-            Process Arrival
-            {loading || !shipmentId || timeline.length < 3 ? 
-              ` (Needs ${3 - timeline.length} more events)` : ''}
-          </Button>
-          
-          <Button
-            variant="contained"
-            startIcon={<CheckCircle />}
-            onClick={completeDelivery}
-            disabled={Boolean(loading || !shipmentId || timeline.length < 4)}
-            sx={{ backgroundColor: loading || !shipmentId || timeline.length < 4 ? 'grey.400' : 'primary.main' }}
-          >
-            Complete Delivery
-            {loading || !shipmentId || timeline.length < 4 ? 
-              ` (Needs ${4 - timeline.length} more events)` : ''}
-          </Button>
-        </Box>
+    <Chip
+      label={status.replace("_", " ")}
+      color={getStatusColor()}
+      size="small"
+    />
+  );
+};
 
-        {/* Debug information */}
-        <Box sx={{ marginBottom: 2 }}>
-          <Typography variant="subtitle2" color="text.secondary">
-            Debug Info:
-          </Typography>
-          <Typography variant="body2">
-            ShipmentId: {shipmentId || 'None'}<br />
-            Timeline Length: {timeline.length}<br />
-            Loading: {loading.toString()}
-          </Typography>
-        </Box>
+const CustomsPreview = ({ processStatus }) => {
+  const [bookings, setBookings] = useState([]);
+  const [selectedBooking, setSelectedBooking] = useState("");
+  const [selectedCargo, setSelectedCargo] = useState("");
+  const [cargoDetails, setCargoDetails] = useState(null);
 
-        {shipmentId && (
-          <Card>
-            <CardHeader title="Shipment Timeline" />
-            <CardContent>
-              <Timeline>
-                {timeline.map((event, index) => (
-                  <TimelineItem key={index}>
-                    <TimelineSeparator>
-                      <TimelineDot color={getTimelineDotColor(event.status)} />
-                      {index < timeline.length - 1 && <TimelineConnector />}
-                    </TimelineSeparator>
-                    <TimelineContent>
-                      <Typography variant="h6" component="span">
-                        {event.status}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {event.timestamp instanceof Date 
-                          ? event.timestamp.toLocaleString()
-                          : new Date(event.timestamp.seconds * 1000).toLocaleString()}
-                      </Typography>
-                      {event.note && (
-                        <Typography variant="body2">
-                          {event.note}
-                        </Typography>
-                      )}
-                    </TimelineContent>
-                  </TimelineItem>
+  // Fetch bookings from Firebase
+  useEffect(() => {
+    const fetchBookings = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "bookings"));
+        const bookingsData = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setBookings(bookingsData);
+      } catch (error) {
+        console.error("Error fetching bookings:", error);
+      }
+    };
+
+    fetchBookings();
+  }, []);
+
+  // Handle booking selection
+  const handleBookingChange = (event) => {
+    const bookingId = event.target.value;
+    setSelectedBooking(bookingId);
+    setSelectedCargo(""); // Reset cargo selection
+    setCargoDetails(null); // Reset cargo details
+  };
+
+  // Handle cargo selection
+  const handleCargoChange = (event) => {
+    const cargoId = event.target.value;
+    setSelectedCargo(cargoId);
+
+    // Find selected booking and cargo
+    const booking = bookings.find((b) => b.id === selectedBooking);
+    if (booking && booking.cargo && booking.cargo[cargoId]) {
+      setCargoDetails(booking.cargo[cargoId]);
+    }
+  };
+
+  // Get cargo category and determine export process stage
+  const determineCategory = (hsCode) => {
+    if (!hsCode) return null;
+    const chapter = hsCode.substring(0, 2);
+
+    if (chapter === "01") return "LIVE_ANIMALS";
+    if (chapter === "08") return "FRESH_FRUITS";
+    if (chapter === "30") return "PHARMACEUTICALS";
+    return null;
+  };
+
+  const category = cargoDetails?.hsCode
+    ? HSCodeCategories[determineCategory(cargoDetails.hsCode)]
+    : null;
+
+  return (
+    <Box sx={{ maxWidth: 1200, margin: "auto", padding: 4 }}>
+      <Paper elevation={3} sx={{ padding: 3 }}>
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={6}>
+            <FormControl fullWidth>
+              <InputLabel>Select Booking</InputLabel>
+              <Select
+                value={selectedBooking}
+                onChange={handleBookingChange}
+                label="Select Booking"
+              >
+                {bookings.map((booking) => (
+                  <MenuItem key={booking.id} value={booking.id}>
+                    Booking ID: {booking.id} - {booking.portDestination}
+                  </MenuItem>
                 ))}
-              </Timeline>
-            </CardContent>
-          </Card>
-        )}
+              </Select>
+            </FormControl>
+          </Grid>
+
+          <Grid item xs={12} md={6}>
+            <FormControl fullWidth disabled={!selectedBooking}>
+              <InputLabel>Select Cargo</InputLabel>
+              <Select
+                value={selectedCargo}
+                onChange={handleCargoChange}
+                label="Select Cargo"
+              >
+                {selectedBooking &&
+                  bookings.find((b) => b.id === selectedBooking)?.cargo &&
+                  Object.entries(
+                    bookings.find((b) => b.id === selectedBooking).cargo
+                  ).map(([cargoId, cargo]) => (
+                    <MenuItem key={cargoId} value={cargoId}>
+                      {cargo.name} - HS Code: {cargo.hsCode}
+                    </MenuItem>
+                  ))}
+              </Select>
+            </FormControl>
+          </Grid>
+
+          {!cargoDetails && (
+            <Grid item xs={12}>
+              <Alert severity="info">
+                Please select a booking and cargo to view export process
+                details.
+              </Alert>
+            </Grid>
+          )}
+
+          {cargoDetails && !category && (
+            <Grid item xs={12}>
+              <Alert severity="warning">
+                The selected cargo's HS code ({cargoDetails.hsCode}) does not
+                match any supported categories. Supported categories are: Live
+                Animals (01), Fresh Fruits (08), and Pharmaceuticals (30).
+              </Alert>
+            </Grid>
+          )}
+
+          {cargoDetails && category && (
+            <>
+              <Grid item xs={12}>
+                <Box display="flex" alignItems="center" gap={2} mb={3}>
+                  <CategoryIcon
+                    category={determineCategory(cargoDetails.hsCode)}
+                  />
+                  <Typography variant="h5">
+                    {category.description} Export Process
+                  </Typography>
+                  <Chip
+                    label={`HS Code: ${cargoDetails.hsCode}`}
+                    variant="outlined"
+                  />
+                </Box>
+              </Grid>
+
+              <Grid item xs={12}>
+                <Stepper
+                  activeStep={
+                    cargoDetails.isCustomsCleared
+                      ? category.processingOrder.length
+                      : 0
+                  }
+                >
+                  {category.processingOrder.map((step, index) => (
+                    <Step key={step} completed={cargoDetails.isCustomsCleared}>
+                      <StepLabel>
+                        {step
+                          .split("_")
+                          .map(
+                            (word) =>
+                              word.charAt(0) + word.slice(1).toLowerCase()
+                          )
+                          .join(" ")}
+                      </StepLabel>
+                    </Step>
+                  ))}
+                </Stepper>
+              </Grid>
+              <Grid item xs={12}>
+                <DocumentStatusTracker cargo={cargoDetails} />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom>
+                      Required Documents
+                    </Typography>
+                    <List>
+                      {category.requiredDocuments.map((doc, index) => (
+                        <ListItem key={index}>
+                          <ListItemIcon>
+                            <PendingActions />
+                          </ListItemIcon>
+                          <ListItemText primary={doc} />
+                          <StatusChip
+                            status={
+                              cargoDetails.isCustomsCleared
+                                ? ProcessStatus.COMPLETED
+                                : ProcessStatus.NOT_STARTED
+                            }
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom>
+                      Required Validations
+                    </Typography>
+                    <List>
+                      {Object.entries(category.validations).map(
+                        ([key, required]) => (
+                          <ListItem key={key}>
+                            <ListItemIcon>
+                              {required ? (
+                                <CheckCircle color="success" />
+                              ) : (
+                                <Warning color="error" />
+                              )}
+                            </ListItemIcon>
+                            <ListItemText
+                              primary={key.split(/(?=[A-Z])/).join(" ")}
+                              secondary={required ? "Required" : "Optional"}
+                            />
+                          </ListItem>
+                        )
+                      )}
+                    </List>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </>
+          )}
+        </Grid>
       </Paper>
     </Box>
   );

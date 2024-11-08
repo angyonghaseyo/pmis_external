@@ -28,6 +28,7 @@ import { useAuth } from "./AuthContext";
 import { jwtDecode } from "jwt-decode";
 import ElectronicTradeDocuments from "./ElectronicTradeDocument";
 import CustomsPreview from "./CustomsPreview";
+import AgencySimulator from "./AgencySimulator"
 
 const drawerWidth = 240;
 
@@ -245,6 +246,12 @@ function App() {
                 <Route
                   path="/customs-and-trade-documents/something"
                   element={<CustomsPreview />}
+                />
+              )}
+               {hasAccessRights(['Manage Documents']) && (
+                <Route
+                  path="/abcd"
+                  element={<AgencySimulator />}
                 />
               )}
               <Route path="*" element={<Navigate to="/" replace />} />

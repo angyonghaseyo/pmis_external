@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import debounce from "lodash/debounce";
 import {
   Box,
   Button,
@@ -28,7 +29,9 @@ import {
   Alert,
   Stack,
   Chip,
-  LinearProgress
+  LinearProgress,
+  CircularProgress,
+  Autocomplete,
 } from "@mui/material";
 import { ExpandMore } from "@mui/icons-material";
 import { db, storage } from "./firebaseConfig";
@@ -48,8 +51,164 @@ import BookingSteps from "./BookingSteps"; // Adjust the path based on where Boo
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorIcon from "@mui/icons-material/Error";
-import UploadFileIcon from '@mui/icons-material/UploadFile';
-import CancelIcon from '@mui/icons-material/Cancel';
+import UploadFileIcon from "@mui/icons-material/UploadFile";
+import CancelIcon from "@mui/icons-material/Cancel";
+import CustomsTradeManager from "./CustomsTradeManager";
+
+const HSCodeLookup = ({ value, onChange, error, helperText }) => {
+  const [open, setOpen] = useState(false);
+  const [options, setOptions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [inputValue, setInputValue] = useState("");
+  const [selectedCode, setSelectedCode] = useState(value);
+
+  const fetchHSCodes = async (searchTerm) => {
+    if (!searchTerm || searchTerm.length < 2) return;
+
+    try {
+      setLoading(true);
+      const url = `https://hs-code-harmonized-system.p.rapidapi.com/code?term=${searchTerm}`;
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "x-rapidapi-key":
+            "a0c2bcb05emsh98328b2714cec53p1fb0e5jsn2cbc002f4ab3",
+          "x-rapidapi-host": "hs-code-harmonized-system.p.rapidapi.com",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Network response was not ok");
+      }
+      const data = await response.json();
+
+      // Check if the response is successful and has result
+      if (data.status === "success" && data.result) {
+        // Since we get a single result object instead of an array
+        const formattedOption = {
+          code: data.result.code,
+          description: data.result.description,
+          digits: data.result.digits, // Optional: if you want to store this info
+        };
+
+        setOptions([formattedOption]); // Wrap in array since Autocomplete expects an array
+      } else {
+        setOptions([]); // No results
+      }
+    } catch (error) {
+      console.error("Error fetching HS codes:", error);
+      setOptions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Debounce the fetch function to prevent too many API calls
+  const debouncedFetch = useCallback(
+    debounce((searchTerm) => fetchHSCodes(searchTerm), 300),
+    []
+  );
+
+  const handleInputChange = (event, newInputValue) => {
+    setInputValue(newInputValue);
+    debouncedFetch(newInputValue);
+  };
+
+  const handleSelect = (event, newValue) => {
+    setSelectedCode(newValue);
+    if (newValue) {
+      onChange({
+        code: newValue.code,
+        description: newValue.description,
+      });
+    }
+  };
+
+  const handleOpenDialog = () => setOpen(true);
+  const handleCloseDialog = () => setOpen(false);
+
+  return (
+    <Box>
+      <TextField
+        fullWidth
+        label="HS Code"
+        value={value ? `${value.code} - ${value.description}` : ""}
+        onClick={handleOpenDialog}
+        error={error}
+        helperText={helperText}
+        InputProps={{
+          readOnly: true,
+        }}
+        sx={{
+          "& .MuiInputBase-input": {
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            paddingRight: "8px", // Add some padding to ensure ellipsis is visible
+          },
+        }}
+      />
+      <Dialog open={open} onClose={handleCloseDialog} maxWidth="md" fullWidth>
+        <DialogTitle>Search HS Code</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+            Enter product description or HS code to search
+          </Typography>
+
+          <Autocomplete
+            fullWidth
+            options={options}
+            loading={loading}
+            value={selectedCode}
+            onChange={handleSelect}
+            inputValue={inputValue}
+            onInputChange={handleInputChange}
+            getOptionLabel={(option) =>
+              `${option.code} - ${option.description}`
+            }
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Search HS Codes"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {loading ? (
+                        <CircularProgress color="inherit" size={20} />
+                      ) : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            renderOption={(props, option) => (
+              <li {...props}>
+                <Box>
+                  <Typography variant="subtitle2">{option.code}</Typography>
+                  <Typography variant="body2" color="textSecondary">
+                    {option.description}
+                  </Typography>
+                </Box>
+              </li>
+            )}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog}>Cancel</Button>
+          <Button
+            onClick={handleCloseDialog}
+            variant="contained"
+            disabled={!selectedCode}
+          >
+            Confirm
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+};
 
 const BookingForm = ({ user }) => {
   const [openDialog, setOpenDialog] = useState(false);
@@ -68,7 +227,7 @@ const BookingForm = ({ user }) => {
   const [bookingData, setBookingData] = useState([]);
   const [uploadStatus, setUploadStatus] = useState({});
   const [vesselVisits, setVesselVisits] = useState([]);
-  const [selectedVessel, setSelectedVessel] = useState('');
+  const [selectedVessel, setSelectedVessel] = useState("");
   const [availableVoyages, setAvailableVoyages] = useState([]);
 
   const cargoTypes = [
@@ -99,10 +258,12 @@ const BookingForm = ({ user }) => {
 
   useEffect(() => {
     const fetchVesselVisits = async () => {
-      const querySnapshot = await getDocs(collection(db, "vesselVisitRequests"));
-      const visits = querySnapshot.docs.map(doc => ({
+      const querySnapshot = await getDocs(
+        collection(db, "vesselVisitRequests")
+      );
+      const visits = querySnapshot.docs.map((doc) => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       }));
       setVesselVisits(visits);
     };
@@ -114,30 +275,33 @@ const BookingForm = ({ user }) => {
     setSelectedVessel(selectedVesselName);
 
     // Find the selected vessel's voyages
-    const selectedVesselData = vesselVisits.find(visit => visit.vesselName === selectedVesselName);
+    const selectedVesselData = vesselVisits.find(
+      (visit) => visit.vesselName === selectedVesselName
+    );
     setAvailableVoyages(selectedVesselData?.voyages || []);
 
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       vesselName: selectedVesselName,
-      voyageNumber: '',
-      portLoading: '',
-      portDestination: ''
+      voyageNumber: "",
+      portLoading: "",
+      portDestination: "",
     }));
   };
 
   const handleVoyageChange = (event) => {
     const selectedVoyageNumber = event.target.value;
-    const selectedVoyage = availableVoyages.find(v => v.voyageNumber === selectedVoyageNumber);
+    const selectedVoyage = availableVoyages.find(
+      (v) => v.voyageNumber === selectedVoyageNumber
+    );
 
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       voyageNumber: selectedVoyageNumber,
-      portLoading: selectedVoyage?.departurePort || '',
-      portDestination: selectedVoyage?.arrivalPort || ''
+      portLoading: selectedVoyage?.departurePort || "",
+      portDestination: selectedVoyage?.arrivalPort || "",
     }));
   };
-
 
   const handleOpenDialog = (booking = null) => {
     if (booking) {
@@ -177,7 +341,7 @@ const BookingForm = ({ user }) => {
     console.log("Submitting formData: ", formData); //debugging
     const newBooking = {
       ...formData, // Contains cargo as a map
-      userEmail: user.email
+      userEmail: user.email,
     };
 
     try {
@@ -234,6 +398,71 @@ const BookingForm = ({ user }) => {
             advancedDeclaration: null,
             exportDocument: null,
           },
+          documentStatus: {
+            veterinaryHealthCertificate: {
+              name: "Veterinary Health Certificate",
+              status: "PENDING",
+              agencyType: "VETERINARY",
+              agencyName: "National Veterinary Authority",
+              lastUpdated: null,
+              comments: null,
+              documentUrl: null,
+            },
+            animalWelfareCertification: {
+              name: "Animal Welfare Certification",
+              status: "PENDING",
+              agencyType: "WELFARE",
+              agencyName: "Animal Welfare Board",
+              lastUpdated: null,
+              comments: null,
+              documentUrl: null,
+            },
+            citesPermit: {
+              name: "CITES Permit",
+              status: "PENDING",
+              agencyType: "SECURITY",
+              agencyName: "CITES Authority",
+              lastUpdated: null,
+              comments: null,
+              documentUrl: null,
+            },
+            quarantineClearance: {
+              name: "Quarantine Clearance Certificate",
+              status: "PENDING",
+              agencyType: "VETERINARY",
+              agencyName: "Quarantine Department",
+              lastUpdated: null,
+              comments: null,
+              documentUrl: null,
+            },
+            transportDeclaration: {
+              name: "Live Animal Transport Declaration",
+              status: "PENDING",
+              agencyType: "TRANSPORT",
+              agencyName: "Transport Authority",
+              lastUpdated: null,
+              comments: null,
+              documentUrl: null,
+            },
+            exportLicense: {
+              name: "Export License",
+              status: "PENDING",
+              agencyType: "CUSTOMS",
+              agencyName: "Customs Department",
+              lastUpdated: null,
+              comments: null,
+              documentUrl: null,
+            },
+            commercialInvoice: {
+              name: "Commercial Invoice",
+              status: "PENDING",
+              agencyType: "CUSTOMS",
+              agencyName: "Customs Department",
+              lastUpdated: null,
+              comments: null,
+              documentUrl: null,
+            },
+          },
         },
       },
     }));
@@ -246,35 +475,57 @@ const BookingForm = ({ user }) => {
     setFormData((prev) => ({ ...prev, cargo: updatedCargo }));
   };
 
+  const validateHsCode = (hsCode) => {
+    // HS Code format is typically 6-10 digits
+    const hsCodeRegex = /^\d{6,10}$/;
+    return hsCodeRegex.test(hsCode);
+  };
+
   // Update cargo item
   const handleCargoChange = (cargoId, field, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      cargo: {
-        ...prev.cargo,
-        [cargoId]: { ...prev.cargo[cargoId], [field]: value },
-      },
-    }));
+    if (field === "hsCode") {
+      setFormData((prev) => ({
+        ...prev,
+        cargo: {
+          ...prev.cargo,
+          [cargoId]: {
+            ...prev.cargo[cargoId],
+            hsCode: value.code, //denzel
+            hsCodeDescription: value.description,
+            hsCodeValid: validateHsCode(value), //denzel it could be just code
+          },
+        },
+      }));
+    } else {
+      // Original implementation for other fields
+      setFormData((prev) => ({
+        ...prev,
+        cargo: {
+          ...prev.cargo,
+          [cargoId]: { ...prev.cargo[cargoId], [field]: value },
+        },
+      }));
+    }
   };
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'success':
-        return 'success';
-      case 'uploading':
-        return 'primary';
-      case 'error':
-        return 'error';
+      case "success":
+        return "success";
+      case "uploading":
+        return "primary";
+      case "error":
+        return "error";
       default:
-        return 'default';
+        return "default";
     }
   };
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'success':
+      case "success":
         return <CheckCircleIcon fontSize="small" />;
-      case 'error':
+      case "error":
         return <ErrorIcon fontSize="small" />;
       default:
         return <UploadFileIcon fontSize="small" />;
@@ -283,21 +534,21 @@ const BookingForm = ({ user }) => {
 
   const renderDocumentUpload = (cargoId) => {
     const documents = [
-      { type: 'vgm', label: 'Verified Gross Mass (VGM)' },
-      { type: 'advancedDeclaration', label: 'Advanced Declaration' },
-      { type: 'exportDocument', label: 'Export Document' }
+      { type: "vgm", label: "Verified Gross Mass (VGM)" },
+      { type: "advancedDeclaration", label: "Advanced Declaration" },
+      { type: "exportDocument", label: "Export Document" },
     ];
 
     return (
       <Grid item xs={12}>
-        <Paper sx={{ p: 2, mt: 2, bgcolor: 'background.default' }}>
+        <Paper sx={{ p: 2, mt: 2, bgcolor: "background.default" }}>
           <Typography variant="subtitle1" gutterBottom fontWeight="medium">
             Required Documents
           </Typography>
           {!formData.cargo[cargoId].isDocumentsChecked && (
             <Alert
               severity="error"
-              sx={{ mt: 2, mb: 2, borderRadius: '8px' }}
+              sx={{ mt: 2, mb: 2, borderRadius: "8px" }}
               icon={<CancelIcon fontSize="small" />}
             >
               Please Submit All Documents
@@ -306,7 +557,7 @@ const BookingForm = ({ user }) => {
           {formData.cargo[cargoId].isDocumentsChecked && (
             <Alert
               severity="success"
-              sx={{ mt: 2, mb: 2, borderRadius: '8px' }}
+              sx={{ mt: 2, mb: 2, borderRadius: "8px" }}
               icon={<CheckCircleIcon fontSize="small" />}
             >
               All required documents have been uploaded and verified
@@ -325,38 +576,70 @@ const BookingForm = ({ user }) => {
                     <Stack direction="row" spacing={1} alignItems="center">
                       <input
                         accept="application/pdf"
-                        style={{ display: 'none' }}
+                        style={{ display: "none" }}
                         id={`${type}-upload-${cargoId}`}
                         type="file"
-                        onChange={(e) => handleDocumentUpload(cargoId, type, e.target.files[0])}
+                        onChange={(e) =>
+                          handleDocumentUpload(cargoId, type, e.target.files[0])
+                        }
                       />
-                      <label htmlFor={`${type}-upload-${cargoId}`} style={{ width: '100%' }}>
+                      <label
+                        htmlFor={`${type}-upload-${cargoId}`}
+                        style={{ width: "100%" }}
+                      >
                         <Button
                           variant="outlined"
                           component="span"
-                          startIcon={formData.cargo[cargoId]?.documents?.[type] ? <CheckCircleIcon fontSize="small" /> : <UploadFileIcon fontSize="small" />}
+                          startIcon={
+                            formData.cargo[cargoId]?.documents?.[type] ? (
+                              <CheckCircleIcon fontSize="small" />
+                            ) : (
+                              <UploadFileIcon fontSize="small" />
+                            )
+                          }
                           fullWidth
-                          color={formData.cargo[cargoId]?.documents?.[type] ? 'success' : 'primary'}
+                          color={
+                            formData.cargo[cargoId]?.documents?.[type]
+                              ? "success"
+                              : "primary"
+                          }
                           size="small"
                           sx={{
-                            borderRadius: '8px',
-                            textTransform: 'none',
-                            minHeight: '36px'
+                            borderRadius: "8px",
+                            textTransform: "none",
+                            minHeight: "36px",
                           }}
                         >
-                          {formData.cargo[cargoId]?.documents?.[type] ? 'Replace Document' : 'Upload Document'}
+                          {formData.cargo[cargoId]?.documents?.[type]
+                            ? "Replace Document"
+                            : "Upload Document"}
                         </Button>
                       </label>
                       {uploadStatus[cargoId]?.[type] && (
                         <Chip
                           size="small"
-                          label={uploadStatus[cargoId]?.[type] || (formData.cargo[cargoId]?.documents?.[type] ? 'success' : null)}
-                          color={uploadStatus[cargoId]?.[type] ? getStatusColor(uploadStatus[cargoId][type]) : 'success'}
-                          icon={uploadStatus[cargoId]?.[type] ? getStatusIcon(uploadStatus[cargoId][type]) : <CheckCircleIcon fontSize="small" />}
+                          label={
+                            uploadStatus[cargoId]?.[type] ||
+                            (formData.cargo[cargoId]?.documents?.[type]
+                              ? "success"
+                              : null)
+                          }
+                          color={
+                            uploadStatus[cargoId]?.[type]
+                              ? getStatusColor(uploadStatus[cargoId][type])
+                              : "success"
+                          }
+                          icon={
+                            uploadStatus[cargoId]?.[type] ? (
+                              getStatusIcon(uploadStatus[cargoId][type])
+                            ) : (
+                              <CheckCircleIcon fontSize="small" />
+                            )
+                          }
                         />
                       )}
                     </Stack>
-                    {uploadStatus[cargoId]?.[type] === 'uploading' && (
+                    {uploadStatus[cargoId]?.[type] === "uploading" && (
                       <LinearProgress sx={{ mt: 1 }} />
                     )}
                   </Grid>
@@ -364,51 +647,10 @@ const BookingForm = ({ user }) => {
               </Box>
             ))}
           </Stack>
-
         </Paper>
       </Grid>
     );
   };
-
-  const renderDocumentStatus = (cargoItem) => (
-    <Grid item xs={12}>
-      <Paper sx={{ p: 2, mt: 2, bgcolor: 'background.default' }}>
-        <Typography variant="subtitle2" gutterBottom fontWeight="medium">
-          Document Status
-        </Typography>
-        <Stack spacing={1}>
-          {[
-            { type: 'vgm', label: 'Verified Gross Mass (VGM)' },
-            { type: 'advancedDeclaration', label: 'Advanced Declaration' },
-            { type: 'exportDocument', label: 'Export Document' }
-          ].map(({ type, label }) => (
-            <Box key={type} display="flex" justifyContent="space-between" alignItems="center">
-              <Typography variant="body2" color="text.secondary">
-                {label}
-              </Typography>
-              <Chip
-                size="small"
-                label={cargoItem.documents?.[type] ? 'Uploaded' : 'Missing'}
-                color={cargoItem.documents?.[type] ? 'success' : 'default'}
-                icon={cargoItem.documents?.[type] ? <CheckCircleIcon fontSize="small" /> : <ErrorIcon fontSize="small" />}
-              />
-            </Box>
-          ))}
-          <Box display="flex" justifyContent="space-between" alignItems="center">
-            <Typography variant="body2" color="text.secondary">
-              Verification Status
-            </Typography>
-            <Chip
-              size="small"
-              label={cargoItem.isDocumentsChecked ? 'Verified' : 'Pending'}
-              color={cargoItem.isDocumentsChecked ? 'success' : 'warning'}
-              icon={cargoItem.isDocumentsChecked ? <CheckCircleIcon fontSize="small" /> : <ErrorIcon fontSize="small" />}
-            />
-          </Box>
-        </Stack>
-      </Paper>
-    </Grid>
-  );
 
   const handleDocumentUpload = async (cargoId, documentType, file) => {
     if (!file) return;
@@ -416,10 +658,13 @@ const BookingForm = ({ user }) => {
     try {
       setUploadStatus((prev) => ({
         ...prev,
-        [cargoId]: { ...prev[cargoId], [documentType]: 'uploading' }
+        [cargoId]: { ...prev[cargoId], [documentType]: "uploading" },
       }));
 
-      const storageRef = ref(storage, `documents/${cargoId}/${documentType}_${file.name}`);
+      const storageRef = ref(
+        storage,
+        `documents/${cargoId}/${documentType}_${file.name}`
+      );
       await uploadBytes(storageRef, file);
       const downloadURL = await getDownloadURL(storageRef);
 
@@ -442,13 +687,15 @@ const BookingForm = ({ user }) => {
         updatedFormData.cargo[cargoId].documents.advancedDeclaration &&
         updatedFormData.cargo[cargoId].documents.exportDocument;
 
-      updatedFormData.cargo[cargoId].isDocumentsChecked = allDocsUploaded ? true : false;
+      updatedFormData.cargo[cargoId].isDocumentsChecked = allDocsUploaded
+        ? true
+        : false;
 
       setFormData(updatedFormData);
 
       if (editingId) {
-        setBookingData(prevBookingData =>
-          prevBookingData.map(booking =>
+        setBookingData((prevBookingData) =>
+          prevBookingData.map((booking) =>
             booking.bookingId === editingId
               ? { ...booking, cargo: updatedFormData.cargo }
               : booking
@@ -458,16 +705,17 @@ const BookingForm = ({ user }) => {
 
       setUploadStatus((prev) => ({
         ...prev,
-        [cargoId]: { ...prev[cargoId], [documentType]: 'success' }
+        [cargoId]: { ...prev[cargoId], [documentType]: "success" },
       }));
     } catch (error) {
       console.error("Error uploading document:", error);
       setUploadStatus((prev) => ({
         ...prev,
-        [cargoId]: { ...prev[cargoId], [documentType]: 'error' }
+        [cargoId]: { ...prev[cargoId], [documentType]: "error" },
       }));
     }
   };
+
   return (
     <Container maxWidth="lg" sx={{ mt: 4 }}>
       <Box
@@ -604,7 +852,6 @@ const BookingForm = ({ user }) => {
                             </Typography>
                           </Grid>
 
-
                           <Grid item xs={12}>
                             <Typography variant="h6" gutterBottom>
                               Cargo Details
@@ -633,13 +880,15 @@ const BookingForm = ({ user }) => {
                                     <Typography>
                                       Cargo Type: {cargoItem.cargoType}
                                     </Typography>
+                                    <Typography>
+                                      <strong>HS Code:</strong>{" "}
+                                      {cargoItem.hsCode}
+                                    </Typography>
                                     <BookingSteps
                                       isContainerRented={
                                         cargoItem.isContainerRented
                                       }
-                                      isTruckBooked={
-                                        cargoItem.isTruckBooked
-                                      }
+                                      isTruckBooked={cargoItem.isTruckBooked}
                                       isCustomsCleared={
                                         cargoItem.isCustomsCleared
                                       }
@@ -663,7 +912,6 @@ const BookingForm = ({ user }) => {
         </Table>
       </TableContainer>
 
-
       <Dialog
         open={openDialog}
         onClose={handleCloseDialog}
@@ -675,7 +923,6 @@ const BookingForm = ({ user }) => {
         </DialogTitle>
         <DialogContent>
           <Grid container spacing={2}>
-
             <Grid item xs={6}>
               <FormControl fullWidth required>
                 <InputLabel>Vessel Name</InputLabel>
@@ -696,7 +943,7 @@ const BookingForm = ({ user }) => {
               <FormControl fullWidth required disabled={!selectedVessel}>
                 <InputLabel>Voyage Number</InputLabel>
                 <Select
-                  value={formData.voyageNumber || ''}
+                  value={formData.voyageNumber || ""}
                   onChange={handleVoyageChange}
                   label="Voyage Number"
                 >
@@ -705,7 +952,8 @@ const BookingForm = ({ user }) => {
                       key={voyage.voyageNumber}
                       value={voyage.voyageNumber}
                     >
-                      {voyage.voyageNumber} ({voyage.departurePort} → {voyage.arrivalPort})
+                      {voyage.voyageNumber} ({voyage.departurePort} →{" "}
+                      {voyage.arrivalPort})
                     </MenuItem>
                   ))}
                 </Select>
@@ -793,7 +1041,6 @@ const BookingForm = ({ user }) => {
               />
             </Grid>
 
-
             {/* Cargo Details */}
             <Grid item xs={12}>
               <Typography variant="h6" gutterBottom>
@@ -833,6 +1080,23 @@ const BookingForm = ({ user }) => {
                           handleCargoChange(cargoId, "name", e.target.value)
                         }
                         required
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <HSCodeLookup
+                        value={
+                          cargoItem.hsCode
+                            ? {
+                                code: cargoItem.hsCode,
+                                description: cargoItem.hsCodeDescription,
+                              }
+                            : null
+                        }
+                        onChange={(value) =>
+                          handleCargoChange(cargoId, "hsCode", value)
+                        }
+                        editMode={!!editingId}
+                        helperText="Search by product description or code"
                       />
                     </Grid>
                     <Grid item xs={12}>
@@ -902,6 +1166,26 @@ const BookingForm = ({ user }) => {
                         required
                       />
                     </Grid>
+
+                    {/* <Grid item xs={12}>
+                      <Button
+                        variant="contained"
+                        color={
+                          cargoItem.isCustomsCleared ? "success" : "primary"
+                        }
+                        onClick={() =>
+                          handleCustomsClearance(cargoId, cargoItem)
+                        }
+                        disabled={
+                          !cargoItem.hsCode || cargoItem.isCustomsCleared
+                        }
+                        fullWidth
+                      >
+                        {cargoItem.isCustomsCleared
+                          ? "Customs Cleared"
+                          : "Process Customs Clearance"}
+                      </Button>
+                    </Grid> */}
                     <Grid item xs={12} sm={4}>
                       <FormControl fullWidth>
                         <InputLabel>Cargo Type</InputLabel>
@@ -924,11 +1208,9 @@ const BookingForm = ({ user }) => {
                           ))}
                         </Select>
                       </FormControl>
-
                     </Grid>
                   </Grid>
                   {editingId && renderDocumentUpload(cargoId)}
-
                 </Paper>
               </Grid>
             ))}
@@ -954,7 +1236,6 @@ const BookingForm = ({ user }) => {
           </Button>
         </DialogActions>
       </Dialog>
-
     </Container>
   );
 };
