@@ -32,6 +32,7 @@ import CargoTransloading from './CargoTransloading';
 import { jwtDecode } from "jwt-decode";
 import ElectronicTradeDocuments from "./ElectronicTradeDocument";
 import CustomsPreview from "./CustomsPreview";
+import AgencySimulator from "./AgencySimulator"
 import BillingRequests from "./BillingRequests";
 
 const drawerWidth = 240;
@@ -240,52 +241,49 @@ function App() {
                 path="/vessels/ad-hoc-resource-request"
                 element={<AdHocResourceRequest />}
               />
-              {
-                hasAccessRights([
-                  "Register Truck",
-                  "View Truck Registrations",
-                ]) && (
-                  <Route
-                    path="/cargos/truck-registration"
-                    element={<TruckRegistration user={user} />}
-                  />
-                )
-              }
-              {
-                hasAccessRights([
-                  "View Container Requests",
-                  "Approve Container Requests",
-                ]) && (
-                  <Route
-                    path="/cargos/container-requests-list"
-                    element={<ContainerRequestsList user={user} />}
-                  />
-                )
-              }
-              {
-                hasAccessRights(["Create Facility Rental"]) && (
-                  <Route
-                    path="/cargos/facility-and-space-rental"
-                    element={<FacilityandSpaceRental />}
-                  />
-                )
-              }
-              {
-                hasAccessRights(['View Documents']) && (
-                  <Route
-                    path="/customs-and-trade-documents/electronic-trade-documents"
-                    element={<ElectronicTradeDocuments />}
-                  />
-                )
-              }
-              {
-                hasAccessRights(['Manage Documents']) && (
-                  <Route
-                    path="/customs-and-trade-documents/document-manager"
-                    element={<CustomsPreview />}
-                  />
-                )
-              }
+              {hasAccessRights([
+                "Register Truck",
+                "View Truck Registrations",
+              ]) && (
+                <Route
+                  path="/cargos/truck-registration"
+                  element={<TruckRegistration user={user} />}
+                />
+              )}
+              {hasAccessRights([
+                "View Container Requests",
+                "Approve Container Requests",
+              ]) && (
+                <Route
+                  path="/cargos/container-requests-list"
+                  element={<ContainerRequestsList user={user} />}
+                />
+              )}
+              {hasAccessRights(["Create Facility Rental"]) && (
+                <Route
+                  path="/cargos/facility-and-space-rental"
+                  element={<FacilityandSpaceRental />}
+                />
+              )}
+              {hasAccessRights(['View Documents']) && (
+                <Route
+                  path="/customs-and-trade-documents/electronic-trade-documents"
+                  element={<ElectronicTradeDocuments />}
+                />
+              )}
+              {hasAccessRights(['Manage Documents']) && (
+                <Route
+                  path="/customs-and-trade-documents/something"
+                  element={<CustomsPreview />}
+                />
+              )}
+               {hasAccessRights(['Manage Documents']) && (
+                <Route
+                  path="/abcd"
+                  element={<AgencySimulator />}
+                />
+              )}
+
               {
                 hasAccessRights(["View Billing Requests"]) && (
                   <Route
@@ -314,7 +312,6 @@ function App() {
                   <Route path="/cargos/cargo-transloading" element={<CargoTransloading />} />
                 )
               }
-
               <Route path="*" element={<Navigate to="/" replace />} />
             </>
           ) : (

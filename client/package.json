@@ -15,6 +15,7 @@
     "axios": "^1.7.7",
     "date-fns": "^2.30.0",
     "dayjs": "^1.11.13",
+    "fast-xml-parser": "^4.5.0",
     "firebase": "^9.8.1",
     "jwt-decode": "^4.0.0",
     "lucide-react": "^0.439.0",
