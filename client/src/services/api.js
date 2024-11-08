@@ -93,6 +93,18 @@ export const updateUserProfile = async (userData) => {
   }
 };
 
+// Fetch current user's company
+export const getCurrentUserCompany = async () => {
+  const user = await auth.currentUser;
+  if (user) {
+    const userDoc = await getDoc(doc(db, 'users', user.uid));
+    if (userDoc.exists()) {
+      return userDoc.data().company;
+    }
+  }
+  throw new Error('User company not found');
+};
+
 export const updateUserPassword = (newPassword) =>
   auth.currentUser.updatePassword(newPassword).catch(handleApiError);
 
@@ -747,6 +759,102 @@ export const addContainerType = async (company, containerData) => {
   }
 };
 
+export const getCarrierContainerPrices = async (company) => {
+  try {
+    const response = await fetch(`http://localhost:5001/carrier-container-prices?company=${encodeURIComponent(company)}`);
+    if (!response.ok) {
+      throw new Error('Error fetching carrier container prices');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in getCarrierContainerPrices:', error);
+    throw error;
+  }
+};
+
+export const assignContainerPrice = async (company, containerData) => {
+  try {
+    const response = await fetch('http://localhost:5001/carrier-container-prices', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        company,
+        ...containerData,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Error assigning container price');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in assignContainerPrice:', error);
+    throw error;
+  }
+};
+
+export const updateContainerPrice = async (company, equipmentId, updateData) => {
+  try {
+    const response = await fetch(`http://localhost:5001/carrier-container-prices/${company}/${equipmentId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updateData),
+    });
+
+    if (!response.ok) {
+      throw new Error('Error updating container price');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in updateContainerPrice:', error);
+    throw error;
+  }
+};
+
+export const deleteContainerPrice = async (company, equipmentId) => {
+  try {
+    const response = await fetch(`http://localhost:5001/carrier-container-prices/${company}/${equipmentId}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      throw new Error('Error deleting container price');
+    }
+  } catch (error) {
+    console.error('Error in deleteContainerPrice:', error);
+    throw error;
+  }
+};
+
+export const getBillingRequests = async (companyId, requestType) => {
+  try {
+    const response = await fetch(
+      `http://localhost:5001/billing-requests?companyId=${encodeURIComponent(companyId)}&requestType=${encodeURIComponent(requestType)}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching billing requests:', error);
+    throw error;
+  }
+};
+
+
 
 // Dashboard data
 export const getLeaveStatistics = () => authAxios.get('/leave-statistics').catch(handleApiError);
@@ -816,6 +924,7 @@ const api = {
   registerUser,
   logoutUser,
   getCurrentUser,
+  getCurrentUserCompany,
   updateUserProfile,
   updateUserPassword,
   sendPasswordResetEmailToUser,
@@ -867,6 +976,13 @@ const api = {
   getAdHocResourceRequests,
   submitAdHocResourceRequest,
   updateAdHocResourceRequest,
+  getContainerTypes,
+  addContainerType,
+  getCarrierContainerPrices,
+  assignContainerPrice,
+  updateContainerPrice,
+  deleteContainerPrice,
+  getBillingRequests
 };
 
 export default api;

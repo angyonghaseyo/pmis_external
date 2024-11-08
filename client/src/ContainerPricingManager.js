@@ -33,8 +33,11 @@ import {
     LinearProgress
 } from '@mui/material';
 import { Add, Close, ArrowBack, ArrowForward, List } from '@mui/icons-material';
-import { doc, getDoc, collection, query, getDocs } from "firebase/firestore";
-import { db } from "./firebaseConfig";
+import { 
+    getContainerTypes, 
+    getCarrierContainerPrices,
+    assignContainerPrice 
+} from './services/api';
 import { useAuth } from './AuthContext';
 
 const ContainerPricingManager = () => {
@@ -55,31 +58,32 @@ const ContainerPricingManager = () => {
     const [containers, setContainers] = useState([]);
     const steps = ['Select Number of Containers', 'Enter Equipment IDs'];
     const { user } = useAuth();
+    const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
+            if (!user?.company) {
+                setSnackbar({
+                    open: true,
+                    message: "Company information not available",
+                    severity: 'error'
+                });
+                return;
+            }
+            setIsLoading(true);
             try {
-                if (!user?.company) {
-                    setSnackbar({
-                        open: true,
-                        message: "Company information not available",
-                        severity: 'error'
-                    });
-                    return;
-                }
                 setCompany(user.company);
-                const menuDocRef = doc(db, "container_menu", user.company);
-                const menuDoc = await getDoc(menuDocRef);
-                if (menuDoc.exists()) {
-                    setMenuContainers(menuDoc.data().container_types || []);
-                }
+                const containerTypes = await getContainerTypes(user.company);
+                setMenuContainers(containerTypes);
             } catch (error) {
-                console.error("Error setting up real-time listener:", error);
+                console.error("Error fetching container types:", error);
                 setSnackbar({
                     open: true,
                     message: "Error loading container menu",
                     severity: 'error'
                 });
+            } finally {
+                setIsLoading(false);
             }
         };
 
@@ -90,34 +94,15 @@ const ContainerPricingManager = () => {
 
     useEffect(() => {
         if (openList && company) {
-            const unsubscribe = fetchContainers();
-            return () => unsubscribe;
+            fetchContainers();
         }
     }, [openList, company]);
 
-    const handleCloseDialog = () => {
-        setOpenDialog(false);
-        setSelectedContainer(null);
-        setNumberOfContainers(1);
-        setEquipmentIds([]);
-        setCurrentEquipmentId('');
-        setActiveStep(0);
-    };
-
-    const handleCloseSnackbar = (event, reason) => {
-        if (reason === 'clickaway') return;
-        setSnackbar({ ...snackbar, open: false });
-    };
-
     const fetchContainers = async () => {
+        setIsLoading(true);
         try {
-            const carrierDocRef = doc(db, "carrier_container_prices", company);
-            const docSnapshot = await getDoc(carrierDocRef);
-            if (docSnapshot.exists()) {
-                setContainers(docSnapshot.data().containers || []);
-            } else {
-                setContainers([]);
-            }
+            const data = await getCarrierContainerPrices(company);
+            setContainers(data);
         } catch (error) {
             console.error("Error fetching containers:", error);
             setSnackbar({
@@ -125,6 +110,8 @@ const ContainerPricingManager = () => {
                 message: "Error loading containers",
                 severity: 'error'
             });
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -138,54 +125,34 @@ const ContainerPricingManager = () => {
             return;
         }
 
-        for (let i = 0; i < equipmentIds.length; i++) {
-            for (let j = i + 1; j < equipmentIds.length; j++) {
-                if (equipmentIds[i] === equipmentIds[j]) {
-                    setSnackbar({
-                        open: true,
-                        message: "Please enter unique equipment ids.",
-                        severity: 'error'
-                    });
-                    return;
-                }
-            }
+        // Check for duplicate equipment IDs
+        const hasDuplicates = equipmentIds.length !== new Set(equipmentIds).size;
+        if (hasDuplicates) {
+            setSnackbar({
+                open: true,
+                message: "Please enter unique equipment ids.",
+                severity: 'error'
+            });
+            return;
         }
 
+        setIsLoading(true);
         try {
-            const allContainersQuery = query(collection(db, "carrier_container_prices"));
-            const allContainersSnapshot = await getDocs(allContainersQuery);
-            const allContainers = allContainersSnapshot.docs.flatMap(doc => doc.data().containers || []);
-
-            for (let equipmentId of equipmentIds) {
-                if (allContainers.some(container => container.EquipmentID === equipmentId)) {
-                    setSnackbar({
-                        open: true,
-                        message: `Equipment ID ${equipmentId} already exists. Please use unique IDs.`,
-                        severity: 'error'
-                    });
-                    return;
-                }
-            }
-
-            const companyDocRef = doc(db, "carrier_container_prices", company);
-            const companyDoc = await getDoc(companyDocRef);
-            let existingContainers = companyDoc.exists() ? companyDoc.data().containers : [];
-            let updatedContainers = [...existingContainers];
-
-            for (let i = 0; i < numberOfContainers; i++) {
-                const newContainer = {
+            // Create array of promises for each container
+            const containerPromises = equipmentIds.map(equipmentId => 
+                assignContainerPrice(company, {
                     size: selectedContainer.size,
                     price: selectedContainer.price,
                     name: selectedContainer.name,
-                    EquipmentID: equipmentIds[i],
+                    EquipmentID: equipmentId,
                     bookingStatus: "available",
                     spaceUsed: 0,
                     containerConsolidationsID: [],
-                };
-                updatedContainers.push(newContainer);
-            }
+                })
+            );
 
-            await companyDocRef.set({ containers: updatedContainers }, { merge: true });
+            await Promise.all(containerPromises);
+
             setSnackbar({
                 open: true,
                 message: `${numberOfContainers} containers added successfully.`,
@@ -198,10 +165,26 @@ const ContainerPricingManager = () => {
             console.error("Error adding containers: ", error);
             setSnackbar({
                 open: true,
-                message: "Error adding containers. Please try again.",
+                message: error.message || "Error adding containers. Please try again.",
                 severity: 'error'
             });
+        } finally {
+            setIsLoading(false);
         }
+    };
+
+    const handleCloseDialog = () => {
+        setOpenDialog(false);
+        setSelectedContainer(null);
+        setNumberOfContainers(1);
+        setEquipmentIds([]);
+        setCurrentEquipmentId('');
+        setActiveStep(0);
+    };
+
+    const handleCloseSnackbar = (event, reason) => {
+        if (reason === 'clickaway') return;
+        setSnackbar({ ...snackbar, open: false });
     };
 
     const handleAddEquipmentId = (e) => {
@@ -228,6 +211,9 @@ const ContainerPricingManager = () => {
     const handleBack = () => {
         setActiveStep(prevStep => prevStep - 1);
     };
+
+    const handleOpenList = () => setOpenList(true);
+    const handleCloseList = () => setOpenList(false);
 
     const getStepContent = (step) => {
         switch (step) {
@@ -310,9 +296,6 @@ const ContainerPricingManager = () => {
         }
     };
 
-    const handleOpenList = () => setOpenList(true);
-    const handleCloseList = () => setOpenList(false);
-
     return (
         <>
             <Dialog
@@ -330,37 +313,43 @@ const ContainerPricingManager = () => {
                     </Box>
                 </DialogTitle>
                 <DialogContent>
-                    <TableContainer component={Paper} sx={{ mt: 2 }}>
-                        <Table>
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell>Equipment ID</TableCell>
-                                    <TableCell>Size</TableCell>
-                                    <TableCell>Price</TableCell>
-                                    <TableCell>Status</TableCell>
-                                    <TableCell>Space Used</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {containers.map((container, index) => (
-                                    <TableRow key={index}>
-                                        <TableCell>{container.EquipmentID}</TableCell>
-                                        <TableCell>{container.size}ft</TableCell>
-                                        <TableCell>${container.price.toLocaleString()}</TableCell>
-                                        <TableCell>{container.bookingStatus}</TableCell>
-                                        <TableCell>{container.spaceUsed}%</TableCell>
-                                    </TableRow>
-                                ))}
-                                {containers.length === 0 && (
+                    {isLoading ? (
+                        <Box sx={{ width: '100%', mt: 2 }}>
+                            <LinearProgress />
+                        </Box>
+                    ) : (
+                        <TableContainer component={Paper} sx={{ mt: 2 }}>
+                            <Table>
+                                <TableHead>
                                     <TableRow>
-                                        <TableCell colSpan={5} align="center">
-                                            No containers found
-                                        </TableCell>
+                                        <TableCell>Equipment ID</TableCell>
+                                        <TableCell>Size</TableCell>
+                                        <TableCell>Price</TableCell>
+                                        <TableCell>Status</TableCell>
+                                        <TableCell>Space Used</TableCell>
                                     </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
+                                </TableHead>
+                                <TableBody>
+                                    {containers.map((container, index) => (
+                                        <TableRow key={index}>
+                                            <TableCell>{container.EquipmentID}</TableCell>
+                                            <TableCell>{container.size}ft</TableCell>
+                                            <TableCell>${container.price.toLocaleString()}</TableCell>
+                                            <TableCell>{container.bookingStatus}</TableCell>
+                                            <TableCell>{container.spaceUsed}%</TableCell>
+                                        </TableRow>
+                                    ))}
+                                    {containers.length === 0 && (
+                                        <TableRow>
+                                            <TableCell colSpan={5} align="center">
+                                                No containers found
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    )}
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={handleCloseList}>Close</Button>
@@ -368,17 +357,6 @@ const ContainerPricingManager = () => {
             </Dialog>
 
             <Container maxWidth="lg" sx={{ p: 3 }}>
-                <Snackbar
-                    open={snackbar.open}
-                    autoHideDuration={6000}
-                    onClose={handleCloseSnackbar}
-                    anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-                >
-                    <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
-                        {snackbar.message}
-                    </Alert>
-                </Snackbar>
-
                 <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
                     <Box
                         display="flex"
@@ -402,50 +380,56 @@ const ContainerPricingManager = () => {
                         Select Container Type
                     </Typography>
 
-                    <Grid container spacing={3}>
-                        {menuContainers.map((container, index) => (
-                            <Grid item xs={12} sm={6} md={4} key={index}>
-                                <Card
-                                    sx={{
-                                        height: '100%',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        transition: 'transform 0.2s ease-in-out',
-                                        '&:hover': {
-                                            transform: 'translateY(-4px)',
-                                        }
-                                    }}
-                                >
-                                    <CardActionArea
-                                        onClick={() => handleContainerSelect(container)}
-                                        sx={{ flexGrow: 1 }}
+                    {isLoading ? (
+                        <Box sx={{ width: '100%', mt: 2 }}>
+                            <LinearProgress />
+                        </Box>
+                    ) : (
+                        <Grid container spacing={3}>
+                            {menuContainers.map((container, index) => (
+                                <Grid item xs={12} sm={6} md={4} key={index}>
+                                    <Card
+                                        sx={{
+                                            height: '100%',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            transition: 'transform 0.2s ease-in-out',
+                                            '&:hover': {
+                                                transform: 'translateY(-4px)',
+                                            }
+                                        }}
                                     >
-                                        <CardMedia
-                                            component="img"
-                                            height="200"
-                                            image={container.imageUrl || '/api/placeholder/400/320'}
-                                            alt={container.name}
-                                            sx={{
-                                                objectFit: 'cover',
-                                                bgcolor: '#f5f5f5'
-                                            }}
-                                        />
-                                        <CardContent>
-                                            <Typography variant="h6" gutterBottom>
-                                                {container.name}
-                                            </Typography>
-                                            <Typography variant="subtitle1">
-                                                Size: {container.size}ft
-                                            </Typography>
-                                            <Typography variant="h6" color="primary">
-                                                ${container.price.toLocaleString()}
-                                            </Typography>
-                                        </CardContent>
-                                    </CardActionArea>
-                                </Card>
-                            </Grid>
-                        ))}
-                    </Grid>
+                                        <CardActionArea
+                                            onClick={() => handleContainerSelect(container)}
+                                            sx={{ flexGrow: 1 }}
+                                        >
+                                            <CardMedia
+                                                component="img"
+                                                height="200"
+                                                image={container.imageUrl || '/api/placeholder/400/320'}
+                                                alt={container.name}
+                                                sx={{
+                                                    objectFit: 'cover',
+                                                    bgcolor: '#f5f5f5'
+                                                }}
+                                            />
+                                            <CardContent>
+                                                <Typography variant="h6" gutterBottom>
+                                                    {container.name}
+                                                </Typography>
+                                                <Typography variant="subtitle1">
+                                                    Size: {container.size}ft
+                                                </Typography>
+                                                <Typography variant="h6" color="primary">
+                                                    ${container.price.toLocaleString()}
+                                                </Typography>
+                                            </CardContent>
+                                        </CardActionArea>
+                                    </Card>
+                                </Grid>
+                            ))}
+                        </Grid>
+                    )}
                 </Paper>
 
                 <Dialog
@@ -486,8 +470,8 @@ const ContainerPricingManager = () => {
                             <Button
                                 variant="contained"
                                 onClick={handleAddContainers}
-                                disabled={equipmentIds.length !== numberOfContainers}
-                                startIcon={<Add />}
+                                disabled={equipmentIds.length !== numberOfContainers || isLoading}
+                                startIcon={isLoading ? <LinearProgress size={24} /> : <Add />}
                             >
                                 Create Containers
                             </Button>
@@ -503,6 +487,21 @@ const ContainerPricingManager = () => {
                         )}
                     </DialogActions>
                 </Dialog>
+
+                <Snackbar
+                    open={snackbar.open}
+                    autoHideDuration={6000}
+                    onClose={handleCloseSnackbar}
+                    anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+                >
+                    <Alert 
+                        onClose={handleCloseSnackbar} 
+                        severity={snackbar.severity} 
+                        sx={{ width: '100%' }}
+                    >
+                        {snackbar.message}
+                    </Alert>
+                </Snackbar>
             </Container>
         </>
     );

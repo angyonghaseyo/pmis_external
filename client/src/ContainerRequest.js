@@ -108,6 +108,40 @@ const ContainerRequest = ({ user }) => {
         }
     };
 
+    const handleBookingSelect = async (selectedBookingId) => {
+        setIsLoading(true);
+        try {
+            const bookingRef = doc(db, 'bookings', selectedBookingId);
+            const bookingDoc = await getDoc(bookingRef);
+            if (bookingDoc.exists()) {
+                const bookingData = bookingDoc.data();
+                setBookingData(bookingData);
+                setIsBookingValid(true);
+                setVoyage(bookingData.voyageNumber);
+                setFormData(prev => ({
+                    ...prev,
+                    bookingId: selectedBookingId,
+                    voyageNumber: bookingData.voyageNumber
+                }));
+            } else {
+                setOpenSnackbar({
+                    open: true,
+                    message: "Booking not found!",
+                    severity: "error"
+                });
+            }
+        } catch (error) {
+            console.error("Error fetching booking:", error);
+            setOpenSnackbar({
+                open: true,
+                message: "Error fetching booking data",
+                severity: "error"
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     async function fetchBookingData(bookingId) {
         setIsLoading(true);
         try {
@@ -267,7 +301,7 @@ const ContainerRequest = ({ user }) => {
                                     <Select
                                         name="bookingId"
                                         value={formData.bookingId}
-                                        onChange={(e) => setFormData({ ...formData, bookingId: e.target.value })}
+                                        onChange={(e) => handleBookingSelect(e.target.value)}
                                         required
                                     >
                                         {bookings.map((booking) => (
@@ -284,6 +318,7 @@ const ContainerRequest = ({ user }) => {
                                     label="Voyage Number"
                                     name="voyageNumber"
                                     value={voyage}
+                                    disabled
                                 />
                             </Grid>
                         </Grid>

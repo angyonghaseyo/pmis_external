@@ -31,11 +31,18 @@ import { Edit as EditIcon, Visibility as VisibilityIcon } from '@mui/icons-mater
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { getAdHocResourceRequests, submitAdHocResourceRequest, updateAdHocResourceRequest, getVesselVisitRequestsAdHocRequest } from './services/api';
+import { getAdHocResourceRequests, submitAdHocResourceRequest, updateAdHocResourceRequest, getVesselVisitRequestsAdHocRequest, getCurrentUserCompany } from './services/api';
+
+const formatDate = (dateString) => {
+  const date = new Date(dateString);
+  if (isNaN(date)) return '-';
+  return date.toLocaleDateString('en-GB') + ', ' + date.toLocaleTimeString('en-GB');
+};
 
 const AdHocResourceRequest = () => {
   const [open, setOpen] = useState(false);
   const [vesselVisits, setVesselVisits] = useState([]);
+  const [company, setCompany] = useState('');
   const [formData, setFormData] = useState({
     vesselVisit: '',
     resourceType: '',
@@ -46,7 +53,6 @@ const AdHocResourceRequest = () => {
     powerKw: '',
     wasteVolume: '',
     wasteType: '',
-    preferredTime: new Date(),
     startTime: new Date(),
     endTime: new Date(),
   });
@@ -69,6 +75,19 @@ const AdHocResourceRequest = () => {
         severity: 'error'
       });
     }
+  }, []);
+
+  // Fetch user's company on component mount
+  useEffect(() => {
+    const fetchCompany = async () => {
+      try {
+        const userCompany = await getCurrentUserCompany();
+        setCompany(userCompany); // Store the company in state
+      } catch (error) {
+        console.error('Error fetching user company:', error);
+      }
+    };
+    fetchCompany();
   }, []);
 
   useEffect(() => {
@@ -119,7 +138,6 @@ const AdHocResourceRequest = () => {
       powerKw: '',
       wasteVolume: '',
       wasteType: '',
-      preferredTime: new Date(),
       startTime: new Date(),
       endTime: new Date(),
     });
@@ -143,14 +161,19 @@ const AdHocResourceRequest = () => {
     if (!validateForm()) return;
 
     try {
+      const requestData = {
+        ...formData,
+        company, // Include company in the request data
+      };
+
       if (editMode && editRequestId) {
-        await updateAdHocResourceRequest(editRequestId, formData);
+        await updateAdHocResourceRequest(editRequestId, requestData);
         setAlert({
           message: 'Request updated successfully',
           severity: 'success'
         });
       } else {
-        await submitAdHocResourceRequest(formData);
+        await submitAdHocResourceRequest(requestData);
         setAlert({
           message: 'Request submitted successfully',
           severity: 'success'
@@ -199,9 +222,8 @@ const AdHocResourceRequest = () => {
   const handleEdit = (request) => {
     setFormData({
       ...request,
-      preferredTime: new Date(request.preferredTime),
-      startTime: request.startTime ? new Date(request.startTime) : new Date(),
-      endTime: request.endTime ? new Date(request.endTime) : new Date(),
+      startTime: request.startTime || new Date(),
+      endTime: request.endTime || new Date(),
     });
     setEditMode(true);
     setEditRequestId(request.id);
@@ -211,9 +233,8 @@ const AdHocResourceRequest = () => {
   const handleView = (request) => {
     setFormData({
       ...request,
-      preferredTime: new Date(request.preferredTime),
-      startTime: request.startTime ? new Date(request.startTime) : new Date(),
-      endTime: request.endTime ? new Date(request.endTime) : new Date(),
+      startTime: request.startTime || new Date(),
+      endTime: request.endTime || new Date(),
     });
     setViewMode(true);
     setOpen(true);
@@ -254,7 +275,7 @@ const AdHocResourceRequest = () => {
               <TableRow>
                 <TableCell>Resource Type</TableCell>
                 <TableCell>Description</TableCell>
-                <TableCell>Preferred Time</TableCell>
+                <TableCell>Creation Time</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
@@ -264,9 +285,7 @@ const AdHocResourceRequest = () => {
                 <TableRow key={request.id}>
                   <TableCell>{request.resourceType}</TableCell>
                   <TableCell>{request.description}</TableCell>
-                  <TableCell>
-                    {new Date(request.preferredTime).toLocaleString()}
-                  </TableCell>
+                  <TableCell>{request.createdAt ? formatDate(request.createdAt) : '-'}</TableCell> 
                   <TableCell>
                     <Chip 
                       label={request.status}
@@ -454,15 +473,17 @@ const AdHocResourceRequest = () => {
                 </>
               )}
 
-              <Grid item xs={12}>
-                <DateTimePicker
-                  label="Preferred Time"
-                  value={formData.preferredTime}
-                  onChange={(newValue) => handleDateChange('preferredTime', newValue)}
-                  disabled={viewMode}
-                  renderInput={(params) => <TextField {...params} fullWidth />}
-                />
-              </Grid>
+              {formData.resourceType !== 'Power Supply (Shore Power)' && (
+                <Grid item xs={12}>
+                  <DateTimePicker
+                    label="Preferred Time"
+                    value={formData.preferredTime}
+                    onChange={(newValue) => handleDateChange('preferredTime', newValue)}
+                    disabled={viewMode}
+                    renderInput={(params) => <TextField {...params} fullWidth />}
+                  />
+                </Grid>
+              )}
 
               <Grid item xs={12}>
                 <TextField
