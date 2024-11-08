@@ -435,13 +435,13 @@ const CargoTransloading = () => {
                                                 </IconButton>
                                             </Tooltip>
                                         )}
-                                        {request.status === 'Completed' && (
+                                        {/* {request.status === 'Completed' && (
                                             <Tooltip title="Download Report">
                                                 <IconButton size="small">
                                                     <Download />
                                                 </IconButton>
                                             </Tooltip>
-                                        )}
+                                        )} */}
                                         {request.status === 'Pending' && (
                                             <Tooltip title="Delete">
                                                 <IconButton
