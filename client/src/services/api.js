@@ -93,6 +93,18 @@ export const updateUserProfile = async (userData) => {
   }
 };
 
+// Fetch current user's company
+export const getCurrentUserCompany = async () => {
+  const user = await auth.currentUser;
+  if (user) {
+    const userDoc = await getDoc(doc(db, 'users', user.uid));
+    if (userDoc.exists()) {
+      return userDoc.data().company;
+    }
+  }
+  throw new Error('User company not found');
+};
+
 export const updateUserPassword = (newPassword) =>
   auth.currentUser.updatePassword(newPassword).catch(handleApiError);
 
@@ -816,6 +828,7 @@ const api = {
   registerUser,
   logoutUser,
   getCurrentUser,
+  getCurrentUserCompany,
   updateUserProfile,
   updateUserPassword,
   sendPasswordResetEmailToUser,
