@@ -250,7 +250,7 @@ function App() {
               )}
               {hasAccessRights(["View Billing Requests"]) && (
                 <Route
-                  path="/finance/billing-requests"
+                  path="/financial/billing-requests"
                   element={<BillingRequests companyId={user.company} />}
                 />
               )}

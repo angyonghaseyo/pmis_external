@@ -19,6 +19,7 @@ import {
   Clock,
   Package,
   Settings,
+  DollarSign,
   FileText
 } from 'lucide-react';
 
@@ -99,6 +100,15 @@ const Sidebar = ({ user }) => {
         { name: 'Document Manager', accessRights: ['Manage Documents'] }
       ],
       accessRights: ['View Documents', 'Manage Documents']
+    },
+    {
+      name: "Financial",
+      icon: <DollarSign />,
+      path: "/financial",
+      children: [
+        { name: 'Billing Requests', accessRights: ['View Billing Requests'] },
+      ],
+      accessRights: ['View Billing Requests']
     },
     {
       name: "Settings",

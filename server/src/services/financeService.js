@@ -1,17 +1,16 @@
-const { db } = require('../config/firebase');
+const { db, admin } = require('../config/firebase');
 
 class FinanceService {
     async getBillingRequests(companyId, requestType) {
+        console.log("Fetching billing requests for:", companyId, requestType);
         const billingRequests = [];
         try {
-            const billingCollection = collection(db, 'billing_requests');
-            const billingQuery = query(
-                billingCollection,
-                where('company', '==', companyId),
-                where('resourceType', '==', requestType)
-            );
-            const querySnapshot = await getDocs(billingQuery);
-
+            const billingQuery = db.collection("billing_requests")
+                                 .where('company', '==', companyId)
+                                 .where('resourceType', '==', requestType);
+            
+            const querySnapshot = await billingQuery.get();
+            
             querySnapshot.forEach((doc) => {
                 billingRequests.push({ id: doc.id, ...doc.data() });
             });
