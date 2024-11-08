@@ -34,7 +34,8 @@ import {
   createOperatorRequisition, 
   updateOperatorRequisition, 
   deleteOperatorRequisition,
-  getActiveVesselVisits 
+  getActiveVesselVisits,
+  getCurrentUserCompany 
 } from './services/api';
 import { useAuth } from './AuthContext';
 
@@ -43,6 +44,7 @@ const durations = ['1 Hour', '2 Hours', '3 Hours', '4 Hours'];
 
 const OperatorRequisition = () => {
   const { user } = useAuth();
+  const [company, setCompany] = useState(''); 
   const [pendingRequests, setPendingRequests] = useState([]);
   const [resolvedRequests, setResolvedRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -85,6 +87,19 @@ const OperatorRequisition = () => {
     }
   }, [user]);
 
+  // Fetch user's company on component mount
+  useEffect(() => {
+    const fetchCompany = async () => {
+      try {
+        const userCompany = await getCurrentUserCompany();
+        setCompany(userCompany); 
+      } catch (error) {
+        console.error('Error fetching user company:', error);
+      }
+    };
+    fetchCompany();
+  }, []);
+
   const fetchActiveVessels = async () => {
     try {
       const visits = await getActiveVesselVisits();
@@ -101,10 +116,7 @@ const OperatorRequisition = () => {
         try {
           setIsLoading(true);
           setError(null);
-          await Promise.all([
-            fetchRequisitions(),
-            fetchActiveVessels()
-          ]);
+          await Promise.all([fetchRequisitions(), fetchActiveVessels()]);
         } catch (error) {
           console.error('Error fetching data:', error);
           setError('An error occurred while fetching data. Please try again.');
@@ -195,16 +207,21 @@ const OperatorRequisition = () => {
         return;
       }
 
+      const requestData = {
+        ...formData,
+        company, 
+        email: user.email,
+        status: 'Pending',
+      };
+
       if (isEditing !== null) {
-        await updateOperatorRequisition(isEditing, { ...formData, email: user.email });
+        await updateOperatorRequisition(isEditing, requestData);
       } else {
         const quantity = parseInt(formData.quantity, 10);
         const createPromises = Array(quantity).fill().map(() => 
           createOperatorRequisition({
-            ...formData,
-            email: user.email,
-            status: 'Pending',
-            quantity: 1
+            ...requestData,
+            quantity: 1,
           })
         );
         await Promise.all(createPromises);
