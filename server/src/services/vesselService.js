@@ -76,6 +76,29 @@ class VesselService {
         }
     }
 
+    async fetchVesselVisitsForBooking() {
+        try {
+          const querySnapshot = await db.collection('vesselVisitRequests').get();
+          return querySnapshot.docs.map((doc) => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              vesselName: data.vesselName,
+              voyages: Array.isArray(data.voyages) ? data.voyages.map(voyage => ({
+                voyageNumber: voyage.voyageNumber,
+                arrivalPort: voyage.arrivalPort,
+                departurePort: voyage.departurePort
+              })) : [],
+              ...data
+            };
+          });
+        } catch (error) {
+          console.error('Error fetching vessel visits:', error);
+          throw error;
+        }
+      }
+    
+
 }
 
 module.exports = VesselService;

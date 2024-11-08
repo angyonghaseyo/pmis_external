@@ -34,26 +34,23 @@ import {
   Autocomplete,
 } from "@mui/material";
 import { ExpandMore } from "@mui/icons-material";
-import { db, storage } from "./firebaseConfig";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import {
-  doc,
-  addDoc,
-  setDoc,
-  getDocs,
-  deleteDoc,
-  collection,
-} from "firebase/firestore";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
-import BookingSteps from "./BookingSteps"; // Adjust the path based on where BookingSteps is located
+import BookingSteps from "./BookingSteps";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorIcon from "@mui/icons-material/Error";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import CancelIcon from "@mui/icons-material/Cancel";
-import CustomsTradeManager from "./CustomsTradeManager";
+import { 
+  getBookings, 
+  createBooking, 
+  updateBooking, 
+  deleteBooking, 
+  uploadBookingDocument, 
+  getVesselVisits 
+} from './services/api';
 
 const HSCodeLookup = ({ value, onChange, error, helperText }) => {
   const [open, setOpen] = useState(false);
@@ -82,18 +79,16 @@ const HSCodeLookup = ({ value, onChange, error, helperText }) => {
       }
       const data = await response.json();
 
-      // Check if the response is successful and has result
       if (data.status === "success" && data.result) {
-        // Since we get a single result object instead of an array
         const formattedOption = {
           code: data.result.code,
           description: data.result.description,
-          digits: data.result.digits, // Optional: if you want to store this info
+          digits: data.result.digits,
         };
 
-        setOptions([formattedOption]); // Wrap in array since Autocomplete expects an array
+        setOptions([formattedOption]);
       } else {
-        setOptions([]); // No results
+        setOptions([]);
       }
     } catch (error) {
       console.error("Error fetching HS codes:", error);
@@ -103,7 +98,6 @@ const HSCodeLookup = ({ value, onChange, error, helperText }) => {
     }
   };
 
-  // Debounce the fetch function to prevent too many API calls
   const debouncedFetch = useCallback(
     debounce((searchTerm) => fetchHSCodes(searchTerm), 300),
     []
@@ -144,7 +138,7 @@ const HSCodeLookup = ({ value, onChange, error, helperText }) => {
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
-            paddingRight: "8px", // Add some padding to ensure ellipsis is visible
+            paddingRight: "8px",
           },
         }}
       />
@@ -214,7 +208,7 @@ const BookingForm = ({ user }) => {
   const [openDialog, setOpenDialog] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
-    cargo: {}, // Store cargo as a map
+    cargo: {},
     pickupDate: "",
     portLoading: "",
     portDestination: "",
@@ -243,29 +237,26 @@ const BookingForm = ({ user }) => {
     "Raw Materials",
   ];
 
-  // Fetch booking data from Firebase
   useEffect(() => {
     const fetchBookings = async () => {
-      const querySnapshot = await getDocs(collection(db, "bookings"));
-      const bookingsArray = querySnapshot.docs.map((doc) => ({
-        bookingId: doc.id,
-        ...doc.data(),
-      }));
-      setBookingData(bookingsArray);
+      try {
+        const bookings = await getBookings();
+        setBookingData(bookings);
+      } catch (error) {
+        console.error('Error fetching bookings:', error);
+      }
     };
     fetchBookings();
   }, []);
 
   useEffect(() => {
     const fetchVesselVisits = async () => {
-      const querySnapshot = await getDocs(
-        collection(db, "vesselVisitRequests")
-      );
-      const visits = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setVesselVisits(visits);
+      try {
+        const visits = await getVesselVisits();
+        setVesselVisits(visits);
+      } catch (error) {
+        console.error('Error fetching vessel visits:', error);
+      }
     };
     fetchVesselVisits();
   }, []);
@@ -274,7 +265,6 @@ const BookingForm = ({ user }) => {
     const selectedVesselName = event.target.value;
     setSelectedVessel(selectedVesselName);
 
-    // Find the selected vessel's voyages
     const selectedVesselData = vesselVisits.find(
       (visit) => visit.vesselName === selectedVesselName
     );
@@ -305,14 +295,31 @@ const BookingForm = ({ user }) => {
 
   const handleOpenDialog = (booking = null) => {
     if (booking) {
+      // Set the vessel name first
+      setSelectedVessel(booking.vesselName || "");
+      
+      // Find the vessel data to get available voyages
+      const selectedVesselData = vesselVisits.find(
+        (visit) => visit.vesselName === booking.vesselName
+      );
+      
+      // Set available voyages for the selected vessel
+      setAvailableVoyages(selectedVesselData?.voyages || []);
+
+      // Set all form data including the voyage number
       setFormData({
         ...booking,
-        cargo: booking.cargo || {}, // Ensure existing cargo data is loaded
+        cargo: booking.cargo || {},
+        voyageNumber: booking.voyageNumber || ""
       });
+      
       setEditingId(booking.bookingId);
     } else {
+      // Reset everything for new booking
+      setSelectedVessel("");
+      setAvailableVoyages([]);
       setFormData({
-        cargo: {}, // Reset cargo as an empty map
+        cargo: {},
         pickupDate: "",
         portLoading: "",
         portDestination: "",
@@ -321,11 +328,14 @@ const BookingForm = ({ user }) => {
         etd: "",
         freeTime: 0,
         bookingId: "",
+        vesselName: "",
+        voyageNumber: ""
       });
       setEditingId(null);
     }
     setOpenDialog(true);
   };
+
 
   const handleCloseDialog = () => {
     setOpenDialog(false);
@@ -336,48 +346,41 @@ const BookingForm = ({ user }) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Handle form submission
   const handleSubmit = async () => {
-    console.log("Submitting formData: ", formData); //debugging
     const newBooking = {
-      ...formData, // Contains cargo as a map
+      ...formData,
       userEmail: user.email,
     };
 
     try {
       if (editingId) {
-        const docRef = doc(db, "bookings", editingId);
-        await setDoc(docRef, newBooking);
+        const updatedBooking = await updateBooking(editingId, newBooking);
+        setBookingData(prevBookings =>
+          prevBookings.map(booking =>
+            booking.bookingId === editingId ? updatedBooking : booking
+          )
+        );
       } else {
-        const docRef = await addDoc(collection(db, "bookings"), newBooking);
-        await setDoc(docRef, { bookingId: docRef.id }, { merge: true });
-        setBookingData((prev) => [
-          ...prev,
-          { ...newBooking, bookingId: docRef.id },
-        ]);
+        const createdBooking = await createBooking(newBooking);
+        setBookingData(prev => [...prev, createdBooking]);
       }
       handleCloseDialog();
     } catch (error) {
-      console.error("Error saving booking:", error);
+      console.error('Error saving booking:', error);
     }
   };
 
   const handleDelete = async (id) => {
     try {
-      const docRef = doc(db, "bookings", id);
-      await deleteDoc(docRef);
-      setBookingData((prev) =>
-        prev.filter((booking) => booking.bookingId !== id)
-      );
+      await deleteBooking(id);
+      setBookingData(prev => prev.filter(booking => booking.bookingId !== id));
     } catch (error) {
-      console.error("Error deleting booking:", error);
+      console.error('Error deleting booking:', error);
     }
   };
 
-  // CARGO HANDLING
-  // Add new cargo item
   const handleAddCargo = () => {
-    const cargoId = Date.now().toString(); // Generate a unique ID based on timestamp
+    const cargoId = Date.now().toString();
     setFormData((prev) => ({
       ...prev,
       cargo: {
@@ -389,10 +392,10 @@ const BookingForm = ({ user }) => {
           quantity: "",
           weightPerUnit: "",
           cargoType: "",
-          isContainerRented: false, // New field for step 1
-          isTruckBooked: false, // New field for step 2
-          isCustomsCleared: false, // New field for step 3
-          isDocumentsChecked: false, // New field for step 4
+          isContainerRented: false,
+          isTruckBooked: false,
+          isCustomsCleared: false,
+          isDocumentsChecked: false,
           documents: {
             vgm: null,
             advancedDeclaration: null,
@@ -468,20 +471,17 @@ const BookingForm = ({ user }) => {
     }));
   };
 
-  // Remove cargo item
   const handleRemoveCargo = (cargoId) => {
     const updatedCargo = { ...formData.cargo };
-    delete updatedCargo[cargoId]; // Remove cargo by key
+    delete updatedCargo[cargoId];
     setFormData((prev) => ({ ...prev, cargo: updatedCargo }));
   };
 
   const validateHsCode = (hsCode) => {
-    // HS Code format is typically 6-10 digits
     const hsCodeRegex = /^\d{6,10}$/;
     return hsCodeRegex.test(hsCode);
   };
 
-  // Update cargo item
   const handleCargoChange = (cargoId, field, value) => {
     if (field === "hsCode") {
       setFormData((prev) => ({
@@ -490,14 +490,13 @@ const BookingForm = ({ user }) => {
           ...prev.cargo,
           [cargoId]: {
             ...prev.cargo[cargoId],
-            hsCode: value.code, //denzel
+            hsCode: value.code,
             hsCodeDescription: value.description,
-            hsCodeValid: validateHsCode(value), //denzel it could be just code
+            hsCodeValid: validateHsCode(value),
           },
         },
       }));
     } else {
-      // Original implementation for other fields
       setFormData((prev) => ({
         ...prev,
         cargo: {
@@ -523,723 +522,640 @@ const BookingForm = ({ user }) => {
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case "success":
-        return <CheckCircleIcon fontSize="small" />;
-      case "error":
-        return <ErrorIcon fontSize="small" />;
-      default:
-        return <UploadFileIcon fontSize="small" />;
+        case "success":
+            return <CheckCircleIcon fontSize="small" />;
+        case "error":
+            return <ErrorIcon fontSize="small" />;
+        default:
+            return <UploadFileIcon fontSize="small" />;
     }
-  };
+};
 
-  const renderDocumentUpload = (cargoId) => {
-    const documents = [
-      { type: "vgm", label: "Verified Gross Mass (VGM)" },
-      { type: "advancedDeclaration", label: "Advanced Declaration" },
-      { type: "exportDocument", label: "Export Document" },
-    ];
-
-    return (
-      <Grid item xs={12}>
-        <Paper sx={{ p: 2, mt: 2, bgcolor: "background.default" }}>
-          <Typography variant="subtitle1" gutterBottom fontWeight="medium">
-            Required Documents
-          </Typography>
-          {!formData.cargo[cargoId].isDocumentsChecked && (
-            <Alert
-              severity="error"
-              sx={{ mt: 2, mb: 2, borderRadius: "8px" }}
-              icon={<CancelIcon fontSize="small" />}
-            >
-              Please Submit All Documents
-            </Alert>
-          )}
-          {formData.cargo[cargoId].isDocumentsChecked && (
-            <Alert
-              severity="success"
-              sx={{ mt: 2, mb: 2, borderRadius: "8px" }}
-              icon={<CheckCircleIcon fontSize="small" />}
-            >
-              All required documents have been uploaded and verified
-            </Alert>
-          )}
-          <Stack spacing={2}>
-            {documents.map(({ type, label }) => (
-              <Box key={type}>
-                <Grid container spacing={2} alignItems="center">
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="body2" color="text.secondary">
-                      {label}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <input
-                        accept="application/pdf"
-                        style={{ display: "none" }}
-                        id={`${type}-upload-${cargoId}`}
-                        type="file"
-                        onChange={(e) =>
-                          handleDocumentUpload(cargoId, type, e.target.files[0])
-                        }
-                      />
-                      <label
-                        htmlFor={`${type}-upload-${cargoId}`}
-                        style={{ width: "100%" }}
-                      >
-                        <Button
-                          variant="outlined"
-                          component="span"
-                          startIcon={
-                            formData.cargo[cargoId]?.documents?.[type] ? (
-                              <CheckCircleIcon fontSize="small" />
-                            ) : (
-                              <UploadFileIcon fontSize="small" />
-                            )
-                          }
-                          fullWidth
-                          color={
-                            formData.cargo[cargoId]?.documents?.[type]
-                              ? "success"
-                              : "primary"
-                          }
-                          size="small"
-                          sx={{
-                            borderRadius: "8px",
-                            textTransform: "none",
-                            minHeight: "36px",
-                          }}
-                        >
-                          {formData.cargo[cargoId]?.documents?.[type]
-                            ? "Replace Document"
-                            : "Upload Document"}
-                        </Button>
-                      </label>
-                      {uploadStatus[cargoId]?.[type] && (
-                        <Chip
-                          size="small"
-                          label={
-                            uploadStatus[cargoId]?.[type] ||
-                            (formData.cargo[cargoId]?.documents?.[type]
-                              ? "success"
-                              : null)
-                          }
-                          color={
-                            uploadStatus[cargoId]?.[type]
-                              ? getStatusColor(uploadStatus[cargoId][type])
-                              : "success"
-                          }
-                          icon={
-                            uploadStatus[cargoId]?.[type] ? (
-                              getStatusIcon(uploadStatus[cargoId][type])
-                            ) : (
-                              <CheckCircleIcon fontSize="small" />
-                            )
-                          }
-                        />
-                      )}
-                    </Stack>
-                    {uploadStatus[cargoId]?.[type] === "uploading" && (
-                      <LinearProgress sx={{ mt: 1 }} />
-                    )}
-                  </Grid>
-                </Grid>
-              </Box>
-            ))}
-          </Stack>
-        </Paper>
-      </Grid>
-    );
-  };
-
-  const handleDocumentUpload = async (cargoId, documentType, file) => {
+const handleDocumentUpload = async (cargoId, documentType, file) => {
     if (!file) return;
 
     try {
-      setUploadStatus((prev) => ({
-        ...prev,
-        [cargoId]: { ...prev[cargoId], [documentType]: "uploading" },
-      }));
+        setUploadStatus((prev) => ({
+            ...prev,
+            [cargoId]: { ...prev[cargoId], [documentType]: "uploading" },
+        }));
 
-      const storageRef = ref(
-        storage,
-        `documents/${cargoId}/${documentType}_${file.name}`
-      );
-      await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(storageRef);
+        const result = await uploadBookingDocument(editingId, cargoId, documentType, file);
 
-      const updatedFormData = {
-        ...formData,
-        cargo: {
-          ...formData.cargo,
-          [cargoId]: {
-            ...formData.cargo[cargoId],
-            documents: {
-              ...formData.cargo[cargoId].documents,
-              [documentType]: downloadURL,
-            },
-          },
-        },
-      };
+        const updatedFormData = {
+            ...formData,
+            cargo: {
+                ...formData.cargo,
+                [cargoId]: {
+                    ...formData.cargo[cargoId],
+                    documents: {
+                        ...formData.cargo[cargoId].documents,
+                        [documentType]: result.url
+                    }
+                }
+            }
+        };
 
-      const allDocsUploaded =
-        updatedFormData.cargo[cargoId].documents.vgm &&
-        updatedFormData.cargo[cargoId].documents.advancedDeclaration &&
-        updatedFormData.cargo[cargoId].documents.exportDocument;
+        const allDocsUploaded =
+            updatedFormData.cargo[cargoId].documents.vgm &&
+            updatedFormData.cargo[cargoId].documents.advancedDeclaration &&
+            updatedFormData.cargo[cargoId].documents.exportDocument;
 
-      updatedFormData.cargo[cargoId].isDocumentsChecked = allDocsUploaded
-        ? true
-        : false;
+        updatedFormData.cargo[cargoId].isDocumentsChecked = allDocsUploaded;
 
-      setFormData(updatedFormData);
-
-      if (editingId) {
-        setBookingData((prevBookingData) =>
-          prevBookingData.map((booking) =>
-            booking.bookingId === editingId
-              ? { ...booking, cargo: updatedFormData.cargo }
-              : booking
-          )
-        );
-      }
-
-      setUploadStatus((prev) => ({
-        ...prev,
-        [cargoId]: { ...prev[cargoId], [documentType]: "success" },
-      }));
+        setFormData(updatedFormData);
+        setUploadStatus((prev) => ({
+            ...prev,
+            [cargoId]: { ...prev[cargoId], [documentType]: "success" },
+        }));
     } catch (error) {
-      console.error("Error uploading document:", error);
-      setUploadStatus((prev) => ({
-        ...prev,
-        [cargoId]: { ...prev[cargoId], [documentType]: "error" },
-      }));
+        console.error("Error uploading document:", error);
+        setUploadStatus((prev) => ({
+            ...prev,
+            [cargoId]: { ...prev[cargoId], [documentType]: "error" },
+        }));
     }
-  };
+};
 
-  return (
+const renderDocumentUpload = (cargoId) => {
+    const documents = [
+        { type: "vgm", label: "Verified Gross Mass (VGM)" },
+        { type: "advancedDeclaration", label: "Advanced Declaration" },
+        { type: "exportDocument", label: "Export Document" },
+    ];
+
+    return (
+        <Grid item xs={12}>
+            <Paper sx={{ p: 2, mt: 2, bgcolor: "background.default" }}>
+                <Typography variant="subtitle1" gutterBottom fontWeight="medium">
+                    Required Documents
+                </Typography>
+                {!formData.cargo[cargoId].isDocumentsChecked && (
+                    <Alert
+                        severity="error"
+                        sx={{ mt: 2, mb: 2, borderRadius: "8px" }}
+                        icon={<CancelIcon fontSize="small" />}
+                    >
+                        Please Submit All Documents
+                    </Alert>
+                )}
+                {formData.cargo[cargoId].isDocumentsChecked && (
+                    <Alert
+                        severity="success"
+                        sx={{ mt: 2, mb: 2, borderRadius: "8px" }}
+                        icon={<CheckCircleIcon fontSize="small" />}
+                    >
+                        All required documents have been uploaded and verified
+                    </Alert>
+                )}
+                <Stack spacing={2}>
+                    {documents.map(({ type, label }) => (
+                        <Box key={type}>
+                            <Grid container spacing={2} alignItems="center">
+                                <Grid item xs={12} sm={6}>
+                                    <Typography variant="body2" color="text.secondary">
+                                        {label}
+                                    </Typography>
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <Stack direction="row" spacing={1} alignItems="center">
+                                        <input
+                                            accept="application/pdf"
+                                            style={{ display: "none" }}
+                                            id={`${type}-upload-${cargoId}`}
+                                            type="file"
+                                            onChange={(e) =>
+                                                handleDocumentUpload(cargoId, type, e.target.files[0])
+                                            }
+                                        />
+                                        <label
+                                            htmlFor={`${type}-upload-${cargoId}`}
+                                            style={{ width: "100%" }}
+                                        >
+                                            <Button
+                                                variant="outlined"
+                                                component="span"
+                                                startIcon={
+                                                    formData.cargo[cargoId]?.documents?.[type] ? (
+                                                        <CheckCircleIcon fontSize="small" />
+                                                    ) : (
+                                                        <UploadFileIcon fontSize="small" />
+                                                    )
+                                                }
+                                                fullWidth
+                                                color={
+                                                    formData.cargo[cargoId]?.documents?.[type]
+                                                        ? "success"
+                                                        : "primary"
+                                                }
+                                                size="small"
+                                                sx={{
+                                                    borderRadius: "8px",
+                                                    textTransform: "none",
+                                                    minHeight: "36px",
+                                                }}
+                                            >
+                                                {formData.cargo[cargoId]?.documents?.[type]
+                                                    ? "Replace Document"
+                                                    : "Upload Document"}
+                                            </Button>
+                                        </label>
+                                        {uploadStatus[cargoId]?.[type] && (
+                                            <Chip
+                                                size="small"
+                                                label={uploadStatus[cargoId]?.[type]}
+                                                color={getStatusColor(uploadStatus[cargoId][type])}
+                                                icon={getStatusIcon(uploadStatus[cargoId][type])}
+                                            />
+                                        )}
+                                    </Stack>
+                                    {uploadStatus[cargoId]?.[type] === "uploading" && (
+                                        <LinearProgress sx={{ mt: 1 }} />
+                                    )}
+                                </Grid>
+                            </Grid>
+                        </Box>
+                    ))}
+                </Stack>
+            </Paper>
+        </Grid>
+    );
+};
+
+return (
     <Container maxWidth="lg" sx={{ mt: 4 }}>
-      <Box
-        display="flex"
-        justifyContent="space-between"
-        alignItems="center"
-        mb={3}
-      >
-        <Typography variant="h4">Bookings</Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={() => handleOpenDialog()}
+        <Box
+            display="flex"
+            justifyContent="space-between"
+            alignItems="center"
+            mb={3}
         >
-          Create Booking
-        </Button>
-      </Box>
-      {/* Table to display bookings */}
-      <TableContainer component={Paper} sx={{ mt: 2 }}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Booking ID</TableCell>
-              <TableCell>Port of Loading</TableCell>
-              <TableCell>Port of Destination</TableCell>
-              <TableCell>Cut-off Deadline</TableCell>
-              <TableCell>ETA</TableCell>
-              <TableCell>ETD</TableCell>
-              <TableCell>Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {bookingData.map((booking) => (
-              <React.Fragment key={booking.bookingId}>
-                <TableRow>
-                  <TableCell style={{ width: "100px", borderBottom: "none" }}>
-                    {booking.bookingId}
-                  </TableCell>
-                  <TableCell style={{ borderBottom: "none" }}>
-                    {booking.portLoading}
-                  </TableCell>
-                  <TableCell style={{ borderBottom: "none" }}>
-                    {booking.portDestination}
-                  </TableCell>
-                  <TableCell style={{ borderBottom: "none" }}>
-                    {booking.cutoffDeadline}
-                  </TableCell>
-                  <TableCell style={{ borderBottom: "none" }}>
-                    {booking.eta}
-                  </TableCell>
-                  <TableCell style={{ borderBottom: "none" }}>
-                    {booking.etd}
-                  </TableCell>
-                  <TableCell style={{ borderBottom: "none" }}>
-                    <IconButton
-                      onClick={() => handleOpenDialog(booking)}
-                      color="primary"
-                    >
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton
-                      onClick={() => handleDelete(booking.bookingId)}
-                      color="secondary"
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
+            <Typography variant="h4">Bookings</Typography>
+            <Button
+                variant="contained"
+                color="primary"
+                onClick={() => handleOpenDialog()}
+            >
+                Create Booking
+            </Button>
+        </Box>
 
-                {/* Accordion Row */}
-                <TableRow>
-                  <TableCell
-                    colSpan={7}
-                    style={{ paddingBottom: 0, paddingTop: 0 }}
-                  >
-                    <Accordion>
-                      <AccordionSummary
-                        expandIcon={<ExpandMore />}
-                        style={{
-                          border: "none",
-                          boxShadow: "none",
-                          padding: 0,
-                        }}
-                      >
-                        <Typography
-                          style={{ border: "none", boxShadow: "none" }}
-                        >
-                          Additional information for{" "}
-                          <span style={{ color: "purple" }}>
-                            {booking.bookingId}
-                          </span>
-                        </Typography>
-                      </AccordionSummary>
-                      <AccordionDetails>
-                        <Grid container spacing={2}>
-                          <Grid item xs={6}>
-                            <Typography>
-                              <strong>Pickup Date:</strong> {booking.pickupDate}
-                            </Typography>
-                          </Grid>
-                          <Grid item xs={6}>
-                            <Typography>
-                              <strong>Free Time (days):</strong>{" "}
-                              {booking.freeTime}
-                            </Typography>
-                          </Grid>
-                          <Grid item xs={6}>
-                            <Typography>
-                              <strong>Port of Loading:</strong>{" "}
-                              {booking.portLoading}
-                            </Typography>
-                          </Grid>
-                          <Grid item xs={6}>
-                            <Typography>
-                              <strong>Port of Destination:</strong>{" "}
-                              {booking.portDestination}
-                            </Typography>
-                          </Grid>
+        <TableContainer component={Paper} sx={{ mt: 2 }}>
+            <Table>
+                <TableHead>
+                    <TableRow>
+                        <TableCell>Booking ID</TableCell>
+                        <TableCell>Port of Loading</TableCell>
+                        <TableCell>Port of Destination</TableCell>
+                        <TableCell>Cut-off Deadline</TableCell>
+                        <TableCell>ETA</TableCell>
+                        <TableCell>ETD</TableCell>
+                        <TableCell>Actions</TableCell>
+                    </TableRow>
+                </TableHead>
+                <TableBody>
+                    {bookingData.map((booking) => (
+                        <React.Fragment key={booking.bookingId}>
+                            <TableRow>
+                                <TableCell style={{ width: "100px", borderBottom: "none" }}>
+                                    {booking.bookingId}
+                                </TableCell>
+                                <TableCell style={{ borderBottom: "none" }}>
+                                    {booking.portLoading}
+                                </TableCell>
+                                <TableCell style={{ borderBottom: "none" }}>
+                                    {booking.portDestination}
+                                </TableCell>
+                                <TableCell style={{ borderBottom: "none" }}>
+                                    {booking.cutoffDeadline}
+                                </TableCell>
+                                <TableCell style={{ borderBottom: "none" }}>
+                                    {booking.eta}
+                                </TableCell>
+                                <TableCell style={{ borderBottom: "none" }}>
+                                    {booking.etd}
+                                </TableCell>
+                                <TableCell style={{ borderBottom: "none" }}>
+                                    <IconButton
+                                        onClick={() => handleOpenDialog(booking)}
+                                        color="primary"
+                                    >
+                                        <EditIcon />
+                                    </IconButton>
+                                    <IconButton
+                                        onClick={() => handleDelete(booking.bookingId)}
+                                        color="secondary"
+                                    >
+                                        <DeleteIcon />
+                                    </IconButton>
+                                </TableCell>
+                            </TableRow>
 
-                          <Grid item xs={6}>
-                            <Typography>
-                              <strong>ETA:</strong> {booking.eta}
-                            </Typography>
-                          </Grid>
-                          <Grid item xs={6}>
-                            <Typography>
-                              <strong>ETD:</strong> {booking.etd}
-                            </Typography>
-                          </Grid>
-                          <Grid item xs={6}>
-                            <Typography>
-                              <strong>Cut-off Deadline:</strong>{" "}
-                              {booking.cutoffDeadline}
-                            </Typography>
-                          </Grid>
+                            <TableRow>
+                                <TableCell colSpan={7} style={{ paddingBottom: 0, paddingTop: 0 }}>
+                                    <Accordion>
+                                        <AccordionSummary expandIcon={<ExpandMore />}>
+                                            <Typography>
+                                                Additional information for{" "}
+                                                <span style={{ color: "purple" }}>
+                                                    {booking.bookingId}
+                                                </span>
+                                            </Typography>
+                                        </AccordionSummary>
+                                        <AccordionDetails>
+                                            <Grid container spacing={2}>
+                                                <Grid item xs={6}>
+                                                    <Typography>
+                                                        <strong>Pickup Date:</strong> {booking.pickupDate}
+                                                    </Typography>
+                                                </Grid>
+                                                <Grid item xs={6}>
+                                                    <Typography>
+                                                        <strong>Free Time (days):</strong>{" "}
+                                                        {booking.freeTime}
+                                                    </Typography>
+                                                </Grid>
+                                                <Grid item xs={6}>
+                                                    <Typography>
+                                                        <strong>Port of Loading:</strong>{" "}
+                                                        {booking.portLoading}
+                                                    </Typography>
+                                                </Grid>
+                                                <Grid item xs={6}>
+                                                    <Typography>
+                                                        <strong>Port of Destination:</strong>{" "}
+                                                        {booking.portDestination}
+                                                    </Typography>
+                                                </Grid>
+                                                <Grid item xs={6}>
+                                                    <Typography>
+                                                        <strong>ETA:</strong> {booking.eta}
+                                                    </Typography>
+                                                </Grid>
+                                                <Grid item xs={6}>
+                                                    <Typography>
+                                                        <strong>ETD:</strong> {booking.etd}
+                                                    </Typography>
+                                                </Grid>
+                                                <Grid item xs={6}>
+                                                    <Typography>
+                                                        <strong>Cut-off Deadline:</strong>{" "}
+                                                        {booking.cutoffDeadline}
+                                                    </Typography>
+                                                </Grid>
 
-                          <Grid item xs={12}>
-                            <Typography variant="h6" gutterBottom>
-                              Cargo Details
-                            </Typography>
-                            {booking.cargo &&
-                              Object.entries(booking.cargo).map(
-                                ([key, cargoItem]) => (
-                                  <Paper key={key} sx={{ p: 2, mb: 2 }}>
-                                    <Typography>
-                                      <strong>Cargo Item {key}:</strong>
-                                    </Typography>
-                                    <Typography>
-                                      Name: {cargoItem.name}
-                                    </Typography>
-                                    <Typography>
-                                      Quantity: {cargoItem.quantity}{" "}
-                                      {cargoItem.unit || "pieces"}
-                                    </Typography>
-                                    <Typography>
-                                      Description: {cargoItem.description}
-                                    </Typography>
-                                    <Typography>
-                                      Weight per Unit: {cargoItem.weightPerUnit}{" "}
-                                      kg
-                                    </Typography>
-                                    <Typography>
-                                      Cargo Type: {cargoItem.cargoType}
-                                    </Typography>
-                                    <Typography>
-                                      <strong>HS Code:</strong>{" "}
-                                      {cargoItem.hsCode}
-                                    </Typography>
-                                    <BookingSteps
-                                      isContainerRented={
-                                        cargoItem.isContainerRented
-                                      }
-                                      isTruckBooked={cargoItem.isTruckBooked}
-                                      isCustomsCleared={
-                                        cargoItem.isCustomsCleared
-                                      }
-                                      isDocumentsChecked={
-                                        cargoItem.isDocumentsChecked
-                                      }
-                                    />
-                                  </Paper>
-                                )
-                              )}
-                          </Grid>
+                                                <Grid item xs={12}>
+                                                    <Typography variant="h6" gutterBottom>
+                                                        Cargo Details
+                                                    </Typography>
+                                                    {booking.cargo &&
+                                                        Object.entries(booking.cargo).map(
+                                                            ([key, cargoItem]) => (
+                                                                <Paper key={key} sx={{ p: 2, mb: 2 }}>
+                                                                    <Typography>
+                                                                        <strong>Cargo Item {key}:</strong>
+                                                                    </Typography>
+                                                                    <Typography>
+                                                                        Name: {cargoItem.name}
+                                                                    </Typography>
+                                                                    <Typography>
+                                                                        Quantity: {cargoItem.quantity}{" "}
+                                                                        {cargoItem.unit || "pieces"}
+                                                                    </Typography>
+                                                                    <Typography>
+                                                                        Description: {cargoItem.description}
+                                                                    </Typography>
+                                                                    <Typography>
+                                                                        Weight per Unit: {cargoItem.weightPerUnit}{" "}
+                                                                        kg
+                                                                    </Typography>
+                                                                    <Typography>
+                                                                        Cargo Type: {cargoItem.cargoType}
+                                                                    </Typography>
+                                                                    <Typography>
+                                                                        <strong>HS Code:</strong>{" "}
+                                                                        {cargoItem.hsCode}
+                                                                    </Typography>
+                                                                    <BookingSteps
+                                                                        isContainerRented={
+                                                                            cargoItem.isContainerRented
+                                                                        }
+                                                                        isTruckBooked={cargoItem.isTruckBooked}
+                                                                        isCustomsCleared={
+                                                                            cargoItem.isCustomsCleared
+                                                                        }
+                                                                        isDocumentsChecked={
+                                                                            cargoItem.isDocumentsChecked
+                                                                        }
+                                                                    />
+                                                                </Paper>
+                                                            )
+                                                        )}
+                                                </Grid>
+                                            </Grid>
+                                        </AccordionDetails>
+                                    </Accordion>
+                                    <br />
+                                </TableCell>
+                            </TableRow>
+                        </React.Fragment>
+                    ))}
+                </TableBody>
+            </Table>
+        </TableContainer>
+
+        <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
+            <DialogTitle>
+                {editingId ? `Edit Booking ID: ${editingId}` : "Create Booking"}
+            </DialogTitle>
+            <DialogContent>
+                <Grid container spacing={2}>
+                    <Grid item xs={6}>
+                        <FormControl fullWidth required>
+                            <InputLabel>Vessel Name</InputLabel>
+                            <Select
+                                value={selectedVessel}
+                                onChange={handleVesselChange}
+                                label="Vessel Name"
+                                disabled={!!editingId} 
+                            >
+                                {vesselVisits.map((visit) => (
+                                    <MenuItem key={visit.vesselName} value={visit.vesselName}>
+                                        {visit.vesselName}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    </Grid>
+                    <Grid item xs={6}>
+                        <FormControl fullWidth required disabled={!selectedVessel}>
+                            <InputLabel>Voyage Number</InputLabel>
+                            <Select
+                                value={formData.voyageNumber || ""}
+                                onChange={handleVoyageChange}
+                                label="Voyage Number"
+                                disabled={!!editingId} 
+                            >
+                                {availableVoyages.map((voyage) => (
+                                    <MenuItem
+                                        key={voyage.voyageNumber}
+                                        value={voyage.voyageNumber}
+                                    >
+                                        {voyage.voyageNumber} ({voyage.departurePort} →{" "}
+                                        {voyage.arrivalPort})
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    </Grid>
+
+                    <Grid item xs={6}>
+                        <TextField
+                            label="Port of Loading"
+                            name="portLoading"
+                            value={formData.portLoading}
+                            onChange={handleChange}
+                            fullWidth
+                            required
+                            disabled
+                        />
+                    </Grid>
+                    <Grid item xs={6}>
+                            <TextField
+                                label="Port of Destination"
+                                name="portDestination"
+                                value={formData.portDestination}
+                                onChange={handleChange}
+                                fullWidth
+                                required
+                                disabled
+                            />
                         </Grid>
-                      </AccordionDetails>
-                    </Accordion>
-                    <br></br>
-                  </TableCell>
-                </TableRow>
-              </React.Fragment>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+                        <Grid item xs={6}>
+                            <TextField
+                                label="Pickup Date"
+                                name="pickupDate"
+                                type="date"
+                                value={formData.pickupDate}
+                                onChange={handleChange}
+                                fullWidth
+                                InputLabelProps={{ shrink: true }}
+                                required
+                            />
+                        </Grid>
+                        <Grid item xs={6}>
+                            <TextField
+                                label="Free Time (days)"
+                                name="freeTime"
+                                type="number"
+                                value={formData.freeTime}
+                                onChange={handleChange}
+                                fullWidth
+                                required
+                            />
+                        </Grid>
 
-      <Dialog
-        open={openDialog}
-        onClose={handleCloseDialog}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>
-          {editingId ? `Edit Booking ID: ${editingId}` : "Create Booking"}
-        </DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2}>
-            <Grid item xs={6}>
-              <FormControl fullWidth required>
-                <InputLabel>Vessel Name</InputLabel>
-                <Select
-                  value={selectedVessel}
-                  onChange={handleVesselChange}
-                  label="Vessel Name"
-                >
-                  {vesselVisits.map((visit) => (
-                    <MenuItem key={visit.vesselName} value={visit.vesselName}>
-                      {visit.vesselName}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={6}>
-              <FormControl fullWidth required disabled={!selectedVessel}>
-                <InputLabel>Voyage Number</InputLabel>
-                <Select
-                  value={formData.voyageNumber || ""}
-                  onChange={handleVoyageChange}
-                  label="Voyage Number"
-                >
-                  {availableVoyages.map((voyage) => (
-                    <MenuItem
-                      key={voyage.voyageNumber}
-                      value={voyage.voyageNumber}
-                    >
-                      {voyage.voyageNumber} ({voyage.departurePort} →{" "}
-                      {voyage.arrivalPort})
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
+                        <Grid item xs={6}>
+                            <TextField
+                                label="ETA"
+                                name="eta"
+                                type="datetime-local"
+                                value={formData.eta}
+                                onChange={handleChange}
+                                InputLabelProps={{ shrink: true }}
+                                fullWidth
+                                required
+                            />
+                        </Grid>
+                        <Grid item xs={6}>
+                            <TextField
+                                label="ETD"
+                                name="etd"
+                                type="datetime-local"
+                                value={formData.etd}
+                                onChange={handleChange}
+                                InputLabelProps={{ shrink: true }}
+                                fullWidth
+                                required
+                            />
+                        </Grid>
+                        <Grid item xs={6}>
+                            <TextField
+                                label="Cut-off Deadline"
+                                name="cutoffDeadline"
+                                type="datetime-local"
+                                value={formData.cutoffDeadline}
+                                onChange={handleChange}
+                                InputLabelProps={{ shrink: true }}
+                                fullWidth
+                                required
+                            />
+                        </Grid>
 
-            <Grid item xs={6}>
-              <TextField
-                label="Port of Loading"
-                name="portLoading"
-                value={formData.portLoading}
-                onChange={handleChange}
-                fullWidth
-                required
-                disabled
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                label="Port of Destination"
-                name="portDestination"
-                value={formData.portDestination}
-                onChange={handleChange}
-                fullWidth
-                required
-                disabled
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                label="Pickup Date"
-                name="pickupDate"
-                type="date"
-                value={formData.pickupDate}
-                onChange={handleChange}
-                fullWidth
-                InputLabelProps={{ shrink: true }}
-                required
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                label="Free Time (days)"
-                name="freeTime"
-                type="number"
-                value={formData.freeTime}
-                onChange={handleChange}
-                fullWidth
-                required
-              />
-            </Grid>
+                        <Grid item xs={12}>
+                            <Typography variant="h6" gutterBottom>
+                                Cargo Details
+                            </Typography>
+                        </Grid>
+                        {Object.entries(formData.cargo).map(([cargoId, cargoItem]) => (
+                            <Grid item xs={12} key={cargoId}>
+                                <Paper sx={{ p: 2, position: "relative" }}>
+                                    <Grid container spacing={2}>
+                                        <Grid item xs={12}>
+                                            <Box
+                                                display="flex"
+                                                justifyContent="space-between"
+                                                alignItems="center"
+                                            >
+                                                <Typography variant="subtitle1">
+                                                    Cargo ID: {cargoId}
+                                                </Typography>
+                                                {Object.keys(formData.cargo).length > 1 && (
+                                                    <IconButton
+                                                        onClick={() => handleRemoveCargo(cargoId)}
+                                                        size="small"
+                                                        color="error"
+                                                    >
+                                                        <DeleteIcon />
+                                                    </IconButton>
+                                                )}
+                                            </Box>
+                                        </Grid>
+                                        <Grid item xs={12} sm={6}>
+                                            <TextField
+                                                fullWidth
+                                                label="Name"
+                                                value={cargoItem.name}
+                                                onChange={(e) =>
+                                                    handleCargoChange(cargoId, "name", e.target.value)
+                                                }
+                                                required
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} sm={6}>
+                                            <HSCodeLookup
+                                                value={
+                                                    cargoItem.hsCode
+                                                        ? {
+                                                            code: cargoItem.hsCode,
+                                                            description: cargoItem.hsCodeDescription,
+                                                        }
+                                                        : null
+                                                }
+                                                onChange={(value) =>
+                                                    handleCargoChange(cargoId, "hsCode", value)
+                                                }
+                                                editMode={!!editingId}
+                                                helperText="Search by product description or code"
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12}>
+                                            <TextField
+                                                fullWidth
+                                                label="Description"
+                                                value={cargoItem.description}
+                                                onChange={(e) =>
+                                                    handleCargoChange(cargoId, "description", e.target.value)
+                                                }
+                                                multiline
+                                                rows={4}
+                                                required
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} sm={4}>
+                                            <TextField
+                                                fullWidth
+                                                label="Quantity"
+                                                type="number"
+                                                value={cargoItem.quantity}
+                                                onChange={(e) =>
+                                                    handleCargoChange(cargoId, "quantity", e.target.value)
+                                                }
+                                                required
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} sm={4}>
+                                            <FormControl fullWidth>
+                                                <InputLabel>Unit</InputLabel>
+                                                <Select
+                                                    value={cargoItem.unit || "pieces"}
+                                                    onChange={(e) =>
+                                                        handleCargoChange(cargoId, "unit", e.target.value)
+                                                    }
+                                                    label="Unit"
+                                                    required
+                                                >
+                                                    <MenuItem value="pieces">Pieces</MenuItem>
+                                                    <MenuItem value="boxes">Boxes</MenuItem>
+                                                    <MenuItem value="bottles">Bottles</MenuItem>
+                                                    <MenuItem value="ampoules">Ampoules</MenuItem>
+                                                    <MenuItem value="kg">Kilograms (kg)</MenuItem>
+                                                    <MenuItem value="g">Grams (g)</MenuItem>
+                                                    <MenuItem value="liters">Liters</MenuItem>
+                                                    <MenuItem value="milliliters">Milliliters</MenuItem>
+                                                </Select>
+                                            </FormControl>
+                                        </Grid>
+                                        <Grid item xs={12} sm={4}>
+                                            <TextField
+                                                fullWidth
+                                                label="Weight per Unit (kg)"
+                                                type="number"
+                                                value={cargoItem.weightPerUnit}
+                                                onChange={(e) =>
+                                                    handleCargoChange(cargoId, "weightPerUnit", e.target.value)
+                                                }
+                                                required
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} sm={4}>
+                                            <FormControl fullWidth>
+                                                <InputLabel>Cargo Type</InputLabel>
+                                                <Select
+                                                    value={cargoItem.cargoType}
+                                                    onChange={(e) =>
+                                                        handleCargoChange(cargoId, "cargoType", e.target.value)
+                                                    }
+                                                    label="Cargo Type"
+                                                    required
+                                                >
+                                                    {cargoTypes.map((type) => (
+                                                        <MenuItem key={type} value={type}>
+                                                            {type}
+                                                        </MenuItem>
+                                                    ))}
+                                                </Select>
+                                            </FormControl>
+                                        </Grid>
+                                    </Grid>
+                                    {editingId && renderDocumentUpload(cargoId)}
+                                </Paper>
+                            </Grid>
+                        ))}
 
-            <Grid item xs={6}>
-              <TextField
-                label="ETA"
-                name="eta"
-                type="datetime-local"
-                value={formData.eta}
-                onChange={handleChange}
-                InputLabelProps={{ shrink: true }}
-                fullWidth
-                required
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                label="ETD"
-                name="etd"
-                type="datetime-local"
-                value={formData.etd}
-                onChange={handleChange}
-                InputLabelProps={{ shrink: true }}
-                fullWidth
-                required
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                label="Cut-off Deadline"
-                name="cutoffDeadline"
-                type="datetime-local"
-                value={formData.cutoffDeadline}
-                onChange={handleChange}
-                InputLabelProps={{ shrink: true }}
-                fullWidth
-                required
-              />
-            </Grid>
-
-            {/* Cargo Details */}
-            <Grid item xs={12}>
-              <Typography variant="h6" gutterBottom>
-                Cargo Details
-              </Typography>
-            </Grid>
-            {Object.entries(formData.cargo).map(([cargoId, cargoItem]) => (
-              <Grid item xs={12} key={cargoId}>
-                <Paper sx={{ p: 2, position: "relative" }}>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12}>
-                      <Box
-                        display="flex"
-                        justifyContent="space-between"
-                        alignItems="center"
-                      >
-                        <Typography variant="subtitle1">
-                          Cargo ID: {cargoId}
-                        </Typography>
-                        {Object.keys(formData.cargo).length > 1 && (
-                          <IconButton
-                            onClick={() => handleRemoveCargo(cargoId)}
-                            size="small"
-                            color="error"
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        )}
-                      </Box>
+                        <Grid item xs={12}>
+                            <Button
+                                startIcon={<AddCircleOutlineIcon />}
+                                onClick={handleAddCargo}
+                                variant="outlined"
+                                fullWidth
+                            >
+                                Add Cargo Item
+                            </Button>
+                        </Grid>
                     </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        label="Name"
-                        value={cargoItem.name}
-                        onChange={(e) =>
-                          handleCargoChange(cargoId, "name", e.target.value)
-                        }
-                        required
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <HSCodeLookup
-                        value={
-                          cargoItem.hsCode
-                            ? {
-                                code: cargoItem.hsCode,
-                                description: cargoItem.hsCodeDescription,
-                              }
-                            : null
-                        }
-                        onChange={(value) =>
-                          handleCargoChange(cargoId, "hsCode", value)
-                        }
-                        editMode={!!editingId}
-                        helperText="Search by product description or code"
-                      />
-                    </Grid>
-                    <Grid item xs={12}>
-                      <TextField
-                        fullWidth
-                        label="Description"
-                        value={cargoItem.description}
-                        onChange={(e) =>
-                          handleCargoChange(
-                            cargoId,
-                            "description",
-                            e.target.value
-                          )
-                        }
-                        multiline
-                        rows={4}
-                        required
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={4}>
-                      <TextField
-                        fullWidth
-                        label="Quantity"
-                        type="number"
-                        value={cargoItem.quantity}
-                        onChange={(e) =>
-                          handleCargoChange(cargoId, "quantity", e.target.value)
-                        }
-                        required
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={4}>
-                      <FormControl fullWidth>
-                        <InputLabel>Unit</InputLabel>
-                        <Select
-                          value={cargoItem.unit || "pieces"}
-                          onChange={(e) =>
-                            handleCargoChange(cargoId, "unit", e.target.value)
-                          }
-                          label="Unit"
-                          required
-                        >
-                          <MenuItem value="pieces">Pieces</MenuItem>
-                          <MenuItem value="boxes">Boxes</MenuItem>
-                          <MenuItem value="bottles">Bottles</MenuItem>
-                          <MenuItem value="ampoules">Ampoules</MenuItem>
-                          <MenuItem value="kg">Kilograms (kg)</MenuItem>
-                          <MenuItem value="g">Grams (g)</MenuItem>
-                          <MenuItem value="liters">Liters</MenuItem>
-                          <MenuItem value="milliliters">Milliliters</MenuItem>
-                        </Select>
-                      </FormControl>
-                    </Grid>
-                    <Grid item xs={12} sm={4}>
-                      <TextField
-                        fullWidth
-                        label="Weight per Unit (kg)"
-                        type="number"
-                        value={cargoItem.weightPerUnit}
-                        onChange={(e) =>
-                          handleCargoChange(
-                            cargoId,
-                            "weightPerUnit",
-                            e.target.value
-                          )
-                        }
-                        required
-                      />
-                    </Grid>
-
-                    {/* <Grid item xs={12}>
-                      <Button
-                        variant="contained"
-                        color={
-                          cargoItem.isCustomsCleared ? "success" : "primary"
-                        }
-                        onClick={() =>
-                          handleCustomsClearance(cargoId, cargoItem)
-                        }
-                        disabled={
-                          !cargoItem.hsCode || cargoItem.isCustomsCleared
-                        }
-                        fullWidth
-                      >
-                        {cargoItem.isCustomsCleared
-                          ? "Customs Cleared"
-                          : "Process Customs Clearance"}
-                      </Button>
-                    </Grid> */}
-                    <Grid item xs={12} sm={4}>
-                      <FormControl fullWidth>
-                        <InputLabel>Cargo Type</InputLabel>
-                        <Select
-                          value={cargoItem.cargoType}
-                          onChange={(e) =>
-                            handleCargoChange(
-                              cargoId,
-                              "cargoType",
-                              e.target.value
-                            )
-                          }
-                          label="Cargo Type"
-                          required
-                        >
-                          {cargoTypes.map((type) => (
-                            <MenuItem key={type} value={type}>
-                              {type}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    </Grid>
-                  </Grid>
-                  {editingId && renderDocumentUpload(cargoId)}
-                </Paper>
-              </Grid>
-            ))}
-
-            <Grid item xs={12}>
-              <Button
-                startIcon={<AddCircleOutlineIcon />}
-                onClick={handleAddCargo}
-                variant="outlined"
-                fullWidth
-              >
-                Add Cargo Item
-              </Button>
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog} color="secondary">
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} color="primary" variant="contained">
-            Submit
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Container>
-  );
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCloseDialog} color="secondary">
+                        Cancel
+                    </Button>
+                    <Button onClick={handleSubmit} color="primary" variant="contained">
+                        Submit
+                    </Button>
+                </DialogActions>
+            </Dialog>
+        </Container>
+    );
 };
 
 export default BookingForm;

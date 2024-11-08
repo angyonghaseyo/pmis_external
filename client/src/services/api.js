@@ -854,7 +854,94 @@ export const getBillingRequests = async (companyId, requestType) => {
   }
 };
 
+export const getBookings = async () => {
+  try {
+    const response = await fetch('http://localhost:5001/bookings');
+    if (!response.ok) {
+      throw new Error('Failed to fetch bookings');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching bookings:', error);
+    throw error;
+  }
+};
 
+export const createBooking = async (bookingData) => {
+  try {
+    const response = await fetch('http://localhost:5001/bookings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(bookingData),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to create booking');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error creating booking:', error);
+    throw error;
+  }
+};
+
+export const updateBooking = async (id, bookingData) => {
+  try {
+    const response = await fetch(`http://localhost:5001/bookings/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(bookingData),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to update booking');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating booking:', error);
+    throw error;
+  }
+};
+
+export const deleteBooking = async (id) => {
+  try {
+    const response = await fetch(`http://localhost:5001/bookings/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      throw new Error('Failed to delete booking');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error deleting booking:', error);
+    throw error;
+  }
+};
+
+export const uploadBookingDocument = async (bookingId, cargoId, documentType, file) => {
+  try {
+    const formData = new FormData();
+    formData.append('document', file);
+    formData.append('documentType', documentType);
+
+    const response = await fetch(
+      `http://localhost:5001/bookings/${bookingId}/cargo/${cargoId}/documents`,
+      {
+        method: 'POST',
+        body: formData,
+      }
+    );
+    if (!response.ok) {
+      throw new Error('Failed to upload document');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error uploading document:', error);
+    throw error;
+  }
+};
 
 // Dashboard data
 export const getLeaveStatistics = () => authAxios.get('/leave-statistics').catch(handleApiError);
@@ -875,7 +962,18 @@ export const updateEmployee = (employeeId, data) =>
   authAxios.put(`/employees/${employeeId}`, data).catch(handleApiError);
 
 // Vessel Visits
-export const getVesselVisits = () => authAxios.get('/vessel-visits').catch(handleApiError);
+export const getVesselVisits = async () => {
+  try {
+      const response = await fetch('http://localhost:5001/vessel-visits-booking');
+      if (!response.ok) {
+          throw new Error('Failed to fetch vessel visits');
+      }
+      return await response.json();
+  } catch (error) {
+      console.error('Error fetching vessel visits:', error);
+      throw error;
+  }
+};
 
 export const getVesselVisitsConfirmedWithoutManifests = () => {
   return axios.get('/vessel-visits-confirmed-without-manifests').catch(handleApiError);
