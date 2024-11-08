@@ -78,40 +78,25 @@ class VesselService {
 
     async fetchVesselVisitsForBooking() {
         try {
-            const vesselVisitsRef = db.collection('vesselVisitRequests');
-            const snapshot = await vesselVisitsRef.get();
-            
-            const visits = [];
-            snapshot.forEach(doc => {
-                const visitData = doc.data();
-                // Only include necessary fields and transform data structure for booking form
-                if (visitData.vesselName && visitData.status === 'confirmed') {
-                    const existingVisit = visits.find(v => v.vesselName === visitData.vesselName);
-                    const voyage = {
-                        voyageNumber: visitData.voyageNumber || doc.id,
-                        departurePort: visitData.portOfDeparture,
-                        arrivalPort: visitData.portOfArrival,
-                        eta: visitData.eta,
-                        etd: visitData.etd
-                    };
-    
-                    if (existingVisit) {
-                        existingVisit.voyages.push(voyage);
-                    } else {
-                        visits.push({
-                            vesselName: visitData.vesselName,
-                            voyages: [voyage]
-                        });
-                    }
-                }
-            });
-            
-            return visits;
+          const querySnapshot = await db.collection('vesselVisitRequests').get();
+          return querySnapshot.docs.map((doc) => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              vesselName: data.vesselName,
+              voyages: Array.isArray(data.voyages) ? data.voyages.map(voyage => ({
+                voyageNumber: voyage.voyageNumber,
+                arrivalPort: voyage.arrivalPort,
+                departurePort: voyage.departurePort
+              })) : [],
+              ...data
+            };
+          });
         } catch (error) {
-            console.error('Error fetching vessel visits for booking:', error);
-            throw error;
+          console.error('Error fetching vessel visits:', error);
+          throw error;
         }
-    }
+      }
     
 
 }
