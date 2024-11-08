@@ -295,12 +295,29 @@ const BookingForm = ({ user }) => {
 
   const handleOpenDialog = (booking = null) => {
     if (booking) {
+      // Set the vessel name first
+      setSelectedVessel(booking.vesselName || "");
+      
+      // Find the vessel data to get available voyages
+      const selectedVesselData = vesselVisits.find(
+        (visit) => visit.vesselName === booking.vesselName
+      );
+      
+      // Set available voyages for the selected vessel
+      setAvailableVoyages(selectedVesselData?.voyages || []);
+
+      // Set all form data including the voyage number
       setFormData({
         ...booking,
         cargo: booking.cargo || {},
+        voyageNumber: booking.voyageNumber || ""
       });
+      
       setEditingId(booking.bookingId);
     } else {
+      // Reset everything for new booking
+      setSelectedVessel("");
+      setAvailableVoyages([]);
       setFormData({
         cargo: {},
         pickupDate: "",
@@ -311,11 +328,14 @@ const BookingForm = ({ user }) => {
         etd: "",
         freeTime: 0,
         bookingId: "",
+        vesselName: "",
+        voyageNumber: ""
       });
       setEditingId(null);
     }
     setOpenDialog(true);
   };
+
 
   const handleCloseDialog = () => {
     setOpenDialog(false);
@@ -857,6 +877,7 @@ return (
                                 value={selectedVessel}
                                 onChange={handleVesselChange}
                                 label="Vessel Name"
+                                disabled={!!editingId} 
                             >
                                 {vesselVisits.map((visit) => (
                                     <MenuItem key={visit.vesselName} value={visit.vesselName}>
@@ -873,6 +894,7 @@ return (
                                 value={formData.voyageNumber || ""}
                                 onChange={handleVoyageChange}
                                 label="Voyage Number"
+                                disabled={!!editingId} 
                             >
                                 {availableVoyages.map((voyage) => (
                                     <MenuItem
