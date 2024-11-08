@@ -21,7 +21,7 @@ const companyRoutes = require('./src/routes/companyRoutes');
 const adHocResourceRequestRoutes = require('./src/routes/adHocResourceRequestRoutes');
 const containerMenuRoutes = require('./src/routes/containerMenuRoutes');
 const financeRoutes = require('./src/routes/financeRoutes')
-
+const containerPricingRoutes = require('./src/routes/containerPricingRoutes');
 require('./src/config/firebase');
 
 const storage = new Storage({
@@ -48,6 +48,7 @@ app.use('/', trainingRoutes);
 app.use('/', companyRoutes);
 app.use('/', adHocResourceRequestRoutes);
 app.use('/', containerMenuRoutes);
+app.use('/', containerPricingRoutes);
 app.use('/', financeRoutes);
 
 app.listen(5001, () => {
