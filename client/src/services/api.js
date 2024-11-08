@@ -759,6 +759,34 @@ export const addContainerType = async (company, containerData) => {
   }
 };
 
+export const getBillingRequests = async (companyId, requestType) => {
+  try {
+    if (!companyId || !requestType) {
+      throw new Error('CompanyId and requestType are required');
+    }
+
+    const response = await fetch(
+      `http://localhost:5001/api/billing-requests?companyId=${encodeURIComponent(companyId)}&requestType=${encodeURIComponent(requestType)}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to fetch billing requests');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching billing requests:', error);
+    throw error;
+  }
+};
+
 
 // Dashboard data
 export const getLeaveStatistics = () => authAxios.get('/leave-statistics').catch(handleApiError);
@@ -880,6 +908,7 @@ const api = {
   getAdHocResourceRequests,
   submitAdHocResourceRequest,
   updateAdHocResourceRequest,
+  getBillingRequests
 };
 
 export default api;

@@ -20,6 +20,7 @@ const trainingRoutes = require('./src/routes/trainingRoutes');
 const companyRoutes = require('./src/routes/companyRoutes');
 const adHocResourceRequestRoutes = require('./src/routes/adHocResourceRequestRoutes');
 const containerMenuRoutes = require('./src/routes/containerMenuRoutes');
+const financeRoutes = require('./src/routes/financeRoutes')
 
 require('./src/config/firebase');
 
@@ -47,7 +48,7 @@ app.use('/', trainingRoutes);
 app.use('/', companyRoutes);
 app.use('/', adHocResourceRequestRoutes);
 app.use('/', containerMenuRoutes);
-
+app.use('/', financeRoutes);
 
 app.listen(5001, () => {
     console.log('Server is running on port 5001');

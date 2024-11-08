@@ -28,6 +28,7 @@ import { useAuth } from "./AuthContext";
 import { jwtDecode } from "jwt-decode";
 import ElectronicTradeDocuments from "./ElectronicTradeDocument";
 import CustomsPreview from "./CustomsPreview";
+import BillingRequests from "./BillingRequests";
 
 const drawerWidth = 240;
 
@@ -245,6 +246,12 @@ function App() {
                 <Route
                   path="/customs-and-trade-documents/document-manager"
                   element={<CustomsPreview />}
+                />
+              )}
+              {hasAccessRights(["View Billing Requests"]) && (
+                <Route
+                  path="/finance/billing-requests"
+                  element={<BillingRequests companyId={user.company} />}
                 />
               )}
               <Route path="*" element={<Navigate to="/" replace />} />
