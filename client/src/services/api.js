@@ -759,6 +759,77 @@ export const addContainerType = async (company, containerData) => {
   }
 };
 
+export const getCarrierContainerPrices = async (company) => {
+  try {
+    const response = await fetch(`http://localhost:5001/carrier-container-prices?company=${encodeURIComponent(company)}`);
+    if (!response.ok) {
+      throw new Error('Error fetching carrier container prices');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in getCarrierContainerPrices:', error);
+    throw error;
+  }
+};
+
+export const assignContainerPrice = async (company, containerData) => {
+  try {
+    const response = await fetch('http://localhost:5001/carrier-container-prices', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        company,
+        ...containerData,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Error assigning container price');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in assignContainerPrice:', error);
+    throw error;
+  }
+};
+
+export const updateContainerPrice = async (company, equipmentId, updateData) => {
+  try {
+    const response = await fetch(`http://localhost:5001/carrier-container-prices/${company}/${equipmentId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updateData),
+    });
+
+    if (!response.ok) {
+      throw new Error('Error updating container price');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in updateContainerPrice:', error);
+    throw error;
+  }
+};
+
+export const deleteContainerPrice = async (company, equipmentId) => {
+  try {
+    const response = await fetch(`http://localhost:5001/carrier-container-prices/${company}/${equipmentId}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      throw new Error('Error deleting container price');
+    }
+  } catch (error) {
+    console.error('Error in deleteContainerPrice:', error);
+    throw error;
+  }
+};
+
 export const getBillingRequests = async (companyId, requestType) => {
   try {
     const response = await fetch(
@@ -905,6 +976,12 @@ const api = {
   getAdHocResourceRequests,
   submitAdHocResourceRequest,
   updateAdHocResourceRequest,
+  getContainerTypes,
+  addContainerType,
+  getCarrierContainerPrices,
+  assignContainerPrice,
+  updateContainerPrice,
+  deleteContainerPrice,
   getBillingRequests
 };
 
