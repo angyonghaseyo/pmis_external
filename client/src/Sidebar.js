@@ -84,12 +84,16 @@ const Sidebar = ({ user }) => {
         { name: 'Container Pricing Manager', accessRights: ['Create Container Pricings', 'View Container Pricings'] },
         { name: 'Container Menu', accessRights: ['Create Container Menu', 'View Container Menu'] },
         { name: 'Container Requests List', accessRights: ['View Container Requests', 'Approve Container Requests'] },
-        { name: 'Facility and Space Rental', accessRights: ['Create Facility Rental'] }
+        { name: 'Facility and Space Rental', accessRights: ['Create Facility Rental'] },
+        { name: 'Cargo Sampling', accessRights: ['Create Sampling Request'] },
+        { name: 'Cargo Repacking', accessRights: ['Create Repacking Request'] },
+        { name: 'Cargo Storage', accessRights: ['Create Storage Request'] },
+        { name: 'Cargo Transloading', accessRights: ['Create Transloading Request'] },
 
       ],
       accessRights: ['Create Cargo Booking', 'Create Facility Rental', 'View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest',
         'Create Container Request', 'View Container Request', 'Create Container Pricings', 'View Container Pricings',
-        'Create Container Menu', 'View Container Menu', 'Register Truck', 'View Truck Registrations', 'View Container Requests', 'Approve Container Requests']
+        'Create Container Menu', 'View Container Menu', 'Register Truck', 'View Truck Registrations', 'View Container Requests', 'Approve Container Requests', 'Create Sampling Request', 'Create Repacking Request', 'Create Storage Request', 'Create Transloading Request']
     },
     {
       name: "Customs and Trade Documents",
