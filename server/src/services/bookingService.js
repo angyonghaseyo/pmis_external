@@ -15,7 +15,7 @@ class BookingService {
         try {
             const snapshot = await this.db.collection('bookings').get();
             return snapshot.docs.map(doc => ({
-                id: doc.id,
+                bookingId: doc.data().bookingId || doc.id, // Use existing bookingId or fallback to doc.id
                 ...doc.data()
             }));
         } catch (error) {
