@@ -525,7 +525,58 @@ const CargoTransloadingRequest = ({ open, handleClose, editingId = null, onSubmi
         }
     };
 
+    const validateForm = () => {
+        const errors = {};
+
+        // Cargo Details Validation
+        if (!formData.cargoDetails.cargoNumber) {
+            errors.cargoNumber = 'Cargo number is required';
+        }
+
+        if (!formData.cargoDetails.cargoType) {
+            errors.cargoType = 'Cargo type is required';
+        }
+
+        if (!formData.cargoDetails.quantity || formData.cargoDetails.quantity <= 0) {
+            errors.quantity = 'Valid quantity is required';
+        }
+
+        // Warehouse Requirement Validation
+        if (!formData.warehouseRequirement) {
+            errors.warehouseRequirement = 'Warehouse requirement is required';
+        }
+
+        // Schedule Validation
+        if (!formData.transloadingTimeWindow.startDate) {
+            errors.startDate = 'Start date is required';
+        }
+
+        if (!formData.transloadingTimeWindow.endDate) {
+            errors.endDate = 'End date is required';
+        }
+
+        if (formData.transloadingTimeWindow.startDate && formData.transloadingTimeWindow.endDate) {
+            if (formData.transloadingTimeWindow.endDate < formData.transloadingTimeWindow.startDate) {
+                errors.endDate = 'End date must be after start date';
+            }
+        }
+
+        // Document Validation
+        if (!formData.documents.storageChecklist || formData.documents.storageChecklist.length === 0) {
+            errors.storageChecklist = 'Storage checklist is required';
+        }
+
+        setErrors(errors);
+        return Object.keys(errors).length === 0;
+    };
+
     const handleSubmit = async () => {
+
+        if (!validateForm()) {
+            setSubmitError('Please fill in all required fields correctly');
+            return;
+        }
+
         try {
             setLoading(true);
             setSubmitError(null);
@@ -577,6 +628,8 @@ const CargoTransloadingRequest = ({ open, handleClose, editingId = null, onSubmi
         await uploadBytes(storageRef, file);
         return await getDownloadURL(storageRef);
     };
+
+
 
 
     return (

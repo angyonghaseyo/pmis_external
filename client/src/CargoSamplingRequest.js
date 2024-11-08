@@ -567,8 +567,6 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
             </Grid>
         </Grid>
     );
-    // Your existing renderStepContent function here...
-    // (Keep the cargo details, sampling requirements, and schedule & documents steps as they were)
 
     const renderStepContent = (step) => {
         switch (step) {
@@ -585,7 +583,33 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
         }
     };
 
+    const validateForm = () => {
+        const errors = {};
+
+        // Cargo Details validation
+        if (!formData.cargoDetails.cargoNumber) errors.cargoNumber = 'Cargo number is required';
+
+        // Sampling Details validation
+        if (!formData.samplingDetails.sampleType.length) errors.sampleType = 'At least one sample type is required';
+        if (!formData.samplingDetails.testingRequirements.length) errors.testingRequirements = 'At least one testing requirement is required';
+        if (!formData.samplingDetails.sampleQuantity) errors.sampleQuantity = 'Sample quantity is required';
+
+        // Schedule validation
+        if (!formData.schedule.startDate) errors.startDate = 'Start date is required';
+        if (!formData.schedule.endDate) errors.endDate = 'End date is required';
+
+        // Document validation
+        if (!formData.documents.safetyDataSheet) errors.safetyDataSheet = 'Safety data sheet is required';
+
+        setErrors(errors);
+        return Object.keys(errors).length === 0;
+    };
+
     const handleSubmit = async () => {
+        if (!validateForm()) {
+            setSubmitError('Please fill in all required fields');
+            return;
+        }
         try {
             setLoading(true);
             setSubmitError(null);

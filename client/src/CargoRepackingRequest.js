@@ -576,7 +576,68 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
         }
     };
 
+    const validateForm = () => {
+        const errors = {};
+
+        // Cargo Details Validation
+        if (!formData.cargoDetails.cargoNumber) {
+            errors.cargoNumber = 'Cargo number is required';
+        }
+
+        if (!formData.cargoDetails.cargoType) {
+            errors.cargoType = 'Cargo type is required';
+        }
+
+        if (!formData.cargoDetails.quantity || formData.cargoDetails.quantity <= 0) {
+            errors.quantity = 'Valid quantity is required';
+        }
+
+        if (!formData.cargoDetails.currentPackaging) {
+            errors.currentPackaging = 'Current packaging type is required';
+        }
+
+        if (!formData.cargoDetails.desiredPackaging) {
+            errors.desiredPackaging = 'Desired packaging type is required';
+        }
+
+        // Repacking Details Validation 
+        if (!formData.repackingDetails.requirements || formData.repackingDetails.requirements.length === 0) {
+            errors.requirements = 'At least one repacking requirement must be selected';
+        }
+
+        // Schedule Validation
+        if (!formData.schedule.startDate) {
+            errors.startDate = 'Start date is required';
+        }
+
+        if (!formData.schedule.endDate) {
+            errors.endDate = 'End date is required';
+        }
+
+        if (formData.schedule.startDate && formData.schedule.endDate) {
+            if (formData.schedule.endDate < formData.schedule.startDate) {
+                errors.endDate = 'End date must be after start date';
+            }
+        }
+
+        // Document Validation
+        if (!formData.documents.repackagingChecklist || formData.documents.repackagingChecklist.length === 0) {
+            errors.repackagingChecklist = 'Repacking checklist is required';
+        }
+
+        // Special instructions are optional, so no validation needed
+
+        setErrors(errors);
+        return Object.keys(errors).length === 0;
+    };
+
     const handleSubmit = async () => {
+
+        if (!validateForm()) {
+            setSubmitError('Please fill in all required fields');
+            return;
+        }
+
         try {
             setLoading(true);
             setSubmitError(null);

@@ -25,7 +25,8 @@ import {
     Dialog,
     DialogTitle,
     DialogContent,
-    DialogActions
+    DialogActions,
+    Link
 } from '@mui/material';
 import {
     Warehouse
@@ -34,7 +35,9 @@ import { Edit, Delete, Visibility, Search, Download } from '@mui/icons-material'
 import { collection, query, where, getDocs, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import CargoStorageRequest from './CargoStorageRequest';
-import { format } from 'date-fns';
+import { format, differenceInDays } from 'date-fns';
+import CloseIcon from '@mui/icons-material/Close';
+import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 
 
 const CargoStorage = () => {
@@ -43,6 +46,7 @@ const CargoStorage = () => {
     const [openDialog, setOpenDialog] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [deleteConfirmation, setDeleteConfirmation] = useState(null);
+    const [viewRequest, setViewRequest] = useState(null);
     const [filters, setFilters] = useState({
         status: 'all',
         searchQuery: '',
@@ -182,6 +186,153 @@ const CargoStorage = () => {
         );
     };
 
+    const RequestDetailsDialog = ({ request, onClose }) => {
+        if (!request) return null;
+
+        return (
+            <Dialog open={true} onClose={onClose} maxWidth="md" fullWidth>
+                <DialogTitle>
+                    <Box display="flex" justifyContent="space-between" alignItems="center">
+                        <Typography variant="h6">Storage Request Details</Typography>
+                        <IconButton onClick={onClose}>
+                            <CloseIcon />
+                        </IconButton>
+                    </Box>
+                </DialogTitle>
+                <DialogContent dividers>
+                    <Grid container spacing={3}>
+                        {/* Cargo Information Section */}
+                        <Grid item xs={12}>
+                            <Typography variant="subtitle1" gutterBottom>Cargo Information</Typography>
+                            <Paper sx={{ p: 2 }}>
+                                <Grid container spacing={2}>
+                                    <Grid item xs={6}>
+                                        <Typography variant="body2" color="textSecondary">Cargo Number</Typography>
+                                        <Typography variant="body1">{request.cargoDetails.cargoNumber}</Typography>
+                                    </Grid>
+                                    <Grid item xs={6}>
+                                        <Typography variant="body2" color="textSecondary">Cargo Type</Typography>
+                                        <Typography variant="body1">{request.cargoDetails.cargoType}</Typography>
+                                    </Grid>
+                                    <Grid item xs={6}>
+                                        <Typography variant="body2" color="textSecondary">Quantity</Typography>
+                                        <Typography variant="body1">
+                                            {request.cargoDetails.quantity} {request.cargoDetails.unit}
+                                        </Typography>
+                                    </Grid>
+                                    <Grid item xs={6}>
+                                        <Typography variant="body2" color="textSecondary">Status</Typography>
+                                        <Chip
+                                            label={request.status}
+                                            color={getStatusColor(request.status)}
+                                            size="small"
+                                        />
+                                    </Grid>
+                                </Grid>
+                            </Paper>
+                        </Grid>
+
+                        {/* Warehouse Requirement Section */}
+                        <Grid item xs={12}>
+                            <Typography variant="subtitle1" gutterBottom>Warehouse Requirement</Typography>
+                            <Paper sx={{ p: 2 }}>
+                                <Typography variant="body1">{request.warehouseRequirement}</Typography>
+                            </Paper>
+                        </Grid>
+
+                        {/* Schedule Section */}
+                        <Grid item xs={12}>
+                            <Typography variant="subtitle1" gutterBottom>Storage Schedule</Typography>
+                            <Paper sx={{ p: 2 }}>
+                                <Grid container spacing={2}>
+                                    <Grid item xs={6}>
+                                        <Typography variant="body2" color="textSecondary">Start Date</Typography>
+                                        <Typography variant="body1">
+                                            {format(request.schedule.startDate.toDate(), 'PPpp')}
+                                        </Typography>
+                                    </Grid>
+                                    <Grid item xs={6}>
+                                        <Typography variant="body2" color="textSecondary">End Date</Typography>
+                                        <Typography variant="body1">
+                                            {format(request.schedule.endDate.toDate(), 'PPpp')}
+                                        </Typography>
+                                    </Grid>
+                                </Grid>
+                            </Paper>
+                        </Grid>
+
+                        {/* Documents Section */}
+                        {/* <Grid item xs={12}>
+                            <Typography variant="subtitle1" gutterBottom>Documents</Typography>
+                            <Paper sx={{ p: 2 }}>
+                                <Grid container spacing={2}>
+                                    <Grid item xs={12}>
+                                        <Typography variant="body2" color="textSecondary" gutterBottom>
+                                            Storage Checklist
+                                        </Typography>
+
+                                        <InsertDriveFileIcon sx={{ mr: 1 }} />
+                                        <Link
+                                            href={request.documents.storageChecklist}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            sx={{ textDecoration: 'none' }}
+                                        >
+                                        </Link>
+
+
+                                    </Grid>
+                                </Grid>
+                            </Paper>
+                        </Grid> */}
+
+                        {/* Special Instructions Section */}
+                        {request.specialInstructions && (
+                            <Grid item xs={12}>
+                                <Typography variant="subtitle1" gutterBottom>Special Instructions</Typography>
+                                <Paper sx={{ p: 2 }}>
+                                    <Typography variant="body1">{request.specialInstructions}</Typography>
+                                </Paper>
+                            </Grid>
+                        )}
+
+                        {/* Storage Duration Section */}
+                        <Grid item xs={12}>
+                            <Typography variant="subtitle1" gutterBottom>Storage Duration</Typography>
+                            <Paper sx={{ p: 2 }}>
+                                <Typography variant="body1">
+                                    {differenceInDays(
+                                        request.schedule.endDate.toDate(),
+                                        request.schedule.startDate.toDate()
+                                    )} days
+                                </Typography>
+                            </Paper>
+                        </Grid>
+                    </Grid>
+                </DialogContent>
+                <DialogActions>
+                    {request.status === 'Pending' && (
+                        <Button
+                            color="primary"
+                            onClick={() => handleStatusChange(request.id, 'In Progress')}
+                        >
+                            Start Storage
+                        </Button>
+                    )}
+                    {request.status === 'In Progress' && (
+                        <Button
+                            color="success"
+                            onClick={() => handleStatusChange(request.id, 'Completed')}
+                        >
+                            Mark as Completed
+                        </Button>
+                    )}
+                    <Button onClick={onClose}>Close</Button>
+                </DialogActions>
+            </Dialog>
+        );
+    };
+
     return (
         <Container maxWidth="xl" sx={{ mt: 4 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
@@ -262,7 +413,7 @@ const CargoStorage = () => {
                                     </TableCell>
                                     <TableCell>
                                         <Tooltip title="View Details">
-                                            <IconButton size="small" onClick={() => { }}>
+                                            <IconButton size="small" onClick={() => { setViewRequest(request) }}>
                                                 <Visibility />
                                             </IconButton>
                                         </Tooltip>
@@ -356,6 +507,13 @@ const CargoStorage = () => {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            {viewRequest && (
+                <RequestDetailsDialog
+                    request={viewRequest}
+                    onClose={() => setViewRequest(null)}
+                />
+            )}
 
         </Container>
     );

@@ -33,6 +33,7 @@ import { db } from './firebaseConfig';
 import CargoSamplingRequest from './CargoSamplingRequest';
 import { format } from 'date-fns';
 import ScienceIcon from '@mui/icons-material/Science';
+import CloseIcon from '@mui/icons-material/Close';
 
 
 const CargoSampling = () => {
@@ -51,6 +52,7 @@ const CargoSampling = () => {
         message: '',
         severity: 'info'
     });
+    const [viewRequest, setViewRequest] = useState(null);
 
     const fetchRequests = async () => {
         try {
@@ -180,6 +182,120 @@ const CargoSampling = () => {
         );
     };
 
+    const RequestDetailsDialog = ({ request, onClose }) => {
+        if (!request) return null;
+
+        return (
+            <Dialog open={true} onClose={onClose} maxWidth="md" fullWidth>
+                <DialogTitle>
+                    <Box display="flex" justifyContent="space-between" alignItems="center">
+                        <Typography variant="h6">Request Details</Typography>
+                        <IconButton onClick={onClose}>
+                            <CloseIcon />
+                        </IconButton>
+                    </Box>
+                </DialogTitle>
+                <DialogContent dividers>
+                    <Grid container spacing={3}>
+                        <Grid item xs={12}>
+                            <Typography variant="subtitle1" gutterBottom>Cargo Information</Typography>
+                            <Paper sx={{ p: 2 }}>
+                                <Grid container spacing={2}>
+                                    <Grid item xs={6}>
+                                        <Typography variant="body2" color="textSecondary">Cargo Number</Typography>
+                                        <Typography variant="body1">{request.cargoDetails.cargoNumber}</Typography>
+                                    </Grid>
+                                    <Grid item xs={6}>
+                                        <Typography variant="body2" color="textSecondary">Cargo Type</Typography>
+                                        <Typography variant="body1">{request.cargoDetails.cargoType}</Typography>
+                                    </Grid>
+                                    <Grid item xs={6}>
+                                        <Typography variant="body2" color="textSecondary">Quantity</Typography>
+                                        <Typography variant="body1">
+                                            {request.cargoDetails.quantity} {request.cargoDetails.unit}
+                                        </Typography>
+                                    </Grid>
+                                    <Grid item xs={6}>
+                                        <Typography variant="body2" color="textSecondary">Status</Typography>
+                                        <Chip
+                                            label={request.status}
+                                            color={getStatusColor(request.status)}
+                                            size="small"
+                                        />
+                                    </Grid>
+                                </Grid>
+                            </Paper>
+                        </Grid>
+
+
+                        <Grid item xs={12}>
+                            <Typography variant="subtitle1" gutterBottom>Sampling Details</Typography>
+                            <Paper sx={{ p: 2 }}>
+                                <Grid container spacing={2}>
+                                    <Grid item xs={12}>
+                                        <Typography variant="body2" color="textSecondary">Sample Types</Typography>
+                                        <Box sx={{ mt: 1 }}>
+                                            {request.samplingDetails.sampleType.map((type) => (
+                                                <Chip key={type} label={type} sx={{ mr: 1, mb: 1 }} />
+                                            ))}
+                                        </Box>
+                                    </Grid>
+                                    <Grid item xs={12}>
+                                        <Typography variant="body2" color="textSecondary">Testing Requirements</Typography>
+                                        <Box sx={{ mt: 1 }}>
+                                            {request.samplingDetails.testingRequirements.map((req) => (
+                                                <Chip key={req} label={req} sx={{ mr: 1, mb: 1 }} />
+                                            ))}
+                                        </Box>
+                                    </Grid>
+                                    <Grid item xs={6}>
+                                        <Typography variant="body2" color="textSecondary">Sample Quantity</Typography>
+                                        <Typography variant="body1">
+                                            {request.samplingDetails.sampleQuantity} {request.samplingDetails.sampleUnit}
+                                        </Typography>
+                                    </Grid>
+                                </Grid>
+                            </Paper>
+                        </Grid>
+
+                        <Grid item xs={12}>
+                            <Typography variant="subtitle1" gutterBottom>Schedule</Typography>
+                            <Paper sx={{ p: 2 }}>
+                                <Grid container spacing={2}>
+                                    <Grid item xs={6}>
+                                        <Typography variant="body2" color="textSecondary">Start Date</Typography>
+                                        <Typography variant="body1">
+                                            {format(request.schedule.startDate.toDate(), 'PPpp')}
+                                        </Typography>
+                                    </Grid>
+                                    <Grid item xs={6}>
+                                        <Typography variant="body2" color="textSecondary">End Date</Typography>
+                                        <Typography variant="body1">
+                                            {format(request.schedule.endDate.toDate(), 'PPpp')}
+                                        </Typography>
+                                    </Grid>
+                                </Grid>
+                            </Paper>
+                        </Grid>
+
+                        {request.specialInstructions && (
+                            <Grid item xs={12}>
+                                <Typography variant="subtitle1" gutterBottom>Special Instructions</Typography>
+                                <Paper sx={{ p: 2 }}>
+                                    <Typography variant="body1">{request.specialInstructions}</Typography>
+                                </Paper>
+                            </Grid>
+                        )}
+                    </Grid>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={onClose}>Close</Button>
+                </DialogActions>
+            </Dialog>
+        );
+    };
+
+
     return (
         <Container maxWidth="xl" sx={{ mt: 4 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
@@ -270,7 +386,7 @@ const CargoSampling = () => {
                                     </TableCell>
                                     <TableCell>
                                         <Tooltip title="View Details">
-                                            <IconButton size="small" onClick={() => { }}>
+                                            <IconButton size="small" onClick={() => setViewRequest(request)}>
                                                 <Visibility />
                                             </IconButton>
                                         </Tooltip>
@@ -364,6 +480,13 @@ const CargoSampling = () => {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            {viewRequest && (
+                <RequestDetailsDialog
+                    request={viewRequest}
+                    onClose={() => setViewRequest(null)}
+                />
+            )}
 
         </Container>
     );
