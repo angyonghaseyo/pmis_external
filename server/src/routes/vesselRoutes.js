@@ -11,5 +11,6 @@ router.get('/vessel-visits', (req, res) => vesselController.getVesselVisits(req,
 router.get('/vessel-visits-confirmed-without-manifests', (req, res) => vesselController.getConfirmedVesselVisitsWithoutManifests(req, res));
 router.get('/vessel-visits-adhoc-requests', (req, res) => vesselController.getVesselVisitsAdHocRequests(req, res));
 router.get('/active-vessel-visits', (req, res) => vesselController.getActiveVesselVisits(req, res));
+router.get('/vessel-visits-booking', (req, res) => vesselController.getVesselVisitsForBooking(req, res));
 
 module.exports = router;
