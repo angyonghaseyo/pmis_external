@@ -314,7 +314,7 @@ const CargoTransloading = () => {
                         </Grid>
                     </Grid>
                 </DialogContent>
-                <DialogActions>
+                {/* <DialogActions>
                     {request.status === 'Pending' && (
                         <Button
                             color="primary"
@@ -332,7 +332,7 @@ const CargoTransloading = () => {
                         </Button>
                     )}
                     <Button onClick={onClose}>Close</Button>
-                </DialogActions>
+                </DialogActions> */}
             </Dialog>
         );
     };

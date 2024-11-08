@@ -283,7 +283,7 @@ const CargoRepacking = () => {
                         </Grid>
 
                         {/* Documents Section */}
-                        <Grid item xs={12}>
+                        {/* <Grid item xs={12}>
                             <Typography variant="subtitle1" gutterBottom>Documents</Typography>
                             <Paper sx={{ p: 2 }}>
                                 <Grid container spacing={2}>
@@ -302,7 +302,7 @@ const CargoRepacking = () => {
                                     </Grid>
                                 </Grid>
                             </Paper>
-                        </Grid>
+                        </Grid> */}
 
                         {/* Special Instructions Section */}
                         {request.specialInstructions && (
@@ -315,7 +315,7 @@ const CargoRepacking = () => {
                         )}
                     </Grid>
                 </DialogContent>
-                <DialogActions>
+                {/* <DialogActions>
                     {request.status === 'Pending' && (
                         <Button
                             color="primary"
@@ -333,7 +333,7 @@ const CargoRepacking = () => {
                         </Button>
                     )}
                     <Button onClick={onClose}>Close</Button>
-                </DialogActions>
+                </DialogActions> */}
             </Dialog>
         );
     };
