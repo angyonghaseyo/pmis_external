@@ -1061,6 +1061,44 @@ export const deleteContainerRequest = async (id) => {
   }
 };
 
+export const assignContainerToRequest = async (requestId, container) => {
+  try {
+    const response = await fetch(`http://localhost:5001/container-requests/${requestId}/assign`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ container }),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to assign container');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error assigning container:', error);
+    throw error;
+  }
+};
+
+export const rejectContainerRequest = async (requestId, rejectionReason) => {
+  try {
+    const response = await fetch(`http://localhost:5001/container-requests/${requestId}/reject`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ rejectionReason }),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to reject container request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error rejecting container request:', error);
+    throw error;
+  }
+};
+
 // Dashboard data
 export const getLeaveStatistics = () => authAxios.get('/leave-statistics').catch(handleApiError);
 
@@ -1209,6 +1247,8 @@ const api = {
   createBooking,
   updateBooking,
   deleteBooking,
+  assignContainerToRequest,
+  rejectContainerRequest,
 };
 
 export default api;

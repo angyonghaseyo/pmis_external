@@ -63,6 +63,84 @@ class ContainerRequestService {
             throw error;
         }
     }
+
+    async assignContainer(requestId, container) {
+        try {
+            const requiredSpace = container.consolidationService
+                ? parseFloat(container.consolidationSpace)
+                : parseFloat(container.size);
+
+            if (requiredSpace > (parseFloat(container.size) - parseFloat(container.spaceUsed))) {
+                throw new Error('Not enough space in the selected container');
+            }
+
+            // Update container space usage
+            const updatedContainer = {
+                ...container,
+                spaceUsed: (parseFloat(container.spaceUsed) + requiredSpace).toString(),
+                bookingStatus: container.consolidationService ? "consolidation" : "booked",
+                containerConsolidationsID: container.consolidationService
+                    ? [...(container.containerConsolidationsID || []), requestId]
+                    : container.containerConsolidationsID
+            };
+
+            // Update the carrier container prices document
+            await this.db.collection("carrier_container_prices")
+                .doc(container.carrierName)
+                .update({
+                    containers: admin.firestore.FieldValue.arrayRemove(container)
+                });
+
+            await this.db.collection("carrier_container_prices")
+                .doc(container.carrierName)
+                .update({
+                    containers: admin.firestore.FieldValue.arrayUnion(updatedContainer)
+                });
+
+            // Update the container request
+            await this.db.collection("container_requests")
+                .doc(requestId)
+                .update({
+                    status: "Assigned",
+                    assignedContainerId: container.EquipmentID
+                });
+
+            // Update the associated booking
+            const bookingsSnapshot = await this.db.collection("bookings").get();
+            for (const doc of bookingsSnapshot.docs) {
+                const bookingData = doc.data();
+                if (bookingData.cargo && bookingData.cargo[container.cargoId]) {
+                    await this.db.collection("bookings")
+                        .doc(doc.id)
+                        .update({
+                            [`cargo.${container.cargoId}.isContainerRented`]: true
+                        });
+                    break;
+                }
+            }
+
+            return { success: true, message: 'Container assigned successfully' };
+        } catch (error) {
+            console.error('Error in assignContainer:', error);
+            throw error;
+        }
+    }
+
+    async rejectRequest(requestId, rejectionReason) {
+        try {
+            await this.db.collection("container_requests")
+                .doc(requestId)
+                .update({
+                    status: "Rejected",
+                    rejectionReason: rejectionReason
+                });
+
+            return { success: true, message: 'Request rejected successfully' };
+        } catch (error) {
+            console.error('Error in rejectRequest:', error);
+            throw error;
+        }
+    }
 }
 
 module.exports = ContainerRequestService;

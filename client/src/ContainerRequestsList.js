@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { doc, getDoc, updateDoc, getFirestore, getDocs, collection } from "firebase/firestore";
 import QRCode from 'qrcode';
 import {
     Box,
@@ -34,8 +33,13 @@ import {
     Download as DownloadIcon,
     Close as CloseIcon
 } from '@mui/icons-material';
-
-const db = getFirestore();
+import { 
+    getContainerRequests, 
+    getCarrierContainerPrices,
+    getContainerTypesForCompany,
+    assignContainerToRequest,
+    rejectContainerRequest
+} from './services/api';
 
 const ContainerRequestsList = () => {
     const [selectedRequest, setSelectedRequest] = useState(null);
@@ -55,14 +59,7 @@ const ContainerRequestsList = () => {
     const fetchData = async () => {
         setIsLoading(true);
         try {
-            // Fetch requests
-            const requestsSnapshot = await getDocs(collection(db, "container_requests"));
-            const requestsData = requestsSnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data(),
-                eta: doc.data().eta,
-                etd: doc.data().etd,
-            }));
+            const requestsData = await getContainerRequests();
             setRequests(requestsData);
         } catch (error) {
             console.error("Failed fetching requests", error);
@@ -72,56 +69,41 @@ const ContainerRequestsList = () => {
         }
     };
 
-
-
-    const showAlert = (message, severity = 'success') => {
-        setAlert({ message, severity });
-    };
-
     const handleRequestClick = async (request) => {
         try {
             let allContainers = [];
             let allImages = {};
 
-            // If carrier name is specified, fetch only that carrier's data
             if (request.carrierName) {
-                const carrierDoc = await getDoc(doc(db, "carrier_container_prices", request.carrierName));
-                const containers = carrierDoc.data()?.containers || [];
+                const containers = await getCarrierContainerPrices(request.carrierName);
                 allContainers = containers;
 
-                const menuDoc = await getDoc(doc(db, "container_menu", request.carrierName));
-                const containerTypes = menuDoc.data()?.container_types || [];
+                const containerTypes = await getContainerTypesForCompany(request.carrierName);
                 containerTypes.forEach(type => {
                     allImages[type.name] = type.imageUrl;
                 });
             } else {
-                // Fetch all carriers' container prices
-                const carrierSnapshot = await getDocs(collection(db, "carrier_container_prices"));
-                carrierSnapshot.forEach(doc => {
-                    const carrierData = doc.data();
-                    if (carrierData.containers) {
-                        // Add carrier name to each container for reference
-                        const containersWithCarrier = carrierData.containers.map(container => ({
+                // If carrier name is not specified, fetch all carriers' data
+                const carrierTypes = await getContainerTypesForCompany();
+                Object.entries(carrierTypes).forEach(([carrier, types]) => {
+                    types.forEach(type => {
+                        allImages[type.name] = type.imageUrl;
+                    });
+                });
+
+                // Fetch container prices for all carriers
+                const carrierPrices = await getCarrierContainerPrices();
+                carrierPrices.forEach(carrier => {
+                    if (carrier.containers) {
+                        const containersWithCarrier = carrier.containers.map(container => ({
                             ...container,
-                            carrierName: doc.id
+                            carrierName: carrier.name
                         }));
                         allContainers = [...allContainers, ...containersWithCarrier];
                     }
                 });
-
-                // Fetch all container types and images
-                const menuSnapshot = await getDocs(collection(db, "container_menu"));
-                menuSnapshot.forEach(doc => {
-                    const menuData = doc.data();
-                    if (menuData.container_types) {
-                        menuData.container_types.forEach(type => {
-                            allImages[type.name] = type.imageUrl;
-                        });
-                    }
-                });
             }
 
-            // Filter out fully booked containers
             const availableContainers = allContainers.filter(container => {
                 const spaceUsed = parseFloat(container.spaceUsed || 0);
                 const totalSpace = parseFloat(container.size || 0);
@@ -155,45 +137,13 @@ const ContainerRequestsList = () => {
         }
 
         try {
-            const updatedContainer = {
-                ...container,
-                spaceUsed: (parseFloat(container.spaceUsed) + requiredSpace).toString(),
-                bookingStatus: selectedRequest.consolidationService ? "consolidation" : "booked",
-                containerConsolidationsID: selectedRequest.consolidationService
-                    ? [...(container.containerConsolidationsID || []), selectedRequest.id]
-                    : container.containerConsolidationsID
-            };
-
-            await updateDoc(doc(db, "carrier_container_prices", selectedRequest.carrierName), {
-                containers: availableContainers.map(c =>
-                    c.EquipmentID === container.EquipmentID ? updatedContainer : c
-                )
+            await assignContainerToRequest(selectedRequest.id, {
+                container,
+                cargoId: selectedRequest.cargoId
             });
-
-            await updateDoc(doc(db, "container_requests", selectedRequest.id), {
-                status: "Assigned",
-                assignedContainerId: container.EquipmentID
-            });
-
-            const bookingsRef = collection(db, "bookings");
-            const bookingSnapshot = await getDocs(bookingsRef);
-            let foundBookingId = null;
-
-            for (const bookingDoc of bookingSnapshot.docs) {
-                const bookingData = bookingDoc.data();
-
-                // Check if booking has cargo map and the specific cargo ID
-                if (bookingData.cargo && bookingData.cargo[selectedRequest.cargoId]) {
-                    foundBookingId = bookingDoc.id;
-                    await updateDoc(doc(db, "bookings", foundBookingId), {
-                        [`cargo.${selectedRequest.cargoId}.isContainerRented`]: true
-                    });
-                    break;
-                }
-            }
 
             showAlert("Container assigned successfully");
-            await fetchData(); // Refresh the list
+            await fetchData();
             setIsDialogOpen(false);
         } catch (error) {
             console.error("Error assigning container:", error);
@@ -205,15 +155,12 @@ const ContainerRequestsList = () => {
         if (!selectedRequest || !rejectionReason) return;
 
         try {
-            await updateDoc(doc(db, "container_requests", selectedRequest.id), {
-                status: "Rejected",
-                rejectionReason: rejectionReason
-            });
-
+            await rejectContainerRequest(selectedRequest.id, rejectionReason);
             showAlert("Request rejected successfully");
             setIsDialogOpen(false);
             setRejectionReason('');
             setIsRejecting(false);
+            await fetchData();
         } catch (error) {
             console.error("Error rejecting request:", error);
             showAlert("Error rejecting request", "error");
@@ -233,6 +180,10 @@ const ContainerRequestsList = () => {
             console.error('Error generating QR code:', error);
             showAlert("Error generating QR code", "error");
         }
+    };
+
+    const showAlert = (message, severity = 'success') => {
+        setAlert({ message, severity });
     };
 
     const ContainerCard = ({ container }) => {
@@ -331,25 +282,17 @@ const ContainerRequestsList = () => {
                                         <Typography variant="body2">
                                             {request.carrierName}
                                         </Typography>
-
                                     </Box>
                                 ) : (
                                     <Box>
                                         <Typography variant="body2">
                                             -
                                         </Typography>
-
                                     </Box>
                                 )}</TableCell>
                                 <TableCell>{request.voyageNumber}</TableCell>
                                 <TableCell>{request.eta?.toLocaleString()}</TableCell>
-
-                                {request.assignedContainerId && (
-                                    <TableCell>{request.assignedContainerId}</TableCell>
-                                )}
-                                {!request.assignedContainerId && (
-                                    <TableCell>No assigned containers yet</TableCell>
-                                )}
+                                <TableCell>{request.assignedContainerId || "No assigned containers yet"}</TableCell>
                                 <TableCell>
                                     <Chip
                                         label={request.consolidationService ? 'Consolidation' : 'Full Container'}

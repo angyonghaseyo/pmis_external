@@ -47,6 +47,30 @@ class ContainerRequestController {
             res.status(500).json({ error: 'Error deleting container request' });
         }
     }
+
+    async assignContainer(req, res) {
+        try {
+            const { id } = req.params;
+            const { container } = req.body;
+            const result = await this.containerRequestService.assignContainer(id, container);
+            res.status(200).json(result);
+        } catch (error) {
+            console.error('Error assigning container:', error);
+            res.status(500).json({ error: 'Error assigning container' });
+        }
+    }
+
+    async rejectRequest(req, res) {
+        try {
+            const { id } = req.params;
+            const { rejectionReason } = req.body;
+            const result = await this.containerRequestService.rejectRequest(id, rejectionReason);
+            res.status(200).json(result);
+        } catch (error) {
+            console.error('Error rejecting request:', error);
+            res.status(500).json({ error: 'Error rejecting request' });
+        }
+    }
 }
 
 module.exports = ContainerRequestController;
