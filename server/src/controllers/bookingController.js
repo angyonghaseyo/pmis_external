@@ -3,6 +3,22 @@ class BookingController {
         this.bookingService = bookingService;
     }
 
+    async getBookingById(req, res) {
+        try {
+            const { id } = req.params;
+            const booking = await this.bookingService.getBookingById(id);
+            
+            if (!booking) {
+                return res.status(404).json({ error: 'Booking not found' });
+            }
+            
+            res.status(200).json(booking);
+        } catch (error) {
+            console.error('Error getting booking:', error);
+            res.status(500).json({ error: 'Error fetching booking details' });
+        }
+    }
+
     async getBookings(req, res) {
         try {
             const bookings = await this.bookingService.fetchBookings();

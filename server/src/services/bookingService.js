@@ -11,6 +11,22 @@ class BookingService {
         this.bucket = this.storage.bucket('pmis-47493.appspot.com');
     }
 
+    async getBookingById(bookingId) {
+        try {
+            const doc = await this.db.collection('bookings').doc(bookingId).get();
+            if (!doc.exists) {
+                return null;
+            }
+            return {
+                bookingId: doc.id,
+                ...doc.data()
+            };
+        } catch (error) {
+            console.error('Error in getBookingById:', error);
+            throw error;
+        }
+    }
+
     async fetchBookings() {
         try {
             const snapshot = await this.db.collection('bookings').get();

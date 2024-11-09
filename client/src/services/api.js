@@ -720,18 +720,35 @@ export const updateAdHocResourceRequest = async (requestId, requestData) => {
   }
 };
 
-export const getContainerTypes = async (company) => {
+export const getContainerTypes = async () => {
   try {
-    const response = await fetch(`http://localhost:5001/container-types?company=${encodeURIComponent(company)}`);
+    const response = await fetch(`http://localhost:5001/container-types`);
+    
     if (!response.ok) {
       throw new Error('Error fetching container types');
     }
+
     return await response.json();
   } catch (error) {
     console.error('Error in getContainerTypes:', error);
     throw error;
   }
 };
+
+
+export const getContainerTypesForCompany = async (company) => {
+  try {
+    const response = await fetch(`http://localhost:5001/container-types/company?company=${encodeURIComponent(company)}`);
+    if (!response.ok) {
+      throw new Error('Error fetching container types');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in getContainerTypesForCompany:', error);
+    throw error;
+  }
+};
+
 
 export const addContainerType = async (company, containerData) => {
   try {
@@ -854,6 +871,19 @@ export const getBillingRequests = async (companyId, requestType) => {
   }
 };
 
+export const getBookingById = async (bookingId) => {
+  try {
+    const response = await fetch(`http://localhost:5001/bookings/${bookingId}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch booking');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching booking:', error);
+    throw error;
+  }
+};
+
 export const getBookings = async () => {
   try {
     const response = await fetch('http://localhost:5001/bookings');
@@ -961,6 +991,72 @@ export const registerTruckForCargo = async (cargoId, truckLicense) => {
     return await response.json();
   } catch (error) {
     console.error('Error registering truck:', error);
+    throw error;
+  }
+};
+
+export const getContainerRequests = async () => {
+  try {
+    const response = await fetch('http://localhost:5001/container-requests');
+    if (!response.ok) {
+      throw new Error('Failed to fetch container requests');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching container requests:', error);
+    throw error;
+  }
+};
+
+export const createContainerRequest = async (requestData) => {
+  try {
+    const response = await fetch('http://localhost:5001/container-requests', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestData),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to create container request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error creating container request:', error);
+    throw error;
+  }
+};
+
+export const updateContainerRequest = async (id, requestData) => {
+  try {
+    const response = await fetch(`http://localhost:5001/container-requests/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestData),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to update container request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating container request:', error);
+    throw error;
+  }
+};
+
+export const deleteContainerRequest = async (id) => {
+  try {
+    const response = await fetch(`http://localhost:5001/container-requests/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      throw new Error('Failed to delete container request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error deleting container request:', error);
     throw error;
   }
 };
@@ -1096,7 +1192,7 @@ const api = {
   getAdHocResourceRequests,
   submitAdHocResourceRequest,
   updateAdHocResourceRequest,
-  getContainerTypes,
+  getContainerTypesForCompany,
   addContainerType,
   getCarrierContainerPrices,
   assignContainerPrice,
@@ -1104,6 +1200,15 @@ const api = {
   deleteContainerPrice,
   getBillingRequests,
   registerTruckForCargo,
+  getContainerRequests,
+  createContainerRequest,
+  updateContainerRequest,
+  deleteContainerRequest,
+  getBookingById,
+  getBookings,
+  createBooking,
+  updateBooking,
+  deleteBooking,
 };
 
 export default api;

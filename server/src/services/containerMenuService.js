@@ -11,7 +11,25 @@ class ContainerMenuService {
     this.bucket = this.storage.bucket('pmis-47493.appspot.com');
   }
 
-  async getContainerTypes(company) {
+  async getContainerTypes() {
+    try {
+      const menuCollectionRef = this.db.collection('container_menu');
+      const snapshot = await menuCollectionRef.get();
+      const containerData = {};
+
+      snapshot.forEach(doc => {
+        const containerTypes = doc.data().container_types || [];
+        containerData[doc.id] = containerTypes;
+      });
+
+      return containerData;
+    } catch (error) {
+      console.error('Error in getContainerTypes:', error);
+      throw error;
+    }
+  }
+
+  async getContainerTypesForCompany(company) {
     try {
       const menuCollectionRef = this.db.collection('container_menu');
       const companyDocRef = menuCollectionRef.doc(company);
@@ -22,7 +40,7 @@ class ContainerMenuService {
       }
       return [];
     } catch (error) {
-      console.error('Error in getContainerTypes:', error);
+      console.error('Error in getContainerTypesForCompany:', error);
       throw error;
     }
   }

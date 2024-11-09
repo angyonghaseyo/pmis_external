@@ -9,6 +9,7 @@ const router = express.Router();
 const bookingService = new BookingService(db);
 const bookingController = new BookingController(bookingService);
 
+router.get('/bookings/:id', (req, res) => bookingController.getBookingById(req, res));
 router.get('/bookings', (req, res) => bookingController.getBookings(req, res));
 router.post('/bookings', (req, res) => bookingController.createBooking(req, res));
 router.put('/bookings/:id', (req, res) => bookingController.updateBooking(req, res));

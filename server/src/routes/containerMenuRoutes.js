@@ -10,6 +10,7 @@ const containerMenuService = new ContainerMenuService(db);
 const containerMenuController = new ContainerMenuController(containerMenuService);
 
 router.get('/container-types', (req, res) => containerMenuController.getContainerTypes(req, res));
+router.get('/container-types/company', (req, res) => containerMenuController.getContainerTypesForCompany(req, res));
 router.post('/container-types', upload.single('image'), (req, res) => containerMenuController.addContainerType(req, res));
 
 module.exports = router;
