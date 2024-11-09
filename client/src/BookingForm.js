@@ -146,7 +146,7 @@ const HSCodeLookup = ({ value, onChange, error, helperText }) => {
         <DialogTitle>Search HS Code</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-            Enter product description or HS code to search
+            Enter HS code to search
           </Typography>
 
           <Autocomplete
