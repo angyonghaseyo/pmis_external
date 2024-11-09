@@ -13,31 +13,6 @@ const getStepIcon = (status) => {
   }
 };
 
-// const BookingSteps = ({
-//   isContainerRented,
-//   isTruckBooked,
-//   isCustomsCleared,
-//   isDocumentsChecked
-// }) => {
-//   const steps = [
-//     {
-//       label: "Rent Containers",
-//       status: isContainerRented,
-//     },
-//     {
-//       label: "Book Truck",
-//       status: isTruckBooked,
-//     },
-//     {
-//       label: "Customs Clearance",
-//       status: isCustomsCleared,
-//     },
-//     {
-//       label: "Document Check",
-//       status: isDocumentsChecked,
-//     },
-//   ];
-
 const BookingSteps = ({ isContainerRented, isTruckBooked, isCustomsCleared, isDocumentsChecked }) => {
   const steps = [
     {

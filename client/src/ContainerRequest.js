@@ -34,8 +34,14 @@ import {
     RadioGroup,
     FormControlLabel
 } from "@mui/material";
-import { doc, addDoc, getDocs, collection, getDoc } from "firebase/firestore";
-import { db } from "./firebaseConfig";
+
+import { 
+    getContainerRequests, 
+    createContainerRequest, 
+    getBookings, 
+    getContainerTypes,
+    getBookingById 
+} from './services/api';
 
 const ContainerRequest = ({ user }) => {
     const [activeStep, setActiveStep] = useState(0);
@@ -69,34 +75,32 @@ const ContainerRequest = ({ user }) => {
 
     useEffect(() => {
         const fetchData = async () => {
-            const querySnapshot = await getDocs(collection(db, "container_requests"));
-            const data = querySnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data(),
-            }));
-            setContainerRequests(data);
+            try {
+                // Fetch container requests
+                const requestsData = await getContainerRequests();
+                setContainerRequests(requestsData);
 
-            // Fetch available containers from all carriers
-            await fetchAllContainers();
+                // Fetch available containers from all carriers
+                await fetchAllContainers();
 
-            const bookingsSnapshot = await getDocs(collection(db, "bookings"));
-            const bookingData = bookingsSnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data(),
-            }));
-            setBookings(bookingData.filter(booking => booking.userEmail === user.email));
+                // Fetch bookings
+                const bookingsData = await getBookings();
+                setBookings(bookingsData.filter(booking => booking.userEmail === user.email));
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                setOpenSnackbar({
+                    open: true,
+                    message: "Error fetching data",
+                    severity: "error"
+                });
+            }
         };
         fetchData();
-    }, []);
+    }, [user.email]);
 
     const fetchAllContainers = async () => {
-
         try {
-            const menuDocRef = await getDocs(collection(db, "container_menu"));
-            const containerData = {};
-            menuDocRef.docs.forEach(doc => {
-                containerData[doc.id] = doc.data().container_types;
-            });
+            const containerData = await getContainerTypes(user.company);
             setAvailableContainers(containerData);
         } catch (error) {
             console.error("Error fetching containers:", error);
@@ -111,17 +115,15 @@ const ContainerRequest = ({ user }) => {
     const handleBookingSelect = async (selectedBookingId) => {
         setIsLoading(true);
         try {
-            const bookingRef = doc(db, 'bookings', selectedBookingId);
-            const bookingDoc = await getDoc(bookingRef);
-            if (bookingDoc.exists()) {
-                const bookingData = bookingDoc.data();
-                setBookingData(bookingData);
+            const bookingDetails = await getBookingById(selectedBookingId);
+            if (bookingDetails) {
+                setBookingData(bookingDetails);
                 setIsBookingValid(true);
-                setVoyage(bookingData.voyageNumber);
+                setVoyage(bookingDetails.voyageNumber);
                 setFormData(prev => ({
                     ...prev,
                     bookingId: selectedBookingId,
-                    voyageNumber: bookingData.voyageNumber
+                    voyageNumber: bookingDetails.voyageNumber
                 }));
             } else {
                 setOpenSnackbar({
@@ -142,18 +144,119 @@ const ContainerRequest = ({ user }) => {
         }
     };
 
+    const handleServiceTypeChange = (cargoId, serviceType) => {
+        setCargos(prevCargos => prevCargos.map(cargo =>
+            cargo.id === cargoId ? { ...cargo, serviceType } : cargo
+        ));
+    };
+
+    const handleContainerSelection = (cargoId, containerDetails, serviceType, carrierName) => {
+        if (serviceType === 'fullContainer') {
+            setSelectedContainers(prev => ({
+                ...prev,
+                [cargoId]: {
+                    ...containerDetails,
+                    carrierName
+                }
+            }));
+        } else if (serviceType === 'consolidation') {
+            setCargos(prevCargos =>
+                prevCargos.map(cargo =>
+                    cargo.id === cargoId
+                        ? {
+                            ...cargo,
+                            selectedContainer: {
+                                ...containerDetails,
+                                carrierName
+                            }
+                        }
+                        : cargo
+                )
+            );
+        }
+    };
+
+    const handleSubmit = async () => {
+        try {
+            // Validate selections
+            const invalidCargos = cargos.filter(cargo => {
+                if (cargo.serviceType === 'fullContainer' && !selectedContainers[cargo.id]) {
+                    return true;
+                }
+                return false;
+            });
+
+            if (invalidCargos.length > 0) {
+                setOpenSnackbar({
+                    open: true,
+                    message: "Please complete all cargo selections",
+                    severity: "error"
+                });
+                return;
+            }
+
+            // Submit individual requests for each cargo
+            for (const cargo of cargos) {
+                const dataToSubmit = {
+                    bookingId: formData.bookingId,
+                    voyageNumber: formData.voyageNumber,
+                    status: 'Pending',
+                    cargoId: cargo.id,
+                    cargoDetails: {
+                        name: cargo.name,
+                        quantity: cargo.quantity,
+                        weightPerUnit: cargo.weightPerUnit
+                    },
+                    eta: bookingData?.eta || null,
+                    etd: bookingData?.etd || null,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                };
+
+                if (cargo.serviceType === 'fullContainer') {
+                    const containerDetails = selectedContainers[cargo.id];
+                    dataToSubmit.containerDetails = containerDetails;
+                    dataToSubmit.carrierName = containerDetails.carrierName;
+                } else {
+                    dataToSubmit.consolidationSpace = cargo.consolidationSpace;
+                    dataToSubmit.consolidationService = true;
+                    dataToSubmit.containerDetails = cargo.selectedContainer;
+                }
+
+                await createContainerRequest(dataToSubmit);
+            }
+
+            setOpenSnackbar({
+                open: true,
+                message: "Successfully submitted container requests!",
+                severity: "success"
+            });
+            handleCloseDialog();
+
+            // Refresh the container requests list
+            const updatedRequests = await getContainerRequests();
+            setContainerRequests(updatedRequests);
+
+        } catch (error) {
+            console.error("Error submitting container request: ", error);
+            setOpenSnackbar({
+                open: true,
+                message: `Error submitting request: ${error.message}`,
+                severity: "error"
+            });
+        }
+    };
+
     async function fetchBookingData(bookingId) {
         setIsLoading(true);
         try {
-            const bookingRef = doc(db, 'bookings', bookingId);
-            const bookingDoc = await getDoc(bookingRef);
-            if (bookingDoc.exists()) {
-                const bookingData = bookingDoc.data();
-                setBookingData(bookingData);
+            const bookingDetails = await getBookingById(bookingId);
+            if (bookingDetails) {
+                setBookingData(bookingDetails);
                 setIsBookingValid(true);
-                setVoyage(bookingData.voyageNumber);
+                setVoyage(bookingDetails.voyageNumber);
 
-                const cargoMap = bookingData.cargo || {};
+                const cargoMap = bookingDetails.cargo || {};
                 const cargoArray = Object.entries(cargoMap).map(([id, cargoData]) => ({
                     id,
                     ...cargoData,
@@ -186,51 +289,13 @@ const ContainerRequest = ({ user }) => {
 
     const generateSteps = () => {
         const baseSteps = ['Enter Booking Details', 'Select Service Type'];
-
-        // Add container selection steps based on number of cargos
         if (cargos.length > 0) {
             cargos.forEach((cargo, index) => {
                 baseSteps.push(`Container Selection - ${cargo.name}`);
             });
         }
-
         return baseSteps;
     };
-
-    const handleServiceTypeChange = (cargoId, serviceType) => {
-        setCargos(prevCargos => prevCargos.map(cargo =>
-            cargo.id === cargoId ? { ...cargo, serviceType } : cargo
-        ));
-    };
-
-    const handleContainerSelection = (cargoId, containerDetails, serviceType, carrierName) => {
-        if (serviceType === 'fullContainer') {
-            setSelectedContainers(prev => ({
-                ...prev,
-                [cargoId]: {
-                    ...containerDetails,
-                    carrierName
-                }
-            }));
-        } else if (serviceType === 'consolidation') {
-            // For consolidation, we replace any existing selection
-            setCargos(prevCargos =>
-                prevCargos.map(cargo =>
-                    cargo.id === cargoId
-                        ? {
-                            ...cargo,
-                            selectedContainer: {
-                                ...containerDetails,
-                                carrierName
-                            }
-                        }
-                        : cargo
-                )
-            );
-        }
-    };
-
-
 
     const ContainerCard = ({ container, cargoId, onSelect, isSelected, serviceType, carrierName }) => (
         <Card
@@ -285,7 +350,6 @@ const ContainerRequest = ({ user }) => {
             </CardContent>
         </Card>
     );
-
 
     const getStepContent = (step) => {
         const currentStepIndex = step;
@@ -370,7 +434,6 @@ const ContainerRequest = ({ user }) => {
                 );
 
             default:
-                // Container selection steps
                 const cargoIndex = currentStepIndex - 2;
                 const currentCargo = cargos[cargoIndex];
 
@@ -381,7 +444,7 @@ const ContainerRequest = ({ user }) => {
                         <Typography variant="h6" gutterBottom>
                             Container Selection for: {currentCargo.name}
                         </Typography>
-                        <Typography variant="head2" color="textSecondary" gutterBottom>
+                        <Typography variant="subtitle1" color="textSecondary" gutterBottom>
                             Service Type: {currentCargo.serviceType === 'fullContainer' ? 'Full Container' : 'Consolidation'}
                         </Typography>
 
@@ -419,9 +482,7 @@ const ContainerRequest = ({ user }) => {
                                                     cargoId={currentCargo.id}
                                                     onSelect={handleContainerSelection}
                                                     isSelected={
-                                                        currentCargo.serviceType === 'fullContainer'
-                                                            ? selectedContainers[currentCargo.id]?.name === container.name
-                                                            : currentCargo.selectedContainer?.name === container.name
+                                                        selectedContainers[currentCargo.id]?.name === container.name
                                                     }
                                                     serviceType={currentCargo.serviceType}
                                                     carrierName={carrierName}
@@ -432,77 +493,8 @@ const ContainerRequest = ({ user }) => {
                                 ))}
                             </Grid>
                         )}
-
                     </Box>
                 );
-        }
-    };
-
-    const handleSubmit = async () => {
-        try {
-            // Validate selections
-            const invalidCargos = cargos.filter(cargo => {
-                if (cargo.serviceType === 'fullContainer' && !selectedContainers[cargo.id]) {
-                    return true;
-                }
-
-                return false;
-            });
-
-            if (invalidCargos.length > 0) {
-                setOpenSnackbar({
-                    open: true,
-                    message: "Please complete all cargo selections",
-                    severity: "error"
-                });
-                return;
-            }
-
-            // Submit individual requests for each cargo
-            for (const cargo of cargos) {
-                const dataToSubmit = {
-                    bookingId: formData.bookingId,
-                    voyageNumber: formData.voyageNumber,
-                    status: 'Pending',
-                    cargoId: cargo.id,
-                    cargoDetails: {
-                        name: cargo.name,
-                        quantity: cargo.quantity,
-                        weightPerUnit: cargo.weightPerUnit
-                    },
-                    eta: bookingData?.eta || null,
-                    etd: bookingData?.etd || null,
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString()
-                };
-
-                if (cargo.serviceType === 'fullContainer') {
-                    const containerDetails = selectedContainers[cargo.id];
-                    dataToSubmit.containerDetails = containerDetails;
-                    dataToSubmit.carrierName = containerDetails.carrierName;
-                } else {
-                    dataToSubmit.consolidationSpace = cargo.consolidationSpace;
-                    dataToSubmit.consolidationService = true;
-                    dataToSubmit.containerDetails = cargo.selectedContainer;
-                }
-
-                await addDoc(collection(db, "container_requests"), dataToSubmit);
-            }
-
-            setOpenSnackbar({
-                open: true,
-                message: "Successfully submitted container requests!",
-                severity: "success"
-            });
-            handleCloseDialog();
-
-        } catch (error) {
-            console.error("Error submitting container request: ", error);
-            setOpenSnackbar({
-                open: true,
-                message: `Error submitting request: ${error.message}`,
-                severity: "error"
-            });
         }
     };
 
@@ -524,7 +516,6 @@ const ContainerRequest = ({ user }) => {
             }
         }
 
-        // Validate container selection before moving to next cargo
         if (activeStep > 1) {
             const currentCargoIndex = activeStep - 2;
             const currentCargo = cargos[currentCargoIndex];
@@ -538,8 +529,7 @@ const ContainerRequest = ({ user }) => {
                 return;
             }
 
-            if (currentCargo.serviceType === 'consolidation' &&
-                (!currentCargo.consolidationSpace)) {
+            if (currentCargo.serviceType === 'consolidation' && !currentCargo.consolidationSpace) {
                 setOpenSnackbar({
                     open: true,
                     message: "Please enter space requirements",
@@ -547,8 +537,6 @@ const ContainerRequest = ({ user }) => {
                 });
                 return;
             }
-
-
         }
 
         setActiveStep((prevStep) => prevStep + 1);
@@ -599,12 +587,7 @@ const ContainerRequest = ({ user }) => {
         if (!request) return null;
 
         return (
-            <Dialog
-                open={open}
-                onClose={onClose}
-                maxWidth="md"
-                fullWidth
-            >
+            <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
                 <DialogTitle>
                     <Typography variant="h6">
                         Container Request Details
@@ -698,7 +681,7 @@ const ContainerRequest = ({ user }) => {
                             />
                         </Grid>
 
-                        {/* Service Specific Details - Either Consolidation Space or Container Details */}
+                        {/* Service Specific Details */}
                         <Grid item xs={12}>
                             <Typography variant="h6" sx={{ mt: 2, mb: 2 }}>
                                 {request.consolidationService ? 'Consolidation Details' : 'Container Details'}
@@ -706,7 +689,6 @@ const ContainerRequest = ({ user }) => {
                         </Grid>
 
                         {request.consolidationService ? (
-                            // Consolidation Service Details
                             <Grid item xs={6}>
                                 <TextField
                                     fullWidth
@@ -718,7 +700,6 @@ const ContainerRequest = ({ user }) => {
                                 />
                             </Grid>
                         ) : (
-                            // Full Container Details
                             <>
                                 <Grid item xs={6}>
                                     <TextField
@@ -763,7 +744,6 @@ const ContainerRequest = ({ user }) => {
                             </>
                         )}
 
-                        {/* Rejection Details */}
                         {request.status === 'Rejected' && (
                             <>
                                 <Grid item xs={12}>
@@ -816,7 +796,7 @@ const ContainerRequest = ({ user }) => {
                         <Grid item xs={6}>
                             <TextField
                                 fullWidth
-                                label="Estimated Time of Departure (ETD)"
+                                label="ETD"
                                 value={request.etd ? new Date(request.etd).toLocaleDateString() : 'Not specified'}
                                 disabled
                                 variant="outlined"
@@ -826,7 +806,7 @@ const ContainerRequest = ({ user }) => {
                         <Grid item xs={6}>
                             <TextField
                                 fullWidth
-                                label="Estimated Time of Arrival (ETA)"
+                                label="ETA"
                                 value={request.eta ? new Date(request.eta).toLocaleDateString() : 'Not specified'}
                                 disabled
                                 variant="outlined"
@@ -840,10 +820,9 @@ const ContainerRequest = ({ user }) => {
                         Close
                     </Button>
                 </DialogActions>
-            </Dialog >
+            </Dialog>
         );
     };
-
 
     return (
         <Box sx={{ p: 3 }}>
@@ -1050,6 +1029,8 @@ const ContainerRequest = ({ user }) => {
                     {openSnackbar.message}
                 </Alert>
             </Snackbar>
+
+            {/* Details Dialog */}
             <RequestDetailsDialog
                 open={openDetailsDialog}
                 onClose={handleCloseDetails}
