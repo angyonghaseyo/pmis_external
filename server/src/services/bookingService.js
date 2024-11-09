@@ -107,6 +107,56 @@ class BookingService {
             throw error;
         }
     }
+
+    async registerTruckForCargo(cargoId, truckLicense) {
+        try {
+            // Fetch all bookings
+            const snapshot = await this.db.collection('bookings').get();
+            let bookingDoc = null;
+            let foundBookingId = null;
+
+            // Find the booking containing the cargo
+            for (const doc of snapshot.docs) {
+                const bookingData = doc.data();
+                if (bookingData.cargo && bookingData.cargo[cargoId]) {
+                    if (bookingData.cargo[cargoId].isTruckBooked) {
+                        throw new Error(`This cargo already has a truck assigned with truck license: ${bookingData.cargo[cargoId].truckLicense}`);
+                    }
+                    bookingDoc = bookingData;
+                    foundBookingId = doc.id;
+                    break;
+                }
+            }
+
+            if (!foundBookingId) {
+                throw new Error('Cargo ID not found in any booking');
+            }
+
+            // Update the cargo with truck information
+            const updatedCargo = {
+                ...bookingDoc.cargo,
+                [cargoId]: {
+                    ...bookingDoc.cargo[cargoId],
+                    isTruckBooked: true,
+                    truckLicense: truckLicense
+                }
+            };
+
+            // Update the document
+            const bookingRef = this.db.collection('bookings').doc(foundBookingId);
+            await bookingRef.set({
+                cargo: updatedCargo
+            }, { merge: true });
+
+            return {
+                success: true,
+                message: 'Truck successfully registered to cargo'
+            };
+        } catch (error) {
+            console.error('Error in registerTruckForCargo:', error);
+            throw error;
+        }
+    }
 }
 
 module.exports = BookingService;

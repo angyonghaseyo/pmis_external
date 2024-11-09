@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { collection, getDocs, getFirestore, setDoc, doc } from 'firebase/firestore';
 import {
     Container,
     Paper,
@@ -13,11 +12,11 @@ import {
     Card,
     CardContent,
     Divider,
-    IconButton,
     Snackbar
 } from '@mui/material';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import InventoryIcon from '@mui/icons-material/Inventory';
+import { registerTruckForCargo } from './services/api';
 
 const TruckRegistration = () => {
     const [cargoId, setCargoId] = useState('');
@@ -26,8 +25,6 @@ const TruckRegistration = () => {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
 
-    const db = getFirestore();
-
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -35,50 +32,7 @@ const TruckRegistration = () => {
         setSuccess(false);
 
         try {
-            // Get all booking documents
-            const bookingsRef = collection(db, "bookings");
-            const bookingSnapshot = await getDocs(bookingsRef);
-
-            let foundBookingId = null;
-            let foundBookingDoc = null;
-            let cargoFound = false;
-
-            // Search through all bookings
-            for (const bookingDoc of bookingSnapshot.docs) {
-                const bookingData = bookingDoc.data();
-
-                // Check if booking has cargo map and the specific cargo ID
-                if (bookingData.cargo && bookingData.cargo[cargoId]) {
-                    if (bookingData.cargo[cargoId].isTruckBooked) {
-                        throw new Error(`This cargo already has a truck assigned with truck license: ${bookingData.cargo[cargoId].truckLicense}`);
-                    }
-                    foundBookingId = bookingDoc.id;
-                    foundBookingDoc = bookingData;
-                    cargoFound = true;
-                    break;
-                }
-            }
-
-            if (!cargoFound) {
-                throw new Error('Cargo ID not found in any booking');
-            }
-
-            // Update just the specific cargo entry
-            const updatedCargo = {
-                ...foundBookingDoc.cargo,
-                [cargoId]: {
-                    ...foundBookingDoc.cargo[cargoId],
-                    isTruckBooked: true,
-                    truckLicense: truckLicense
-                }
-            };
-
-            // Update the document using setDoc with merge option
-            const bookingRef = doc(db, "bookings", foundBookingId);
-            await setDoc(bookingRef, {
-                cargo: updatedCargo
-            }, { merge: true });  // Use merge: true to update only the specified fields
-
+            await registerTruckForCargo(cargoId, truckLicense);
             setSuccess(true);
             setCargoId('');
             setTruckLicense('');

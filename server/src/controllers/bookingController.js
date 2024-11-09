@@ -60,6 +60,24 @@ class BookingController {
             res.status(500).json({ error: 'Error uploading document' });
         }
     }
+
+    async registerTruckForCargo(req, res) {
+        try {
+            const { cargoId, truckLicense } = req.body;
+            
+            if (!cargoId || !truckLicense) {
+                return res.status(400).json({ error: 'Missing required fields' });
+            }
+
+            const result = await this.bookingService.registerTruckForCargo(cargoId, truckLicense);
+            res.status(200).json(result);
+        } catch (error) {
+            console.error('Error registering truck for cargo:', error);
+            res.status(500).json({ 
+                error: error.message || 'Error registering truck for cargo' 
+            });
+        }
+    }
 }
 
 module.exports = BookingController;

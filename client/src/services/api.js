@@ -943,6 +943,28 @@ export const uploadBookingDocument = async (bookingId, cargoId, documentType, fi
   }
 };
 
+export const registerTruckForCargo = async (cargoId, truckLicense) => {
+  try {
+    const response = await fetch('http://localhost:5001/bookings/register-truck', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ cargoId, truckLicense }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to register truck');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error registering truck:', error);
+    throw error;
+  }
+};
+
 // Dashboard data
 export const getLeaveStatistics = () => authAxios.get('/leave-statistics').catch(handleApiError);
 
@@ -1080,7 +1102,8 @@ const api = {
   assignContainerPrice,
   updateContainerPrice,
   deleteContainerPrice,
-  getBillingRequests
+  getBillingRequests,
+  registerTruckForCargo,
 };
 
 export default api;
