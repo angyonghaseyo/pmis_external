@@ -34,6 +34,7 @@ import ElectronicTradeDocuments from "./ElectronicTradeDocument";
 import CustomsPreview from "./CustomsPreview";
 import AgencySimulator from "./AgencySimulator"
 import BillingRequests from "./BillingRequests";
+import Invoice from './invoice';
 
 const drawerWidth = 240;
 
@@ -310,6 +311,14 @@ function App() {
               {
                 hasAccessRights(['Create Transloading Request']) && (
                   <Route path="/cargos/cargo-transloading" element={<CargoTransloading />} />
+                )
+              }
+              {
+                hasAccessRights(['View Invoice']) && (
+                  <Route
+                    path="/financial/invoice"
+                    element={<Invoice companyId={user.company} />}
+                  />
                 )
               }
               <Route path="*" element={<Navigate to="/" replace />} />

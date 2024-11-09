@@ -30,6 +30,8 @@ import {
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 import { db } from '../firebaseConfig';
+import { startOfMonth, endOfMonth } from 'date-fns';
+
 
 const storage = getStorage();
 
@@ -871,6 +873,30 @@ export const getBillingRequests = async (companyId, requestType) => {
   }
 };
 
+export const getBillingRequestsByMonth = async (companyId, month) => {
+  try {
+    const response = await fetch(
+      `http://localhost:5001/billing-requests-by-month?companyId=${encodeURIComponent(companyId)}&month=${encodeURIComponent(month)}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching billing requests by month:', error);
+    throw error;
+  }
+};
+
 export const getBookingById = async (bookingId) => {
   try {
     const response = await fetch(`http://localhost:5001/bookings/${bookingId}`);
@@ -1135,6 +1161,32 @@ export const getUserSettings = () => authAxios.get('/user-settings').catch(handl
 export const updateUserSettings = (settingsData) =>
   authAxios.put('/user-settings', settingsData).catch(handleApiError);
 
+export const getBillingRequestsByMonth1 = async (companyId, monthRange) => {
+  try {
+    const billingRequestsQuery = query(
+      collection(db, 'billing_requests'),
+      where('company', '==', companyId)
+    );
+
+    const querySnapshot = await getDocs(billingRequestsQuery);
+
+    const billingRequests = querySnapshot.docs
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+      .filter(request => {
+        const dateCompleted = new Date(request.dateCompleted);
+        return dateCompleted >= new Date(monthRange.start) && dateCompleted <= new Date(monthRange.end);
+      });
+
+    return billingRequests;
+  } catch (error) {
+    console.error('Error fetching billing requests by month:', error);
+    throw error;
+  }
+};
+
 const api = {
   loginUser,
   registerUser,
@@ -1199,6 +1251,7 @@ const api = {
   updateContainerPrice,
   deleteContainerPrice,
   getBillingRequests,
+  getBillingRequestsByMonth,
   registerTruckForCargo,
   getContainerRequests,
   createContainerRequest,
@@ -1209,6 +1262,7 @@ const api = {
   createBooking,
   updateBooking,
   deleteBooking,
+  getBillingRequestsByMonth1,
 };
 
 export default api;
