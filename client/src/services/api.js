@@ -943,6 +943,45 @@ export const uploadBookingDocument = async (bookingId, cargoId, documentType, fi
   }
 };
 
+export const fetchContainerRequests = async () => {
+  const response = await fetch('http://localhost:5001/container-requests');
+  if (!response.ok) throw new Error('Error fetching container requests');
+  return response.json();
+};
+
+export const createContainerRequest = async (requestData) => {
+  const response = await fetch('http://localhost:5001/container-requests', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(requestData),
+  });
+  if (!response.ok) throw new Error('Error creating container request');
+  return response.json();
+};
+
+export const updateContainerRequest = async (id, requestData) => {
+  const response = await fetch(`http://localhost:5001/container-requests/${id}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(requestData),
+  });
+  if (!response.ok) throw new Error('Error updating container request');
+  return response.json();
+};
+
+export const deleteContainerRequest = async (id) => {
+  const response = await fetch(`http://localhost:5001/container-requests/${id}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) throw new Error('Error deleting container request');
+  return response.json();
+};
+
+
 // Dashboard data
 export const getLeaveStatistics = () => authAxios.get('/leave-statistics').catch(handleApiError);
 
@@ -1022,12 +1061,12 @@ const api = {
   registerUser,
   logoutUser,
   getCurrentUser,
-  getCurrentUserCompany,
   updateUserProfile,
   updateUserPassword,
   sendPasswordResetEmailToUser,
   confirmUserPasswordReset,
   getUsers,
+  getAllUsersInCompany,
   createUser,
   updateUser,
   deleteUser,
@@ -1044,6 +1083,37 @@ const api = {
   createOperatorRequisition,
   updateOperatorRequisition,
   deleteOperatorRequisition,
+  getTrainingPrograms,
+  getUserData,
+  getUserUpdatedData,
+  registerForProgram,
+  withdrawFromProgram,
+  updateProgramCompletionStatus,
+  getCargoManifests,
+  submitCargoManifest,
+  updateCargoManifest,
+  deleteCargoManifest,
+  getVesselVisitRequestsAdHocRequest,
+  getActiveVesselVisits,
+  getAdHocResourceRequests,
+  submitAdHocResourceRequest,
+  updateAdHocResourceRequest,
+  getContainerTypes,
+  addContainerType,
+  getCarrierContainerPrices,
+  assignContainerPrice,
+  updateContainerPrice,
+  deleteContainerPrice,
+  getBillingRequests,
+  getBookings,
+  createBooking,
+  updateBooking,
+  deleteBooking,
+  uploadBookingDocument,
+  fetchContainerRequests,
+  createContainerRequest,
+  updateContainerRequest,
+  deleteContainerRequest,
   getLeaveStatistics,
   getTimeLog,
   getServiceOperations,
@@ -1052,6 +1122,7 @@ const api = {
   getEmployees,
   updateEmployee,
   getVesselVisits,
+  getVesselVisitsConfirmedWithoutManifests,
   createVesselVisit,
   updateVesselVisit,
   getPortOperations,
@@ -1065,22 +1136,6 @@ const api = {
   submitCustomsDocument,
   getUserSettings,
   updateUserSettings,
-  getAllUsersInCompany,
-  getCargoManifests,
-  submitCargoManifest,
-  updateCargoManifest,
-  deleteCargoManifest,
-  getVesselVisitRequestsAdHocRequest,
-  getAdHocResourceRequests,
-  submitAdHocResourceRequest,
-  updateAdHocResourceRequest,
-  getContainerTypes,
-  addContainerType,
-  getCarrierContainerPrices,
-  assignContainerPrice,
-  updateContainerPrice,
-  deleteContainerPrice,
-  getBillingRequests
 };
 
 export default api;
