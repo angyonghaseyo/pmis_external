@@ -34,9 +34,9 @@ import {
 } from '@mui/material';
 import { Add, Close, ArrowBack, ArrowForward, List } from '@mui/icons-material';
 import { 
-    getContainerTypes, 
+    getContainerTypesForCompany, 
     getCarrierContainerPrices,
-    assignContainerPrice 
+    assignContainerPrice
 } from './services/api';
 import { useAuth } from './AuthContext';
 
@@ -73,7 +73,7 @@ const ContainerPricingManager = () => {
             setIsLoading(true);
             try {
                 setCompany(user.company);
-                const containerTypes = await getContainerTypes(user.company);
+                const containerTypes = await getContainerTypesForCompany(user.company);
                 setMenuContainers(containerTypes);
             } catch (error) {
                 console.error("Error fetching container types:", error);

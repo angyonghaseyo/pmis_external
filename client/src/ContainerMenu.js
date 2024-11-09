@@ -31,7 +31,7 @@ import {
     Delete
 } from '@mui/icons-material';
 import { useAuth } from './AuthContext';
-import { getContainerTypes, addContainerType } from './services/api';
+import { getContainerTypesForCompany, addContainerType } from './services/api';
 
 const ContainerMenu = () => {
     const { user } = useAuth();
@@ -65,7 +65,7 @@ const ContainerMenu = () => {
             setLoading(true);
             try {
                 setCompany(user.company);
-                const containerTypes = await getContainerTypes(user.company);
+                const containerTypes = await getContainerTypesForCompany(user.company);
                 setContainers(containerTypes);
             } catch (error) {
                 console.error("Error loading container types:", error);
@@ -151,7 +151,7 @@ const ContainerMenu = () => {
             setImagePreview(null);
 
             // Refresh container list
-            const updatedContainers = await getContainerTypes(company);
+            const updatedContainers = await getContainerTypesForCompany(company);
             setContainers(updatedContainers);
         } catch (error) {
             console.error("Error adding container:", error);

@@ -720,18 +720,35 @@ export const updateAdHocResourceRequest = async (requestId, requestData) => {
   }
 };
 
-export const getContainerTypes = async (company) => {
+export const getContainerTypes = async () => {
   try {
-    const response = await fetch(`http://localhost:5001/container-types?company=${encodeURIComponent(company)}`);
+    const response = await fetch(`http://localhost:5001/container-types`);
+    
     if (!response.ok) {
       throw new Error('Error fetching container types');
     }
+
     return await response.json();
   } catch (error) {
     console.error('Error in getContainerTypes:', error);
     throw error;
   }
 };
+
+
+export const getContainerTypesForCompany = async (company) => {
+  try {
+    const response = await fetch(`http://localhost:5001/container-types/company?company=${encodeURIComponent(company)}`);
+    if (!response.ok) {
+      throw new Error('Error fetching container types');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in getContainerTypesForCompany:', error);
+    throw error;
+  }
+};
+
 
 export const addContainerType = async (company, containerData) => {
   try {
@@ -1175,7 +1192,7 @@ const api = {
   getAdHocResourceRequests,
   submitAdHocResourceRequest,
   updateAdHocResourceRequest,
-  getContainerTypes,
+  getContainerTypesForCompany,
   addContainerType,
   getCarrierContainerPrices,
   assignContainerPrice,

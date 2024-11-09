@@ -100,7 +100,7 @@ const ContainerRequest = ({ user }) => {
 
     const fetchAllContainers = async () => {
         try {
-            const containerData = await getContainerTypes(user.company);
+            const containerData = await getContainerTypes();
             setAvailableContainers(containerData);
         } catch (error) {
             console.error("Error fetching containers:", error);
