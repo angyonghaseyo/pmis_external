@@ -79,7 +79,21 @@ const getStatusIcon = (status) => {
 const DocumentStatus = ({ document, onExpand, expanded }) => {
   const getTimeAgo = (timestamp) => {
     if (!timestamp) return 'Not updated';
-    return formatDistanceToNow(timestamp.toDate(), { addSuffix: true });
+    
+    // Handle different timestamp formats
+    let date;
+    if (timestamp instanceof Date) {
+      date = timestamp;
+    } else if (typeof timestamp === 'string') {
+      date = new Date(timestamp);
+    } else if (timestamp._seconds !== undefined) {
+      // Handle Firestore timestamp format
+      date = new Date(timestamp._seconds * 1000);
+    } else {
+      return 'Invalid date';
+    }
+
+    return formatDistanceToNow(date, { addSuffix: true });
   };
 
   return (
