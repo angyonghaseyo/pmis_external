@@ -1,14 +1,13 @@
 import React from 'react';
 import {
   Box,
-  Paper,
   Typography,
   Grid,
   Chip,
   List,
   ListItem,
-  ListItemText,
   ListItemIcon,
+  ListItemText,
   ListItemSecondaryAction,
   IconButton,
   Tooltip,
@@ -34,7 +33,7 @@ import {
 import { formatDistanceToNow } from 'date-fns';
 
 const getAgencyIcon = (agencyType) => {
-  switch (agencyType) {
+  switch (agencyType?.toUpperCase()) {
     case 'VETERINARY':
       return <LocalHospital />;
     case 'WELFARE':
@@ -51,7 +50,7 @@ const getAgencyIcon = (agencyType) => {
 };
 
 const getStatusColor = (status) => {
-  switch (status) {
+  switch (status?.toUpperCase()) {
     case 'APPROVED':
       return 'success';
     case 'REJECTED':
@@ -64,7 +63,7 @@ const getStatusColor = (status) => {
 };
 
 const getStatusIcon = (status) => {
-  switch (status) {
+  switch (status?.toUpperCase()) {
     case 'APPROVED':
       return <CheckCircle color="success" />;
     case 'REJECTED':
@@ -80,14 +79,12 @@ const DocumentStatus = ({ document, onExpand, expanded }) => {
   const getTimeAgo = (timestamp) => {
     if (!timestamp) return 'Not updated';
     
-    // Handle different timestamp formats
     let date;
     if (timestamp instanceof Date) {
       date = timestamp;
     } else if (typeof timestamp === 'string') {
       date = new Date(timestamp);
     } else if (timestamp._seconds !== undefined) {
-      // Handle Firestore timestamp format
       date = new Date(timestamp._seconds * 1000);
     } else {
       return 'Invalid date';
@@ -111,7 +108,7 @@ const DocumentStatus = ({ document, onExpand, expanded }) => {
         </ListItemIcon>
         <ListItemText
           primary={document.name}
-          secondary={`Required by: ${document.agencyName}`}
+          secondary={`Required by: ${document.agencyName || document.updatedBy || 'Pending Assignment'}`}
         />
         <ListItemSecondaryAction>
           <Box display="flex" alignItems="center" gap={1}>
@@ -181,7 +178,7 @@ const DocumentStatusTracker = ({ cargo }) => {
   const rejectedDocs = documentsArray.filter(doc => doc.status === 'REJECTED').length;
 
   return (
-    <Paper sx={{ p: 3 }}>
+    <Box sx={{ p: 3 }}>
       <Typography variant="h6" gutterBottom>
         Document Status Tracking
       </Typography>
@@ -229,7 +226,7 @@ const DocumentStatusTracker = ({ cargo }) => {
           />
         ))}
       </List>
-    </Paper>
+    </Box>
   );
 };
 
