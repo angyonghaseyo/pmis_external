@@ -11,13 +11,12 @@ import {
   Button,
   Alert,
   Grid,
+  CircularProgress
 } from '@mui/material';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from './firebaseConfig';
-import { updateDocumentStatus } from './CustomsTradeManager';
+import { getAgencies, getBookings, updateDocumentStatus } from './services/api';
 
 const AgencySimulator = () => {
-  const [agencies, setAgencies] = useState({});
+  const [agencies, setAgencies] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [selectedAgencyKey, setSelectedAgencyKey] = useState('');
   const [selectedBooking, setSelectedBooking] = useState('');
@@ -26,32 +25,51 @@ const AgencySimulator = () => {
   const [status, setStatus] = useState('PENDING');
   const [comments, setComments] = useState('');
   const [notification, setNotification] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   // Fetch agencies and bookings on component mount
   useEffect(() => {
     const fetchData = async () => {
-      // Fetch agencies
-      const agenciesSnapshot = await getDocs(collection(db, 'agencies'));
-      const agenciesData = {};
-      agenciesSnapshot.forEach(doc => {
-        agenciesData[doc.id] = doc.data();
-      });
-      setAgencies(agenciesData);
-
-      // Fetch bookings
-      const bookingsSnapshot = await getDocs(collection(db, 'bookings'));
-      const bookingsData = bookingsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setBookings(bookingsData);
+      try {
+        setLoading(true);
+        const [agenciesData, bookingsData] = await Promise.all([
+          getAgencies(),
+          getBookings()
+        ]);
+        
+        // Convert agencies array to object with key as index
+        const agenciesObj = agenciesData.reduce((acc, agency) => {
+          acc[agency.key] = agency;
+          return acc;
+        }, {});
+        
+        setAgencies(agenciesObj);
+        setBookings(bookingsData);
+      } catch (error) {
+        setNotification({
+          type: 'error',
+          message: 'Error loading data: ' + error.message
+        });
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchData();
   }, []);
 
   const handleSubmit = async () => {
+    if (!selectedAgencyKey || !selectedBooking || !selectedCargo || !selectedDocument) {
+      setNotification({
+        type: 'error',
+        message: 'Please fill in all required fields'
+      });
+      return;
+    }
+
     try {
+      setSubmitting(true);
       const result = await updateDocumentStatus(
         selectedAgencyKey,
         selectedBooking,
@@ -62,17 +80,32 @@ const AgencySimulator = () => {
       );
 
       setNotification({
-        type: result.success ? 'success' : 'error',
-        message: result.success ? result.message : result.error
+        type: 'success',
+        message: result.message || 'Document status updated successfully'
       });
+
+      // Reset form fields except agency selection
+      setSelectedDocument('');
+      setStatus('PENDING');
+      setComments('');
 
     } catch (error) {
       setNotification({
         type: 'error',
-        message: error.message
+        message: error.message || 'Error updating document status'
       });
+    } finally {
+      setSubmitting(false);
     }
   };
+
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ maxWidth: 800, margin: 'auto', p: 3 }}>
@@ -122,8 +155,8 @@ const AgencySimulator = () => {
                 }}
               >
                 {bookings.map(booking => (
-                  <MenuItem key={booking.id} value={booking.id}>
-                    Booking: {booking.id}
+                  <MenuItem key={booking.bookingId} value={booking.bookingId}>
+                    Booking: {booking.bookingId}
                   </MenuItem>
                 ))}
               </Select>
@@ -138,8 +171,8 @@ const AgencySimulator = () => {
                 onChange={(e) => setSelectedCargo(e.target.value)}
               >
                 {selectedBooking && 
-                  bookings.find(b => b.id === selectedBooking)?.cargo &&
-                  Object.keys(bookings.find(b => b.id === selectedBooking).cargo)
+                  bookings.find(b => b.bookingId === selectedBooking)?.cargo &&
+                  Object.keys(bookings.find(b => b.bookingId === selectedBooking).cargo)
                     .map(cargoId => (
                       <MenuItem key={cargoId} value={cargoId}>
                         Cargo: {cargoId}
@@ -197,10 +230,10 @@ const AgencySimulator = () => {
             <Button
               variant="contained"
               onClick={handleSubmit}
-              disabled={!selectedAgencyKey || !selectedBooking || !selectedCargo || !selectedDocument}
+              disabled={submitting || !selectedAgencyKey || !selectedBooking || !selectedCargo || !selectedDocument}
               fullWidth
             >
-              Update Document Status
+              {submitting ? <CircularProgress size={24} /> : 'Update Document Status'}
             </Button>
           </Grid>
         </Grid>
