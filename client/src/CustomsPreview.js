@@ -19,6 +19,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  CircularProgress,
 } from "@mui/material";
 import {
   CheckCircle,
@@ -27,11 +28,110 @@ import {
   Pets,
   LocalFlorist,
   Medication,
+  InfoOutlined,
+  LocalHospital,
+  Security,
+  Assessment,
+  LocalShipping,
 } from "@mui/icons-material";
-import { HSCodeCategories, ProcessStatus } from "./CustomsTradeManager";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "./firebaseConfig";
+import { getBookings, getBookingById } from "./services/api";
 import DocumentStatusTracker from "./DocumentStatusTracker";
+
+// HS Code Categories constants
+const HSCodeCategories = {
+  LIVE_ANIMALS: {
+    chapter: '01',
+    description: 'Live Animals',
+    processingOrder: [
+      'VETERINARY_INSPECTION',
+      'HEALTH_CERTIFICATION',
+      'CITES_CHECK',
+      'QUARANTINE_CLEARANCE',
+      'TRANSPORT_APPROVAL',
+      'CUSTOMS_DECLARATION',
+      'FINAL_VETERINARY_CHECK'
+    ],
+    requiredDocuments: [
+      'Veterinary Health Certificate',
+      'Animal Welfare Certification',
+      'CITES Permit (if applicable)',
+      'Quarantine Clearance Certificate',
+      'Live Animal Transport Declaration',
+      'Export License',
+      'Commercial Invoice',
+      'Packing List'
+    ],
+    validations: {
+      transportConditions: true,
+      healthStatus: true,
+      speciesRestrictions: true,
+      quarantinePeriod: true
+    }
+  },
+  FRESH_FRUITS: {
+    chapter: '08',
+    description: 'Fresh Fruits',
+    processingOrder: [
+      'PHYTOSANITARY_INSPECTION',
+      'PESTICIDE_TESTING',
+      'COLD_CHAIN_VERIFICATION',
+      'PACKAGING_INSPECTION',
+      'CUSTOMS_DECLARATION',
+      'FINAL_QUALITY_CHECK'
+    ],
+    requiredDocuments: [
+      'Phytosanitary Certificate',
+      'Pesticide Residue Test Report',
+      'Cold Chain Compliance Certificate',
+      'Packaging Declaration',
+      'Export License',
+      'Certificate of Origin',
+      'Commercial Invoice',
+      'Packing List'
+    ],
+    validations: {
+      pesticideLevel: true,
+      coldChainMaintenance: true,
+      packagingStandards: true,
+      shelfLife: true
+    }
+  },
+  PHARMACEUTICALS: {
+    chapter: '30',
+    description: 'Pharmaceutical Products',
+    processingOrder: [
+      'GMP_VERIFICATION',
+      'DRUG_REGISTRATION_CHECK',
+      'CONTROLLED_SUBSTANCE_CHECK',
+      'STABILITY_VERIFICATION',
+      'CUSTOMS_DECLARATION',
+      'FINAL_QUALITY_ASSURANCE'
+    ],
+    requiredDocuments: [
+      'GMP Certificate',
+      'Drug Registration Certificate',
+      'Export License for Pharmaceuticals',
+      'Certificate of Pharmaceutical Product (CPP)',
+      'Batch Analysis Certificate',
+      'Stability Study Report',
+      'Commercial Invoice',
+      'Packing List'
+    ],
+    validations: {
+      controlledSubstance: true,
+      storageConditions: true,
+      expiryDates: true,
+      batchTracking: true
+    }
+  }
+};
+
+const ProcessStatus = {
+  NOT_STARTED: 'NOT_STARTED',
+  IN_PROGRESS: 'IN_PROGRESS',
+  COMPLETED: 'COMPLETED',
+  REJECTED: 'REJECTED'
+};
 
 const CategoryIcon = ({ category }) => {
   switch (category) {
@@ -43,6 +143,23 @@ const CategoryIcon = ({ category }) => {
       return <Medication />;
     default:
       return null;
+  }
+};
+
+const getAgencyIcon = (agencyType) => {
+  switch (agencyType) {
+    case 'VETERINARY':
+      return <LocalHospital />;
+    case 'WELFARE':
+      return <Pets />;
+    case 'SECURITY':
+      return <Security />;
+    case 'CUSTOMS':
+      return <Assessment />;
+    case 'TRANSPORT':
+      return <LocalShipping />;
+    default:
+      return <InfoOutlined />;
   }
 };
 
@@ -69,24 +186,25 @@ const StatusChip = ({ status }) => {
   );
 };
 
-const CustomsPreview = ({ processStatus }) => {
+const CustomsPreview = () => {
   const [bookings, setBookings] = useState([]);
   const [selectedBooking, setSelectedBooking] = useState("");
   const [selectedCargo, setSelectedCargo] = useState("");
   const [cargoDetails, setCargoDetails] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Fetch bookings from Firebase
+  // Fetch bookings on component mount
   useEffect(() => {
     const fetchBookings = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, "bookings"));
-        const bookingsData = querySnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
+        setLoading(true);
+        const bookingsData = await getBookings();
         setBookings(bookingsData);
       } catch (error) {
-        console.error("Error fetching bookings:", error);
+        setError("Error fetching bookings: " + error.message);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -94,11 +212,23 @@ const CustomsPreview = ({ processStatus }) => {
   }, []);
 
   // Handle booking selection
-  const handleBookingChange = (event) => {
+  const handleBookingChange = async (event) => {
     const bookingId = event.target.value;
     setSelectedBooking(bookingId);
     setSelectedCargo(""); // Reset cargo selection
     setCargoDetails(null); // Reset cargo details
+    
+    if (bookingId) {
+      try {
+        const bookingData = await getBookingById(bookingId);
+        const booking = bookings.find(b => b.bookingId === bookingId);
+        if (booking) {
+          booking.cargo = bookingData.cargo;
+        }
+      } catch (error) {
+        setError("Error fetching booking details: " + error.message);
+      }
+    }
   };
 
   // Handle cargo selection
@@ -107,13 +237,13 @@ const CustomsPreview = ({ processStatus }) => {
     setSelectedCargo(cargoId);
 
     // Find selected booking and cargo
-    const booking = bookings.find((b) => b.id === selectedBooking);
+    const booking = bookings.find((b) => b.bookingId === selectedBooking);
     if (booking && booking.cargo && booking.cargo[cargoId]) {
       setCargoDetails(booking.cargo[cargoId]);
     }
   };
 
-  // Get cargo category and determine export process stage
+  // Get cargo category based on HS code
   const determineCategory = (hsCode) => {
     if (!hsCode) return null;
     const chapter = hsCode.substring(0, 2);
@@ -128,6 +258,22 @@ const CustomsPreview = ({ processStatus }) => {
     ? HSCodeCategories[determineCategory(cargoDetails.hsCode)]
     : null;
 
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ maxWidth: 1200, margin: "auto", padding: 4 }}>
+        <Alert severity="error">{error}</Alert>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ maxWidth: 1200, margin: "auto", padding: 4 }}>
       <Paper elevation={3} sx={{ padding: 3 }}>
@@ -141,8 +287,8 @@ const CustomsPreview = ({ processStatus }) => {
                 label="Select Booking"
               >
                 {bookings.map((booking) => (
-                  <MenuItem key={booking.id} value={booking.id}>
-                    Booking ID: {booking.id} - {booking.portDestination}
+                  <MenuItem key={booking.bookingId} value={booking.bookingId}>
+                    Booking ID: {booking.bookingId} - {booking.portDestination}
                   </MenuItem>
                 ))}
               </Select>
@@ -158,9 +304,9 @@ const CustomsPreview = ({ processStatus }) => {
                 label="Select Cargo"
               >
                 {selectedBooking &&
-                  bookings.find((b) => b.id === selectedBooking)?.cargo &&
+                  bookings.find((b) => b.bookingId === selectedBooking)?.cargo &&
                   Object.entries(
-                    bookings.find((b) => b.id === selectedBooking).cargo
+                    bookings.find((b) => b.bookingId === selectedBooking).cargo
                   ).map(([cargoId, cargo]) => (
                     <MenuItem key={cargoId} value={cargoId}>
                       {cargo.name} - HS Code: {cargo.hsCode}
@@ -229,9 +375,11 @@ const CustomsPreview = ({ processStatus }) => {
                   ))}
                 </Stepper>
               </Grid>
+
               <Grid item xs={12}>
                 <DocumentStatusTracker cargo={cargoDetails} />
               </Grid>
+
               <Grid item xs={12} md={6}>
                 <Card>
                   <CardContent>

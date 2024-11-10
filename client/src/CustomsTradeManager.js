@@ -1,147 +1,9 @@
-import { db } from './firebaseConfig';
-import { collection, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-
-export const initializeAgencies = async () => {
-  // Define agencies with their API keys and permissions
-  const agencies = {
-    'vet-agency-key-123': {
-      name: 'National Veterinary Authority',
-      type: 'VETERINARY',
-      allowedDocuments: ['veterinaryHealthCertificate', 'quarantineClearance'],
-      category: 'LIVE_ANIMALS',
-      description: 'National authority for animal health certifications'
-    },
-    'welfare-agency-key-456': {
-      name: 'Animal Welfare Board',
-      type: 'WELFARE',
-      allowedDocuments: ['animalWelfareCertification'],
-      category: 'LIVE_ANIMALS',
-      description: 'Authority for animal welfare compliance'
-    },
-    'phyto-agency-key-789': {
-      name: 'Phytosanitary Department',
-      type: 'PHYTOSANITARY',
-      allowedDocuments: ['phytosanitaryCertificate', 'pesticideTestReport'],
-      category: 'FRESH_FRUITS',
-      description: 'Authority for plant health certifications'
-    },
-    'pharma-agency-key-101': {
-      name: 'Pharmaceutical Control Board',
-      type: 'PHARMA',
-      allowedDocuments: ['gmpCertificate', 'drugRegistrationCertificate'],
-      category: 'PHARMACEUTICALS',
-      description: 'Authority for pharmaceutical regulations'
-    }
-  };
-
-  try {
-    const agenciesRef = collection(db, 'agencies');
-    for (const [key, data] of Object.entries(agencies)) {
-      await setDoc(doc(agenciesRef, key), {
-        ...data,
-        createdAt: new Date(),
-        active: true
-      });
-    }
-    console.log('Agencies initialized successfully');
-  } catch (error) {
-    console.error('Error initializing agencies:', error);
-  }
-};
-
-// Verify agency API key and permissions
-export const verifyAgencyAccess = async (agencyKey, documentType) => {
-  try {
-    const agencyRef = doc(db, 'agencies', agencyKey);
-    const agencyDoc = await getDoc(agencyRef);
-
-    if (!agencyDoc.exists()) {
-      return { isValid: false, error: 'Invalid agency key' };
-    }
-
-    const agencyData = agencyDoc.data();
-    if (!agencyData.allowedDocuments.includes(documentType)) {
-      return {
-        isValid: false,
-        error: `${agencyData.name} is not authorized to update ${documentType}`
-      };
-    }
-
-    return {
-      isValid: true,
-      agency: agencyData
-    };
-  } catch (error) {
-    console.error('Error verifying agency:', error);
-    return { isValid: false, error: error.message };
-  }
-};
-
-// Update document status
-export const updateDocumentStatus = async (
-  agencyKey,
-  bookingId,
-  cargoId,
-  documentType,
-  status,
-  comments = ''
-) => {
-  try {
-    // First verify agency access
-    const verificationResult = await verifyAgencyAccess(agencyKey, documentType);
-    if (!verificationResult.isValid) {
-      throw new Error(verificationResult.error);
-    }
-
-    const { agency } = verificationResult;
-
-    // Update the document status
-    const bookingRef = doc(db, 'bookings', bookingId);
-    const updateData = {
-      [`cargo.${cargoId}.documentStatus.${documentType}`]: {
-        status: status,
-        lastUpdated: new Date(),
-        updatedBy: agency.name,
-        agencyType: agency.type,
-        comments: comments
-      }
-    };
-
-    await updateDoc(bookingRef, updateData);
-
-    // Check if all required documents are approved
-    const bookingDoc = await getDoc(bookingRef);
-    const cargoData = bookingDoc.data().cargo[cargoId];
-
-    // Get the category and required documents
-    const category = HSCodeCategories[agency.category];
-    if (category) {
-      const allDocumentsApproved = category.requiredDocuments.every(doc => {
-        const docStatus = cargoData.documentStatus[doc];
-        return docStatus && docStatus.status === 'APPROVED';
-      });
-
-      if (allDocumentsApproved) {
-        await updateDoc(bookingRef, {
-          [`cargo.${cargoId}.isCustomsCleared`]: true
-        });
-      }
-    }
-
-    return {
-      success: true,
-      message: 'Document status updated successfully',
-      updatedBy: agency.name,
-      timestamp: new Date()
-    };
-
-  } catch (error) {
-    console.error('Error updating document status:', error);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
+// Constants for process status and categories
+export const ProcessStatus = {
+  NOT_STARTED: 'NOT_STARTED',
+  IN_PROGRESS: 'IN_PROGRESS',
+  COMPLETED: 'COMPLETED',
+  REJECTED: 'REJECTED'
 };
 
 // HS Code Categories and their specific requirements
@@ -235,13 +97,6 @@ export const HSCodeCategories = {
   }
 };
 
-export const ProcessStatus = {
-  NOT_STARTED: 'NOT_STARTED',
-  IN_PROGRESS: 'IN_PROGRESS',
-  COMPLETED: 'COMPLETED',
-  REJECTED: 'REJECTED'
-};
-
 class CustomsTradeManager {
   constructor() {
     this.currentCategory = null;
@@ -297,66 +152,89 @@ class CustomsTradeManager {
   }
 
   async initializeAnimalExport(exportData) {
-    // Specific validations for live animals
-    this.validateLiveAnimalRequirements(exportData);
-    // Setup quarantine monitoring
-    this.setupQuarantineMonitoring(exportData);
-    // Initialize veterinary inspection schedule
-    this.scheduleVeterinaryInspections(exportData);
-  }
-
-  async initializeFruitExport(exportData) {
-    // Initialize cold chain monitoring
-    this.setupColdChainMonitoring(exportData);
-    // Schedule phytosanitary inspections
-    this.schedulePestInspections(exportData);
-    // Setup quality control checkpoints
-    this.initializeQualityControl(exportData);
-  }
-
-  async initializePharmaceuticalExport(exportData) {
-    // Verify controlled substance compliance
-    this.verifyControlledSubstanceCompliance(exportData);
-    // Setup stability monitoring
-    this.initializeStabilityMonitoring(exportData);
-    // Verify GMP compliance
-    this.verifyGMPCompliance(exportData);
-  }
-
-  validateLiveAnimalRequirements(exportData) {
-    const validations = {
+    return {
       speciesAllowed: this.checkSpeciesRestrictions(exportData.species),
       healthStatus: this.validateHealthCertificates(exportData.healthCerts),
       transportConditions: this.validateTransportConditions(exportData.transport),
       quarantineCompliance: this.checkQuarantineRequirements(exportData)
     };
-
-    return validations;
   }
 
-  setupColdChainMonitoring(exportData) {
-    const monitoring = {
+  async initializeFruitExport(exportData) {
+    return {
       temperatureRange: this.validateTemperatureRequirements(exportData.temperature),
       humidityControl: this.validateHumidityRequirements(exportData.humidity),
       storageFacilities: this.validateStorageFacilities(exportData.storage),
       transportConditions: this.validateTransportConditions(exportData.transport)
     };
-
-    return monitoring;
   }
 
-  verifyControlledSubstanceCompliance(exportData) {
-    const compliance = {
+  async initializePharmaceuticalExport(exportData) {
+    return {
       substanceSchedule: this.checkSubstanceSchedule(exportData.substance),
       exportAuthorization: this.validateExportAuthorization(exportData.authorization),
       securityMeasures: this.validateSecurityProtocols(exportData.security),
       trackingSystem: this.validateTrackingSystem(exportData.tracking)
     };
-
-    return compliance;
   }
 
-  // Example of a step progression method
+  // Validation methods
+  checkSpeciesRestrictions(species) {
+    // Implement species restriction checks
+    return { isValid: true, restrictions: [] };
+  }
+
+  validateHealthCertificates(certificates) {
+    // Implement health certificate validation
+    return { isValid: true, issues: [] };
+  }
+
+  validateTransportConditions(transport) {
+    // Implement transport conditions validation
+    return { isValid: true, conditions: [] };
+  }
+
+  checkQuarantineRequirements(data) {
+    // Implement quarantine requirements check
+    return { isValid: true, requirements: [] };
+  }
+
+  validateTemperatureRequirements(temperature) {
+    // Implement temperature validation
+    return { isValid: true, range: {} };
+  }
+
+  validateHumidityRequirements(humidity) {
+    // Implement humidity validation
+    return { isValid: true, range: {} };
+  }
+
+  validateStorageFacilities(storage) {
+    // Implement storage facility validation
+    return { isValid: true, facilities: [] };
+  }
+
+  checkSubstanceSchedule(substance) {
+    // Implement substance schedule check
+    return { isValid: true, schedule: '' };
+  }
+
+  validateExportAuthorization(authorization) {
+    // Implement export authorization validation
+    return { isValid: true, authorization: {} };
+  }
+
+  validateSecurityProtocols(security) {
+    // Implement security protocol validation
+    return { isValid: true, protocols: [] };
+  }
+
+  validateTrackingSystem(tracking) {
+    // Implement tracking system validation
+    return { isValid: true, system: {} };
+  }
+
+  // Progress management
   async progressToNextStep() {
     const currentStep = this.processStatus.steps[this.processStatus.currentStep];
     
@@ -383,6 +261,48 @@ class CustomsTradeManager {
       documents: category.requiredDocuments,
       validations: category.validations
     };
+  }
+
+  // Validate current step
+  validateCurrentStep() {
+    const currentStep = this.processStatus.steps[this.processStatus.currentStep];
+    const category = HSCodeCategories[this.currentCategory];
+
+    // Implement step-specific validation logic
+    const validationResults = {
+      isValid: true,
+      errors: [],
+      warnings: []
+    };
+
+    // Update step status based on validation results
+    if (validationResults.isValid) {
+      currentStep.status = ProcessStatus.COMPLETED;
+    } else {
+      currentStep.status = ProcessStatus.REJECTED;
+    }
+
+    return validationResults;
+  }
+
+  // Get process summary
+  getProcessSummary() {
+    return {
+      category: this.currentCategory,
+      currentStep: this.processStatus.currentStep,
+      totalSteps: this.processStatus.steps.length,
+      completedSteps: this.processStatus.steps.filter(
+        step => step.status === ProcessStatus.COMPLETED
+      ).length,
+      status: this.processStatus.steps[this.processStatus.currentStep].status
+    };
+  }
+
+  // Check if process is complete
+  isProcessComplete() {
+    return this.processStatus.steps.every(
+      step => step.status === ProcessStatus.COMPLETED
+    );
   }
 }
 

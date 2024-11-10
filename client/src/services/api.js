@@ -1061,6 +1061,65 @@ export const deleteContainerRequest = async (id) => {
   }
 };
 
+export const getAgencies = async () => {
+  try {
+    const response = await fetch('http://localhost:5001/agencies');
+    if (!response.ok) {
+      throw new Error('Error fetching agencies');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in getAgencies:', error);
+    throw error;
+  }
+};
+
+export const verifyAgencyAccess = async (agencyKey, documentType) => {
+  try {
+    const response = await fetch('http://localhost:5001/agencies/verify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ agencyKey, documentType }),
+    });
+    if (!response.ok) {
+      throw new Error('Error verifying agency access');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in verifyAgencyAccess:', error);
+    throw error;
+  }
+};
+
+export const updateDocumentStatus = async (agencyKey, bookingId, cargoId, documentType, status, comments) => {
+  try {
+    const response = await fetch('http://localhost:5001/agencies/document-status', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        agencyKey,
+        bookingId,
+        cargoId,
+        documentType,
+        status,
+        comments
+      }),
+    });
+    if (!response.ok) {
+      throw new Error('Error updating document status');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in updateDocumentStatus:', error);
+    throw error;
+  }
+};
+
+
 // Dashboard data
 export const getLeaveStatistics = () => authAxios.get('/leave-statistics').catch(handleApiError);
 
