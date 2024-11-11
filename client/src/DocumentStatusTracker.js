@@ -108,7 +108,7 @@ const DocumentStatus = ({ document, onExpand, expanded }) => {
         </ListItemIcon>
         <ListItemText
           primary={document.name}
-          secondary={`Required by: ${document.agencyName || document.updatedBy || 'Pending Assignment'}`}
+          secondary={`Required by: ${document.updatedBy}`}
         />
         <ListItemSecondaryAction>
           <Box display="flex" alignItems="center" gap={1}>

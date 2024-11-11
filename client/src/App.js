@@ -35,6 +35,7 @@ import CustomsPreview from "./CustomsPreview";
 import AgencySimulator from "./AgencySimulator"
 import BillingRequests from "./BillingRequests";
 import Invoice from './invoice';
+import DatabaseSetup from "./DatabaseSetup";
 
 const drawerWidth = 240;
 
@@ -53,7 +54,6 @@ function App() {
   }, [login]);
 
   const hasAccessRights = (requiredRights) => {
-    console.log("hooopalah" + user);
     console.log('User access rights:', user?.accessRights);
     console.log('Required rights:', requiredRights);
     if (!user || !user.accessRights) return false;
@@ -97,6 +97,7 @@ function App() {
         <Routes>
           {user ? (
             <>
+            <Route path="/setup" element={<DatabaseSetup />} />
               <Route path="/" element={<UserWorkspace user={user} />} />
               {
                 hasAccessRights([

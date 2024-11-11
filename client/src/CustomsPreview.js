@@ -177,9 +177,11 @@ const StatusChip = ({ status }) => {
     }
   };
 
+  const displayStatus = status ? status.replace(/_/g, " ") : "NOT STARTED";
+
   return (
     <Chip
-      label={status.replace("_", " ")}
+      label={displayStatus}
       color={getStatusColor()}
       size="small"
     />
@@ -375,11 +377,9 @@ const CustomsPreview = () => {
                   ))}
                 </Stepper>
               </Grid>
-
-              <Grid item xs={12}>
+              {/* <Grid item xs={12}>
                 <DocumentStatusTracker cargo={cargoDetails} />
-              </Grid>
-
+              </Grid> */}
               <Grid item xs={12} md={6}>
                 <Card>
                   <CardContent>
@@ -395,9 +395,7 @@ const CustomsPreview = () => {
                           <ListItemText primary={doc} />
                           <StatusChip
                             status={
-                              cargoDetails.isCustomsCleared
-                                ? ProcessStatus.COMPLETED
-                                : ProcessStatus.NOT_STARTED
+                              cargoDetails.documentStatus?.[doc]?.status || ProcessStatus.NOT_STARTED
                             }
                           />
                         </ListItem>

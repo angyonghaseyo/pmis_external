@@ -1,9 +1,159 @@
-// Constants for process status and categories
-export const ProcessStatus = {
-  NOT_STARTED: 'NOT_STARTED',
-  IN_PROGRESS: 'IN_PROGRESS',
-  COMPLETED: 'COMPLETED',
-  REJECTED: 'REJECTED'
+import { db } from './firebaseConfig';
+import { collection, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+
+export const initializeAgencies = async () => {
+  // Define agencies with their API keys and permissions
+  const agencies = {
+    'vet-agency-key-123': {
+      name: 'National Veterinary Authority',
+      type: 'VETERINARY',
+      allowedDocuments: ['veterinaryHealthCertificate', 'quarantineClearance'],
+      category: 'LIVE_ANIMALS',
+      description: 'National authority for animal health certifications'
+    },
+    'welfare-agency-key-456': {
+      name: 'Animal Welfare Board',
+      type: 'WELFARE',
+      allowedDocuments: ['animalWelfareCertification'],
+      category: 'LIVE_ANIMALS',
+      description: 'Authority for animal welfare compliance'
+    },
+    'phyto-agency-key-789': {
+      name: 'Phytosanitary Department',
+      type: 'PHYTOSANITARY',
+      allowedDocuments: ['phytosanitaryCertificate', 'pesticideTestReport'],
+      category: 'FRESH_FRUITS',
+      description: 'Authority for plant health certifications'
+    },
+    'pharma-agency-key-101': {
+      name: 'Pharmaceutical Control Board',
+      type: 'PHARMA',
+      allowedDocuments: ['gmpCertificate', 'drugRegistrationCertificate'],
+      category: 'PHARMACEUTICALS',
+      description: 'Authority for pharmaceutical regulations'
+    }
+  };
+
+  try {
+    const agenciesRef = collection(db, 'agencies');
+    for (const [key, data] of Object.entries(agencies)) {
+      await setDoc(doc(agenciesRef, key), {
+        ...data,
+        createdAt: new Date(),
+        active: true
+      });
+    }
+    console.log('Agencies initialized successfully');
+  } catch (error) {
+    console.error('Error initializing agencies:', error);
+  }
+};
+
+// Verify agency API key and permissions
+export const verifyAgencyAccess = async (agencyKey, documentType) => {
+  try {
+    const agencyRef = doc(db, 'agencies', agencyKey);
+    const agencyDoc = await getDoc(agencyRef);
+
+    if (!agencyDoc.exists()) {
+      return { isValid: false, error: 'Invalid agency key' };
+    }
+
+    const agencyData = agencyDoc.data();
+    if (!agencyData.allowedDocuments.includes(documentType)) {
+      return {
+        isValid: false,
+        error: `${agencyData.name} is not authorized to update ${documentType}`
+      };
+    }
+
+    return {
+      isValid: true,
+      agency: agencyData
+    };
+  } catch (error) {
+    console.error('Error verifying agency:', error);
+    return { isValid: false, error: error.message };
+  }
+};
+
+// Update document status
+export const updateDocumentStatus = async (
+  agencyKey,
+  bookingId,
+  cargoId,
+  documentType,
+  status,
+  comments = ''
+) => {
+  try {
+    // First verify agency access
+    const verificationResult = await verifyAgencyAccess(agencyKey, documentType);
+    if (!verificationResult.isValid) {
+      throw new Error(verificationResult.error);
+    }
+
+    const { agency } = verificationResult;
+
+       // Get current booking data
+       const bookingRef = doc(db, 'bookings', bookingId);
+       const bookingDoc = await getDoc(bookingRef);
+       const bookingData = bookingDoc.data();
+   
+       // Format document name to match the display format
+       const formattedDocumentName = documentType
+         .split(/(?=[A-Z])/)
+         .join(' ')
+         .replace(/^\w/, c => c.toUpperCase());
+
+   
+    const updateData = {
+      [`cargo.${cargoId}.documentStatus.${formattedDocumentName}`]: {
+        status: ProcessStatus[status],
+        lastUpdated: new Date(),
+        updatedBy: agency.name,
+        agencyType: agency.type,
+        comments: comments
+      }
+    };
+
+    await updateDoc(bookingRef, updateData);
+
+    
+    const cargoData = bookingDoc.data().cargo[cargoId];
+    const hsCode = cargoData.hsCode;
+    const category = Object.values(HSCodeCategories).find(
+      cat => hsCode.startsWith(cat.chapter)
+    );
+
+    
+    if (category) {
+      const allDocumentsApproved = category.requiredDocuments.every(doc => {
+        const docStatus = cargoData.documentStatus[doc]?.status;
+        return docStatus && docStatus.status === 'APPROVED';
+      });
+
+      if (allDocumentsApproved) {
+        await updateDoc(bookingRef, {
+          [`cargo.${cargoId}.isCustomsCleared`]: true
+        });
+      }
+    }
+
+    return {
+      success: true,
+      message: 'Document status updated successfully',
+      updatedBy: agency.name,
+      timestamp: new Date()
+    };
+
+  } catch (error) {
+    console.error('Error updating document status:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
 };
 
 // HS Code Categories and their specific requirements
@@ -95,6 +245,13 @@ export const HSCodeCategories = {
       batchTracking: true
     }
   }
+};
+
+export const ProcessStatus = {
+  PENDING: 'IN_PROGRESS',
+  APPROVED: 'COMPLETED',
+  REJECTED: 'REJECTED',
+  NOT_STARTED: 'NOT_STARTED'
 };
 
 class CustomsTradeManager {
