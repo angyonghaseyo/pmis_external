@@ -312,7 +312,6 @@ const ContainerRequestsList = () => {
                         <TableRow>
                             <TableCell>Cargo ID</TableCell>
                             <TableCell>Cargo Name</TableCell>
-                            <TableCell>Carrier</TableCell>
                             <TableCell>Voyage Number</TableCell>
                             <TableCell>ETA</TableCell>
                             <TableCell>Assigned Container ID</TableCell>
@@ -326,7 +325,7 @@ const ContainerRequestsList = () => {
                             <TableRow key={request.id}>
                                 <TableCell>{request.cargoId}</TableCell>
                                 <TableCell>{request.cargoDetails.name}</TableCell>
-                                <TableCell>{request.carrierName ? (
+                                {/* <TableCell>{request.carrierName ? (
                                     <Box>
                                         <Typography variant="body2">
                                             {request.carrierName}
@@ -340,7 +339,7 @@ const ContainerRequestsList = () => {
                                         </Typography>
 
                                     </Box>
-                                )}</TableCell>
+                                )}</TableCell> */}
                                 <TableCell>{request.voyageNumber}</TableCell>
                                 <TableCell>{request.eta?.toLocaleString()}</TableCell>
 
