@@ -649,7 +649,8 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
                 documents: fileUrls,
                 status: 'Pending',
                 updatedAt: new Date(),
-                createdAt: editingId ? formData.createdAt : new Date()
+                createdAt: editingId ? formData.createdAt : new Date(),
+                requestType: "repackingRequests"
             };
 
             if (editingId) {

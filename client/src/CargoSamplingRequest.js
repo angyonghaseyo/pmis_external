@@ -485,7 +485,7 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
                 <StyledPaper>
                     <LocalizationProvider dateAdapter={AdapterDateFns}>
                         <Grid container spacing={3}>
-                            <Grid item xs={12}>
+                            <Grid item xs={6}>
                                 <DateTimePicker
                                     label="Start Date & Time"
                                     value={formData.schedule.startDate}
@@ -502,7 +502,7 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
                                     minDate={new Date()}
                                 />
                             </Grid>
-                            <Grid item xs={12}>
+                            <Grid item xs={6}>
                                 <DateTimePicker
                                     label="End Date & Time"
                                     value={formData.schedule.endDate}
@@ -621,7 +621,8 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
                 documents: fileUrls,
                 status: 'Pending',
                 updatedAt: new Date(),
-                createdAt: editingId ? formData.createdAt : new Date()
+                createdAt: editingId ? formData.createdAt : new Date(),
+                requestType: "samplingRequests"
             };
 
             if (editingId) {

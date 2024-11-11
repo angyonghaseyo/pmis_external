@@ -588,7 +588,8 @@ const CargoTransloadingRequest = ({ open, handleClose, editingId = null, onSubmi
                 documents: fileUrls,
                 status: 'Pending',
                 updatedAt: new Date(),
-                createdAt: editingId ? formData.createdAt : new Date()
+                createdAt: editingId ? formData.createdAt : new Date(),
+                requestType: "transloadingRequests"
             };
 
             if (editingId) {
