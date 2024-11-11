@@ -7,5 +7,6 @@ const financeService = new FinanceService();
 const financeController = new FinanceController(financeService);
 
 router.get('/billing-requests', (req, res) => financeController.getBillingRequests(req, res));
+router.get('/billing-requests-by-month', (req, res) => financeController.getBillingRequestsByMonth(req, res));
 
 module.exports = router;

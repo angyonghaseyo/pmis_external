@@ -17,6 +17,21 @@ class FinanceController {
         res.status(500).json({ error: 'Failed to fetch billing requests', details: error.message });
       }
     }
+
+    async getBillingRequestsByMonth(req, res) {
+      const { companyId, month } = req.query;
+      if (!companyId || !month) {
+        return res.status(400).json({ error: 'companyId and month are required' });
+      }
+  
+      try {
+        const billingRequests = await this.financeService.getBillingRequestsByMonth(companyId, month);
+        res.status(200).json(billingRequests);
+      } catch (error) {
+        console.error('Error fetching billing requests by month:', error);
+        res.status(500).json({ error: 'Failed to fetch billing requests', details: error.message });
+      }
+    }
   }
   
   module.exports = FinanceController;
