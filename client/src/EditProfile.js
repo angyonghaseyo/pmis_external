@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { TextField, Button, Box, Typography, Select, MenuItem, InputLabel, FormControl, Grid, Avatar, Chip, Snackbar, Alert } from '@mui/material';
 import {sendPasswordResetEmailToUser, deleteUserAccount } from './services/api';
 import { useAuth } from './AuthContext';
+import { API_URL } from './config/apiConfig';
 
 
 const teams = [
@@ -39,7 +40,7 @@ function EditProfile() {
 
   const fetchProfile = async (email) => {
     try {
-      const response = await fetch(`http://localhost:5001/user-profile?email=${encodeURIComponent(email)}`);
+      const response = await fetch(`${API_URL}/user-profile?email=${encodeURIComponent(email)}`);
       if (!response.ok) {
         throw new Error('Error fetching user profile');
       }
@@ -114,7 +115,7 @@ function EditProfile() {
         formData.append('photoFile', blob, 'profile_photo.png');
       }
 
-      const response = await fetch('http://localhost:5001/update-profile', {
+      const response = await fetch(`${API_URL}/update-profile`, {
         method: 'PUT',
         body: formData,
       });
