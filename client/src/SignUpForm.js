@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import './AuthForms.css';
+import { API_URL } from './config/apiConfig';
 
 const teams = [
     'Assets and Facilities',
@@ -97,7 +98,7 @@ function SignUpForm() {
                 formDataToSend.append('photoFile', photoFile);
             }
 
-            const response = await fetch('http://localhost:5001/register', {
+            const response = await fetch(`${API_URL}/register`, {
                 method: 'POST',
                 body: formDataToSend,
             });

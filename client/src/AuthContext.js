@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { jwtDecode } from "jwt-decode";
+import { API_URL } from './config/apiConfig';
 
 const AuthContext = createContext();
 
@@ -37,7 +38,7 @@ export const AuthProvider = ({ children }) => {
     };
     const fetchUserProfile = async () => {
         try {
-            const response = await fetch(`http://localhost:5001/user-profile?email=${user.email}`);
+            const response = await fetch(`${API_URL}/user-profile?email=${user.email}`);
             if (!response.ok) {
                 throw new Error('Error fetching user profile');
             }
