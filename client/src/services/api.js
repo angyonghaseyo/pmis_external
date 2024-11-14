@@ -31,11 +31,10 @@ import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'fire
 
 import { db } from '../firebaseConfig';
 import { startOfMonth, endOfMonth } from 'date-fns';
+import { API_URL } from '../config/apiConfig';
 
 
 const storage = getStorage();
-
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 
 const authAxios = axios.create({
   baseURL: API_URL,
@@ -120,7 +119,7 @@ export const confirmUserPasswordReset = (oobCode, newPassword) =>
 export const getUsers = async (userId) => {
   try {
 
-    const response = await fetch(`http://localhost:5001/users?email=${userId}`);
+    const response = await fetch(`${API_URL}/users?email=${userId}`);
     if (!response.ok) {
       throw new Error('Error fetching users');
     }
@@ -135,7 +134,7 @@ export const getUsers = async (userId) => {
 
 export const getAllUsersInCompany = async (userId) => {
   try {
-    const response = await fetch(`http://localhost:5001/all-users-in-company?email=${userId}`);
+    const response = await fetch(`${API_URL}/all-users-in-company?email=${userId}`);
     if (!response.ok) {
       throw new Error('Error fetching users in company');
     }
@@ -175,7 +174,7 @@ export const updateUser = async (userId, userData, isPending = false) => {
 
 export const deleteUser = async (email) => {
   try {
-    const response = await fetch(`http://localhost:5001/users?email=${encodeURIComponent(email)}`, {
+    const response = await fetch(`${API_URL}/users?email=${encodeURIComponent(email)}`, {
       method: 'DELETE',
     });
     if (!response.ok) {
@@ -188,7 +187,7 @@ export const deleteUser = async (email) => {
 
 export const deleteUserAccount = async (email) => {
   try {
-    const response = await fetch('http://localhost:5001/user-account', {
+    const response = await fetch(`${API_URL}/user-account`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -205,7 +204,7 @@ export const deleteUserAccount = async (email) => {
 
 export const inviteUser = async (userData) => {
   try {
-    const response = await fetch('http://localhost:5001/invitations', {
+    const response = await fetch(`${API_URL}/invitations`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -224,7 +223,7 @@ export const inviteUser = async (userData) => {
 
 export const cancelInvitation = async (invitationId) => {
   try {
-    const response = await fetch(`http://localhost:5001/invitations/${invitationId}`, {
+    const response = await fetch(`${API_URL}/invitations/${invitationId}`, {
       method: 'DELETE',
     });
     if (!response.ok) {
@@ -238,7 +237,7 @@ export const cancelInvitation = async (invitationId) => {
 // Get user's inquiries and feedback
 export const getUserInquiriesFeedback = async (userId) => {
   try {
-    const response = await fetch(`http://localhost:5001/inquiries-feedback/${userId}`);
+    const response = await fetch(`${API_URL}/inquiries-feedback/${userId}`);
     if (!response.ok) {
       throw new Error('Error fetching inquiries and feedback');
     }
@@ -258,7 +257,7 @@ export const createInquiryFeedback = async (data) => {
       formData.append(key, data[key]);
     }
 
-    const response = await fetch('http://localhost:5001/inquiries-feedback', {
+    const response = await fetch(`${API_URL}/inquiries-feedback`, {
       method: 'POST',
       body: formData,
     });
@@ -282,7 +281,7 @@ export const updateInquiryFeedback = async (incrementalId, data) => {
       formData.append(key, data[key]);
     }
 
-    const response = await fetch(`http://localhost:5001/inquiries-feedback/${incrementalId}`, {
+    const response = await fetch(`${API_URL}/inquiries-feedback/${incrementalId}`, {
       method: 'PUT',
       body: formData,
     });
@@ -310,7 +309,7 @@ export const deleteInquiryFeedback = async (id) => {
 export const getCompanyInfo = async (companyName) => {
   try {
     console.log("Company Name", companyName)
-    const response = await fetch(`http://localhost:5001/company-data?companyName=${encodeURIComponent(companyName)}`);
+    const response = await fetch(`${API_URL}/company-data?companyName=${encodeURIComponent(companyName)}`);
     if (!response.ok) {
       throw new Error('Error fetching company data');
     }
@@ -324,7 +323,7 @@ export const getCompanyInfo = async (companyName) => {
 
 export const updateCompanyInfo = async (companyName, data) => {
   try {
-    const response = await fetch(`http://localhost:5001/company-data/${companyName}`, {
+    const response = await fetch(`${API_URL}/company-data/${companyName}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -341,7 +340,7 @@ export const updateCompanyInfo = async (companyName, data) => {
 };
 export const getOperatorRequisitions = async (userId) => {
   try {
-    const response = await fetch(`http://localhost:5001/operator-requisitions/${userId}`);
+    const response = await fetch(`${API_URL}/operator-requisitions/${userId}`);
     if (!response.ok) {
       throw new Error('Error fetching operator requisitions');
     }
@@ -355,7 +354,7 @@ export const getOperatorRequisitions = async (userId) => {
 
 export const createOperatorRequisition = async (requisitionData) => {
   try {
-    const response = await fetch('http://localhost:5001/operator-requisitions', {
+    const response = await fetch(`${API_URL}/operator-requisitions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -375,7 +374,7 @@ export const createOperatorRequisition = async (requisitionData) => {
 
 export const updateOperatorRequisition = async (requisitionId, updateData) => {
   try {
-    const response = await fetch(`http://localhost:5001/operator-requisitions/${requisitionId}`, {
+    const response = await fetch(`${API_URL}/operator-requisitions/${requisitionId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -393,7 +392,7 @@ export const updateOperatorRequisition = async (requisitionId, updateData) => {
 
 export const deleteOperatorRequisition = async (requisitionId) => {
   try {
-    const response = await fetch(`http://localhost:5001/operator-requisitions/${requisitionId}`, {
+    const response = await fetch(`${API_URL}/operator-requisitions/${requisitionId}`, {
       method: 'DELETE',
     });
     if (!response.ok) {
@@ -407,7 +406,7 @@ export const deleteOperatorRequisition = async (requisitionId) => {
 
 export const getTrainingPrograms = async () => {
   try {
-    const response = await fetch('http://localhost:5001/training-programs');
+    const response = await fetch(`${API_URL}/training-programs`);
     if (!response.ok) {
       throw new Error('Error fetching training programs');
     }
@@ -591,7 +590,7 @@ export const getCargoManifests = async () => {
 
 export const submitCargoManifest = async (manifestData) => {
   try {
-    const response = await fetch('http://localhost:5001/cargo-manifests', {
+    const response = await fetch(`${API_URL}/cargo-manifests`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -611,7 +610,7 @@ export const submitCargoManifest = async (manifestData) => {
 
 export const updateCargoManifest = async (id, manifestData) => {
   try {
-    const response = await fetch(`http://localhost:5001/cargo-manifests/${id}`, {
+    const response = await fetch(`${API_URL}/cargo-manifests/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -630,7 +629,7 @@ export const updateCargoManifest = async (id, manifestData) => {
 
 export const deleteCargoManifest = async (id) => {
   try {
-    const response = await fetch(`http://localhost:5001/cargo-manifests/${id}`, {
+    const response = await fetch(`${API_URL}/cargo-manifests/${id}`, {
       method: 'DELETE',
     });
     if (!response.ok) {
@@ -644,7 +643,7 @@ export const deleteCargoManifest = async (id) => {
 
 export const getVesselVisitRequestsAdHocRequest = async () => {
   try {
-    const response = await fetch('http://localhost:5001/vessel-visits-adhoc-requests');
+    const response = await fetch(`${API_URL}/vessel-visits-adhoc-requests`);
     if (!response.ok) {
       throw new Error('Failed to fetch vessel visits');
     }
@@ -658,7 +657,7 @@ export const getVesselVisitRequestsAdHocRequest = async () => {
 
 export const getActiveVesselVisits = async () => {
   try {
-    const response = await fetch('http://localhost:5001/active-vessel-visits');
+    const response = await fetch(`${API_URL}/active-vessel-visits`);
     if (!response.ok) {
       throw new Error('Failed to fetch active vessel visits');
     }
@@ -673,7 +672,7 @@ export const getActiveVesselVisits = async () => {
 // In api.js, add these functions
 export const getAdHocResourceRequests = async () => {
   try {
-    const response = await fetch('http://localhost:5001/ad-hoc-resource-requests');
+    const response = await fetch(`${API_URL}/ad-hoc-resource-requests`);
     if (!response.ok) {
       throw new Error('Failed to fetch ad hoc requests');
     }
@@ -686,7 +685,7 @@ export const getAdHocResourceRequests = async () => {
 
 export const submitAdHocResourceRequest = async (requestData) => {
   try {
-    const response = await fetch('http://localhost:5001/ad-hoc-resource-requests', {
+    const response = await fetch(`${API_URL}/ad-hoc-resource-requests`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -705,7 +704,7 @@ export const submitAdHocResourceRequest = async (requestData) => {
 
 export const updateAdHocResourceRequest = async (requestId, requestData) => {
   try {
-    const response = await fetch(`http://localhost:5001/ad-hoc-resource-requests/${requestId}`, {
+    const response = await fetch(`${API_URL}/ad-hoc-resource-requests/${requestId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -724,7 +723,7 @@ export const updateAdHocResourceRequest = async (requestId, requestData) => {
 
 export const getContainerTypes = async () => {
   try {
-    const response = await fetch(`http://localhost:5001/container-types`);
+    const response = await fetch(`${API_URL}/container-types`);
 
     if (!response.ok) {
       throw new Error('Error fetching container types');
@@ -740,7 +739,7 @@ export const getContainerTypes = async () => {
 
 export const getContainerTypesForCompany = async (company) => {
   try {
-    const response = await fetch(`http://localhost:5001/container-types/company?company=${encodeURIComponent(company)}`);
+    const response = await fetch(`${API_URL}/container-types/company?company=${encodeURIComponent(company)}`);
     if (!response.ok) {
       throw new Error('Error fetching container types');
     }
@@ -763,7 +762,7 @@ export const addContainerType = async (company, containerData) => {
       formData.append('image', containerData.imageFile);
     }
 
-    const response = await fetch('http://localhost:5001/container-types', {
+    const response = await fetch(`${API_URL}/container-types`, {
       method: 'POST',
       body: formData
     });
@@ -780,7 +779,7 @@ export const addContainerType = async (company, containerData) => {
 
 export const getCarrierContainerPrices = async (company) => {
   try {
-    const response = await fetch(`http://localhost:5001/carrier-container-prices?company=${encodeURIComponent(company)}`);
+    const response = await fetch(`${API_URL}/carrier-container-prices?company=${encodeURIComponent(company)}`);
     if (!response.ok) {
       throw new Error('Error fetching carrier container prices');
     }
@@ -793,7 +792,7 @@ export const getCarrierContainerPrices = async (company) => {
 
 export const assignContainerPrice = async (company, containerData) => {
   try {
-    const response = await fetch(`${API_URL}/carrier-container-prices`, { // Remove /api from here
+    const response = await fetch(`${API_URL}/carrier-container-prices`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -818,7 +817,7 @@ export const assignContainerPrice = async (company, containerData) => {
 
 export const updateContainerPrice = async (company, equipmentId, updateData) => {
   try {
-    const response = await fetch(`http://localhost:5001/carrier-container-prices/${company}/${equipmentId}`, {
+    const response = await fetch(`${API_URL}/carrier-container-prices/${company}/${equipmentId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -838,7 +837,7 @@ export const updateContainerPrice = async (company, equipmentId, updateData) => 
 
 export const deleteContainerPrice = async (company, equipmentId) => {
   try {
-    const response = await fetch(`http://localhost:5001/carrier-container-prices/${company}/${equipmentId}`, {
+    const response = await fetch(`${API_URL}/carrier-container-prices/${company}/${equipmentId}`, {
       method: 'DELETE',
     });
 
@@ -854,7 +853,7 @@ export const deleteContainerPrice = async (company, equipmentId) => {
 export const getBillingRequests = async (companyId, requestType) => {
   try {
     const response = await fetch(
-      `http://localhost:5001/billing-requests?companyId=${encodeURIComponent(companyId)}&requestType=${encodeURIComponent(requestType)}`,
+      `${API_URL}/billing-requests?companyId=${encodeURIComponent(companyId)}&requestType=${encodeURIComponent(requestType)}`,
       {
         method: 'GET',
         headers: {
@@ -878,7 +877,7 @@ export const getBillingRequests = async (companyId, requestType) => {
 export const getBillingRequestsByMonth = async (companyId, month) => {
   try {
     const response = await fetch(
-      `http://localhost:5001/billing-requests-by-month?companyId=${encodeURIComponent(companyId)}&month=${encodeURIComponent(month)}`,
+      `${API_URL}/billing-requests-by-month?companyId=${encodeURIComponent(companyId)}&month=${encodeURIComponent(month)}`,
       {
         method: 'GET',
         headers: {
@@ -901,7 +900,7 @@ export const getBillingRequestsByMonth = async (companyId, month) => {
 
 export const getBookingById = async (bookingId) => {
   try {
-    const response = await fetch(`http://localhost:5001/bookings/${bookingId}`);
+    const response = await fetch(`${API_URL}/bookings/${bookingId}`);
     if (!response.ok) {
       throw new Error('Failed to fetch booking');
     }
@@ -914,7 +913,7 @@ export const getBookingById = async (bookingId) => {
 
 export const getBookings = async () => {
   try {
-    const response = await fetch('http://localhost:5001/bookings');
+    const response = await fetch(`${API_URL}/bookings`);
     if (!response.ok) {
       throw new Error('Failed to fetch bookings');
     }
@@ -927,7 +926,7 @@ export const getBookings = async () => {
 
 export const createBooking = async (bookingData) => {
   try {
-    const response = await fetch('http://localhost:5001/bookings', {
+    const response = await fetch(`${API_URL}/bookings`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -946,7 +945,7 @@ export const createBooking = async (bookingData) => {
 
 export const updateBooking = async (id, bookingData) => {
   try {
-    const response = await fetch(`http://localhost:5001/bookings/${id}`, {
+    const response = await fetch(`${API_URL}/bookings/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -965,7 +964,7 @@ export const updateBooking = async (id, bookingData) => {
 
 export const deleteBooking = async (id) => {
   try {
-    const response = await fetch(`http://localhost:5001/bookings/${id}`, {
+    const response = await fetch(`${API_URL}/bookings/${id}`, {
       method: 'DELETE',
     });
     if (!response.ok) {
@@ -985,7 +984,7 @@ export const uploadBookingDocument = async (bookingId, cargoId, documentType, fi
     formData.append('documentType', documentType);
 
     const response = await fetch(
-      `http://localhost:5001/bookings/${bookingId}/cargo/${cargoId}/documents`,
+      `${API_URL}/bookings/${bookingId}/cargo/${cargoId}/documents`,
       {
         method: 'POST',
         body: formData,
@@ -1003,7 +1002,7 @@ export const uploadBookingDocument = async (bookingId, cargoId, documentType, fi
 
 export const registerTruckForCargo = async (cargoId, truckLicense) => {
   try {
-    const response = await fetch('http://localhost:5001/bookings/register-truck', {
+    const response = await fetch(`${API_URL}/bookings/register-truck`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1025,7 +1024,7 @@ export const registerTruckForCargo = async (cargoId, truckLicense) => {
 
 export const getContainerRequests = async () => {
   try {
-    const response = await fetch('http://localhost:5001/container-requests');
+    const response = await fetch(`${API_URL}/container-requests`);
     if (!response.ok) {
       throw new Error('Failed to fetch container requests');
     }
@@ -1038,7 +1037,7 @@ export const getContainerRequests = async () => {
 
 export const createContainerRequest = async (requestData) => {
   try {
-    const response = await fetch('http://localhost:5001/container-requests', {
+    const response = await fetch(`${API_URL}/container-requests`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1057,7 +1056,7 @@ export const createContainerRequest = async (requestData) => {
 
 export const updateContainerRequest = async (id, requestData) => {
   try {
-    const response = await fetch(`http://localhost:5001/container-requests/${id}`, {
+    const response = await fetch(`${API_URL}/container-requests/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -1076,7 +1075,7 @@ export const updateContainerRequest = async (id, requestData) => {
 
 export const deleteContainerRequest = async (id) => {
   try {
-    const response = await fetch(`http://localhost:5001/container-requests/${id}`, {
+    const response = await fetch(`${API_URL}/container-requests/${id}`, {
       method: 'DELETE',
     });
     if (!response.ok) {
@@ -1091,7 +1090,7 @@ export const deleteContainerRequest = async (id) => {
 
 export const getAgencies = async () => {
   try {
-    const response = await fetch('http://localhost:5001/agencies');
+    const response = await fetch(`${API_URL}/agencies`);
     if (!response.ok) {
       throw new Error('Error fetching agencies');
     }
@@ -1104,7 +1103,7 @@ export const getAgencies = async () => {
 
 export const verifyAgencyAccess = async (agencyKey, documentType) => {
   try {
-    const response = await fetch('http://localhost:5001/agencies/verify', {
+    const response = await fetch(`${API_URL}/agencies/verify`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1123,7 +1122,7 @@ export const verifyAgencyAccess = async (agencyKey, documentType) => {
 
 export const updateDocumentStatus = async (agencyKey, bookingId, cargoId, documentType, status, comments) => {
   try {
-    const response = await fetch('http://localhost:5001/agencies/document-status', {
+    const response = await fetch(`${API_URL}/agencies/document-status`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -1169,7 +1168,7 @@ export const updateEmployee = (employeeId, data) =>
 // Vessel Visits
 export const getVesselVisits = async () => {
   try {
-    const response = await fetch('http://localhost:5001/vessel-visits-booking');
+    const response = await fetch(`${API_URL}/vessel-visits-booking`);
     if (!response.ok) {
       throw new Error('Failed to fetch vessel visits');
     }

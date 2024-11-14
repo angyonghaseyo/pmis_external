@@ -29,6 +29,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
 import { submitCargoManifest, updateCargoManifest, deleteCargoManifest } from './services/api';
+import { API_URL } from './config/apiConfig';
 
 const CargoManifest = () => {
   const [manifests, setManifests] = useState([]);
@@ -82,7 +83,7 @@ const CargoManifest = () => {
 
   const fetchManifests = async () => {
     try {
-      const response = await fetch('http://localhost:5001/cargo-manifests');
+      const response = await fetch(`${API_URL}/cargo-manifests`);
       if (!response.ok) {
         throw new Error('Failed to fetch cargo manifests');
       }
@@ -96,7 +97,7 @@ const CargoManifest = () => {
 
   const fetchVesselVisits = async () => {
     try {
-      const response = await fetch('http://localhost:5001/vessel-visits-confirmed-without-manifests');
+      const response = await fetch(`${API_URL}/vessel-visits-confirmed-without-manifests`);
       if (!response.ok) {
         throw new Error('Failed to fetch vessel visits');
       }
