@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { doc, getDoc, updateDoc, getFirestore, getDocs, collection } from "firebase/firestore";
+import { doc, getDoc, updateDoc, getFirestore, getDocs, collection, where, query } from "firebase/firestore";
 import QRCode from 'qrcode';
 import {
     Box,
@@ -80,57 +80,78 @@ const ContainerRequestsList = () => {
 
     const handleRequestClick = async (request) => {
         try {
-            let allContainers = [];
+            console.log('Processing request:', request);
+            let allContainers = new Map(); // Use Map to ensure uniqueness by EquipmentID
             let allImages = {};
 
-            // If carrier name is specified, fetch only that carrier's data
-            if (request.carrierName) {
-                const carrierDoc = await getDoc(doc(db, "carrier_container_prices", request.carrierName));
-                const containers = carrierDoc.data()?.containers || [];
-                allContainers = containers;
+            const carrierSnapshot = await getDocs(collection(db, "carrier_container_prices"));
+            console.log('Found carriers:', carrierSnapshot.size);
 
-                const menuDoc = await getDoc(doc(db, "container_menu", request.carrierName));
-                const containerTypes = menuDoc.data()?.container_types || [];
-                containerTypes.forEach(type => {
-                    allImages[type.name] = type.imageUrl;
-                });
-            } else {
-                // Fetch all carriers' container prices
-                const carrierSnapshot = await getDocs(collection(db, "carrier_container_prices"));
-                carrierSnapshot.forEach(doc => {
-                    const carrierData = doc.data();
-                    if (carrierData.containers) {
-                        // Add carrier name to each container for reference
-                        const containersWithCarrier = carrierData.containers.map(container => ({
-                            ...container,
-                            carrierName: doc.id
-                        }));
-                        allContainers = [...allContainers, ...containersWithCarrier];
-                    }
-                });
+            for (const carrierDoc of carrierSnapshot.docs) {
+                const carrierData = carrierDoc.data();
+                const carrierName = carrierDoc.id;
 
-                // Fetch all container types and images
-                const menuSnapshot = await getDocs(collection(db, "container_menu"));
-                menuSnapshot.forEach(doc => {
-                    const menuData = doc.data();
-                    if (menuData.container_types) {
-                        menuData.container_types.forEach(type => {
-                            allImages[type.name] = type.imageUrl;
-                        });
-                    }
-                });
+                console.log(`Processing carrier ${carrierName}:`, carrierData);
+
+                if (carrierData.containers) {
+                    carrierData.containers.forEach(container => {
+                        // Only add if not already in the Map
+                        if (!allContainers.has(container.EquipmentID)) {
+                            allContainers.set(container.EquipmentID, {
+                                ...container,
+                                carrierName,
+                            });
+                        }
+                    });
+                }
+
+                // Fetch container types for this carrier to get images
+                const menuDoc = await getDoc(doc(db, "container_menu", carrierName));
+                if (menuDoc.exists()) {
+                    const containerTypes = menuDoc.data()?.container_types || [];
+                    containerTypes.forEach(type => {
+                        allImages[type.name] = type.imageUrl;
+                    });
+                }
             }
 
-            // Filter out fully booked containers
-            const availableContainers = allContainers.filter(container => {
+            // Convert Map to Array
+            const containersArray = Array.from(allContainers.values());
+            console.log('All unique containers before filtering:', containersArray);
+
+            // Filter containers based on request type and availability
+            const availableContainers = containersArray.filter(container => {
+                // Parse numeric values
                 const spaceUsed = parseFloat(container.spaceUsed || 0);
                 const totalSpace = parseFloat(container.size || 0);
                 const requiredSpace = request.consolidationService
                     ? parseFloat(request.consolidationSpace || 0)
                     : totalSpace;
 
-                return (totalSpace - spaceUsed) >= requiredSpace;
+                // For consolidation service
+                if (request.consolidationService) {
+                    const hasEnoughSpace = (totalSpace - spaceUsed) >= requiredSpace;
+                    const isValidStatus = ['available', 'consolidation'].includes(container.bookingStatus);
+                    console.log(`Container ${container.EquipmentID} - Space Check:`, {
+                        totalSpace,
+                        spaceUsed,
+                        requiredSpace,
+                        hasEnoughSpace,
+                        status: container.bookingStatus,
+                        isValidStatus
+                    });
+                    return hasEnoughSpace && isValidStatus;
+                }
+
+                // For full container service
+                return spaceUsed === 0 && container.bookingStatus === 'available';
             });
+
+            console.log('Filtered available containers:', availableContainers);
+
+            if (availableContainers.length === 0) {
+                showAlert("No available containers found matching the requirements", "warning");
+            }
 
             setAvailableContainers(availableContainers);
             setContainerImages(allImages);
@@ -138,7 +159,7 @@ const ContainerRequestsList = () => {
             setIsDialogOpen(true);
         } catch (error) {
             console.error("Error fetching container data:", error);
-            showAlert("Error loading container data", "error");
+            showAlert("Error loading container data: " + error.message, "error");
         }
     };
 
@@ -149,47 +170,62 @@ const ContainerRequestsList = () => {
             ? parseFloat(selectedRequest.consolidationSpace)
             : parseFloat(container.size);
 
-        if (requiredSpace > (parseFloat(container.size) - parseFloat(container.spaceUsed))) {
-            showAlert("Not enough space in the selected container", "error");
-            return;
-        }
-
         try {
+            // Get current container state
+            const carrierDoc = await getDoc(doc(db, "carrier_container_prices", container.carrierName));
+            const currentContainers = carrierDoc.data()?.containers || [];
+            const currentContainer = currentContainers.find(c => c.EquipmentID === container.EquipmentID);
+
+            if (!currentContainer) {
+                throw new Error("Container not found in database");
+            }
+
+            const currentSpaceUsed = parseFloat(currentContainer.spaceUsed || 0);
+            const totalSpace = parseFloat(currentContainer.size);
+
+            if ((currentSpaceUsed + requiredSpace) > totalSpace) {
+                throw new Error("Container space has changed and no longer has enough capacity");
+            }
+
             const updatedContainer = {
-                ...container,
-                spaceUsed: (parseFloat(container.spaceUsed) + requiredSpace).toString(),
+                ...currentContainer,
+                spaceUsed: (currentSpaceUsed + requiredSpace).toString(),
                 bookingStatus: selectedRequest.consolidationService ? "consolidation" : "booked",
                 containerConsolidationsID: selectedRequest.consolidationService
-                    ? [...(container.containerConsolidationsID || []), selectedRequest.id]
-                    : container.containerConsolidationsID
+                    ? [...(currentContainer.containerConsolidationsID || []), selectedRequest.id]
+                    : currentContainer.containerConsolidationsID,
+                updatedAt: new Date().toISOString()
             };
 
-            await updateDoc(doc(db, "carrier_container_prices", selectedRequest.carrierName), {
-                containers: availableContainers.map(c =>
+            // Update carrier_container_prices document
+            await updateDoc(doc(db, "carrier_container_prices", container.carrierName), {
+                containers: currentContainers.map(c =>
                     c.EquipmentID === container.EquipmentID ? updatedContainer : c
                 )
             });
 
+            // Update container_requests document
             await updateDoc(doc(db, "container_requests", selectedRequest.id), {
                 status: "Assigned",
-                assignedContainerId: container.EquipmentID
+                assignedContainerId: container.EquipmentID,
+                carrierName: container.carrierName,
+                updatedAt: new Date().toISOString()
             });
 
-            const bookingsRef = collection(db, "bookings");
-            const bookingSnapshot = await getDocs(bookingsRef);
-            let foundBookingId = null;
+            // Update booking
+            const bookingQuery = query(
+                collection(db, "bookings"),
+                where(`cargo.${selectedRequest.cargoId}`, '!=', null)
+            );
+            const bookingSnapshot = await getDocs(bookingQuery);
 
-            for (const bookingDoc of bookingSnapshot.docs) {
-                const bookingData = bookingDoc.data();
-
-                // Check if booking has cargo map and the specific cargo ID
-                if (bookingData.cargo && bookingData.cargo[selectedRequest.cargoId]) {
-                    foundBookingId = bookingDoc.id;
-                    await updateDoc(doc(db, "bookings", foundBookingId), {
-                        [`cargo.${selectedRequest.cargoId}.isContainerRented`]: true
-                    });
-                    break;
-                }
+            if (!bookingSnapshot.empty) {
+                const bookingDoc = bookingSnapshot.docs[0];
+                await updateDoc(doc(db, "bookings", bookingDoc.id), {
+                    [`cargo.${selectedRequest.cargoId}.isContainerRented`]: true,
+                    [`cargo.${selectedRequest.cargoId}.assignedContainerId`]: container.EquipmentID,
+                    [`cargo.${selectedRequest.cargoId}.carrierName`]: container.carrierName
+                });
             }
 
             showAlert("Container assigned successfully");
@@ -197,7 +233,7 @@ const ContainerRequestsList = () => {
             setIsDialogOpen(false);
         } catch (error) {
             console.error("Error assigning container:", error);
-            showAlert("Error assigning container", "error");
+            showAlert(error.message || "Error assigning container", "error");
         }
     };
 
@@ -236,31 +272,38 @@ const ContainerRequestsList = () => {
     };
 
     const ContainerCard = ({ container }) => {
-        const spaceUsed = parseFloat(container.spaceUsed);
-        const totalSpace = parseFloat(container.size);
+        const spaceUsed = parseFloat(container.spaceUsed || 0);
+        const totalSpace = parseFloat(container.size || 0);
         const spacePercentage = (spaceUsed / totalSpace) * 100;
         const spaceLeft = totalSpace - spaceUsed;
 
+        console.log('Rendering container card:', container);
+
         return (
             <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                {containerImages[container.name] && (
-                    <CardMedia
-                        component="img"
-                        height="140"
-                        image={containerImages[container.name]}
-                        alt={container.name}
-                        sx={{ objectFit: 'contain', bgcolor: 'grey.100' }}
-                    />
-                )}
+                <CardMedia
+                    component="img"
+                    height="140"
+                    image={containerImages[container.name] || '/api/placeholder/400/320'}
+                    alt={container.name}
+                    sx={{ objectFit: 'contain', bgcolor: 'grey.100' }}
+                />
                 <CardContent>
                     <Stack spacing={2}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <Typography variant="h6">{container.EquipmentID}</Typography>
-                            <Chip
-                                label={container.bookingStatus}
-                                color={container.bookingStatus === 'available' ? 'success' : 'default'}
-                                size="small"
-                            />
+                            <Stack direction="row" spacing={1}>
+                                <Chip
+                                    label={container.carrierName}
+                                    color="primary"
+                                    size="small"
+                                />
+                                <Chip
+                                    label={container.bookingStatus}
+                                    color={container.bookingStatus === 'available' ? 'success' : 'default'}
+                                    size="small"
+                                />
+                            </Stack>
                         </Box>
                         <Typography color="text.secondary">
                             {container.name} - {container.size}ft
@@ -279,7 +322,7 @@ const ContainerRequestsList = () => {
                             />
                         </Box>
                         <Typography variant="h6" color="primary">
-                            ${container.price}
+                            ${parseFloat(container.price).toLocaleString()}
                         </Typography>
                     </Stack>
                 </CardContent>

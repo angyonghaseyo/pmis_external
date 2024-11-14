@@ -9,7 +9,7 @@ class ContainerPricingService {
         try {
             const carrierContainerRef = this.db.collection('carrier_container_prices').doc(company);
             const snapshot = await carrierContainerRef.get();
-            
+
             if (!snapshot.exists) {
                 return [];
             }
@@ -23,12 +23,19 @@ class ContainerPricingService {
 
     async createContainerPrice(company, containerData) {
         try {
+            console.log('Creating container price for company:', company);
+            console.log('Container data:', containerData);
+
+            if (!company) {
+                throw new Error('Company is required');
+            }
+
             const carrierContainerRef = this.db.collection('carrier_container_prices').doc(company);
             const snapshot = await carrierContainerRef.get();
-            
+
             let existingContainers = [];
             if (snapshot.exists) {
-                existingContainers = snapshot.data().containers || [];
+                existingContainers = snapshot.data()?.containers || [];
             }
 
             // Check for duplicate Equipment ID
@@ -37,29 +44,29 @@ class ContainerPricingService {
             );
 
             if (isDuplicate) {
-                throw new Error('Container with this Equipment ID already exists');
+                throw new Error(`Container with Equipment ID ${containerData.EquipmentID} already exists`);
             }
 
             const newContainer = {
                 ...containerData,
-                bookingStatus: 'available',
-                spaceUsed: 0,
-                containerConsolidationsID: [],
+                company, // Ensure company is included in the container data
+                bookingStatus: containerData.bookingStatus || 'available',
+                spaceUsed: containerData.spaceUsed || 0,
+                containerConsolidationsID: containerData.containerConsolidationsID || [],
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             };
 
-            const updatedContainers = [...existingContainers, newContainer];
-
+            // Use set with merge to create or update the document
             await carrierContainerRef.set({
-                containers: updatedContainers,
+                containers: [...existingContainers, newContainer],
                 lastUpdated: new Date().toISOString()
             }, { merge: true });
 
             return newContainer;
         } catch (error) {
-            console.error('Error creating container price:', error);
-            throw error;
+            console.error('Detailed error in createContainerPrice:', error);
+            throw new Error(`Error creating container price: ${error.message}`);
         }
     }
 
@@ -137,8 +144,8 @@ class ContainerPricingService {
             }
 
             const containers = snapshot.data().containers || [];
-            return containers.filter(container => 
-                container.bookingStatus === 'available' && 
+            return containers.filter(container =>
+                container.bookingStatus === 'available' &&
                 container.spaceUsed < container.size
             );
         } catch (error) {

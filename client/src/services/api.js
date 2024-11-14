@@ -35,7 +35,7 @@ import { startOfMonth, endOfMonth } from 'date-fns';
 
 const storage = getStorage();
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 
 const authAxios = axios.create({
   baseURL: API_URL,
@@ -441,7 +441,7 @@ export const getUserUpdatedData = async (userEmail) => {
     const usersRef = collection(db, 'users');
     const q = query(usersRef, where('email', '==', userEmail));
     const querySnapshot = await getDocs(q);
-    
+
     if (querySnapshot.empty) {
       throw new Error('User not found');
     }
@@ -458,7 +458,7 @@ export const registerForProgram = async (programId, userEmail) => {
     const usersRef = collection(db, 'users');
     const q = query(usersRef, where('email', '==', userEmail));
     const querySnapshot = await getDocs(q);
-    
+
     if (querySnapshot.empty) {
       throw new Error('User not found');
     }
@@ -511,7 +511,7 @@ export const withdrawFromProgram = async (programId, userEmail) => {
     const usersRef = collection(db, 'users');
     const q = query(usersRef, where('email', '==', userEmail));
     const querySnapshot = await getDocs(q);
-    
+
     if (querySnapshot.empty) {
       throw new Error('User not found');
     }
@@ -519,9 +519,9 @@ export const withdrawFromProgram = async (programId, userEmail) => {
     const userDoc = querySnapshot.docs[0];
     const userData = userDoc.data();
     const programRef = doc(db, 'training_programs', programId);
-    
+
     const enrollmentToRemove = userData.enrolledPrograms?.find(ep => ep.programId === programId);
-    
+
     if (!enrollmentToRemove) {
       throw new Error('Not enrolled in this program');
     }
@@ -725,7 +725,7 @@ export const updateAdHocResourceRequest = async (requestId, requestData) => {
 export const getContainerTypes = async () => {
   try {
     const response = await fetch(`http://localhost:5001/container-types`);
-    
+
     if (!response.ok) {
       throw new Error('Error fetching container types');
     }
@@ -793,7 +793,7 @@ export const getCarrierContainerPrices = async (company) => {
 
 export const assignContainerPrice = async (company, containerData) => {
   try {
-    const response = await fetch('http://localhost:5001/carrier-container-prices', {
+    const response = await fetch(`${API_URL}/carrier-container-prices`, { // Remove /api from here
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -805,8 +805,10 @@ export const assignContainerPrice = async (company, containerData) => {
     });
 
     if (!response.ok) {
-      throw new Error('Error assigning container price');
+      const errorData = await response.json().catch(() => ({ error: 'Server error' }));
+      throw new Error(errorData.error || 'Error assigning container price');
     }
+
     return await response.json();
   } catch (error) {
     console.error('Error in assignContainerPrice:', error);
@@ -1167,14 +1169,14 @@ export const updateEmployee = (employeeId, data) =>
 // Vessel Visits
 export const getVesselVisits = async () => {
   try {
-      const response = await fetch('http://localhost:5001/vessel-visits-booking');
-      if (!response.ok) {
-          throw new Error('Failed to fetch vessel visits');
-      }
-      return await response.json();
+    const response = await fetch('http://localhost:5001/vessel-visits-booking');
+    if (!response.ok) {
+      throw new Error('Failed to fetch vessel visits');
+    }
+    return await response.json();
   } catch (error) {
-      console.error('Error fetching vessel visits:', error);
-      throw error;
+    console.error('Error fetching vessel visits:', error);
+    throw error;
   }
 };
 
@@ -1242,6 +1244,97 @@ export const getBillingRequestsByMonth1 = async (companyId, monthRange) => {
     return billingRequests;
   } catch (error) {
     console.error('Error fetching billing requests by month:', error);
+    throw error;
+  }
+};
+
+// Cargo Sampling
+
+export const getSamplingRequests = async () => {
+  try {
+    const response = await fetch('http://localhost:5001/sampling-requests');
+    if (!response.ok) {
+      throw new Error('Failed to fetch sampling requests');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching sampling requests:', error);
+    throw error;
+  }
+};
+
+export const createSamplingRequest = async (requestData) => {
+  try {
+    const response = await fetch('http://localhost:5001/sampling-requests', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestData),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to create sampling request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error creating sampling request:', error);
+    throw error;
+  }
+};
+
+export const updateSamplingRequest = async (id, requestData) => {
+  try {
+    const response = await fetch(`http://localhost:5001/sampling-requests/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestData),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to update sampling request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating sampling request:', error);
+    throw error;
+  }
+};
+
+export const deleteSamplingRequest = async (id) => {
+  try {
+    const response = await fetch(`http://localhost:5001/sampling-requests/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      throw new Error('Failed to delete sampling request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error deleting sampling request:', error);
+    throw error;
+  }
+};
+
+export const uploadSamplingDocument = async (requestId, documentType, file) => {
+  try {
+    const formData = new FormData();
+    formData.append('document', file);
+    formData.append('documentType', documentType);
+
+    const response = await fetch(
+      `http://localhost:5001/sampling-requests/${requestId}/documents`,
+      {
+        method: 'POST',
+        body: formData,
+      }
+    );
+    if (!response.ok) {
+      throw new Error('Failed to upload document');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error uploading document:', error);
     throw error;
   }
 };
