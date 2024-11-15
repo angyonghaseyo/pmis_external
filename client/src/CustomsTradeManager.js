@@ -78,7 +78,7 @@ export const verifyAgencyAccess = async (agencyKey, documentType) => {
 };
 
 // Update document status
-export const updateDocumentStatus = async (
+export const updateDocumentStatus = async ( // rectangle
   agencyKey,
   bookingId,
   cargoId,
@@ -98,7 +98,6 @@ export const updateDocumentStatus = async (
        // Get current booking data
        const bookingRef = doc(db, 'bookings', bookingId);
        const bookingDoc = await getDoc(bookingRef);
-       const bookingData = bookingDoc.data();
    
        // Format document name to match the display format
        const formattedDocumentName = documentType

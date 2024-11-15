@@ -346,27 +346,218 @@ const BookingForm = ({ user }) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  // const handleSubmit = async () => {
+  //   const newBooking = {
+  //     ...formData,
+  //     userEmail: user.email,
+  //   };
+
+  //   try {
+  //     if (editingId) {
+  //       const updatedBooking = await updateBooking(editingId, newBooking);
+  //       setBookingData(prevBookings =>
+  //         prevBookings.map(booking =>
+  //           booking.bookingId === editingId ? updatedBooking : booking
+  //         )
+  //       );
+  //     } else {
+  //       const createdBooking = await createBooking(newBooking);
+  //       setBookingData(prev => [...prev, createdBooking]);
+  //     }
+  //     handleCloseDialog();
+  //   } catch (error) {
+  //     console.error('Error saving booking:', error);
+  //   }
+  // };
+
   const handleSubmit = async () => {
-    const newBooking = {
+    // First validate all cargo items
+    const cargoValidationErrors = [];
+    
+    Object.entries(formData.cargo).forEach(([cargoId, cargo]) => {
+      if (!cargo.hsCode) {
+        cargoValidationErrors.push(`Cargo ${cargoId}: HS Code is required`);
+        return;
+      }
+      
+      const hsCodePrefix = cargo.hsCode.substring(0, 2);
+      if (!['01', '08', '30'].includes(hsCodePrefix)) {
+        cargoValidationErrors.push(
+          `Cargo ${cargoId}: HS Code must start with 01 (Live Animals), 08 (Fresh Fruits), or 30 (Pharmaceuticals)`
+        );
+      }
+    });
+  
+    if (cargoValidationErrors.length > 0) {
+      alert(cargoValidationErrors.join('\n'));
+      return;
+    }
+  
+    // Process cargo items and add document requirements
+    const processedCargo = {};
+    Object.entries(formData.cargo).forEach(([cargoId, cargo]) => {
+      const hsCodePrefix = cargo.hsCode.substring(0, 2);
+      let documentStatus = {};
+  
+      switch (hsCodePrefix) {
+        case '01': // Live Animals
+          documentStatus = {
+            'Veterinary Health Certificate': {
+              name: 'Veterinary Health Certificate',
+              status: 'PENDING',
+              agencyType: 'VETERINARY',
+              agencyName: 'National Veterinary Authority',
+              lastUpdated: new Date(),
+              comments: null,
+              documentUrl: null
+            },
+            'Animal Welfare Certification': {
+              name: 'Animal Welfare Certification',
+              status: 'PENDING',
+              agencyType: 'WELFARE',
+              agencyName: 'Animal Welfare Board',
+              lastUpdated: new Date(),
+              comments: null,
+              documentUrl: null
+            },
+            'CITES Permit': {
+              name: 'CITES Permit',
+              status: 'PENDING',
+              agencyType: 'SECURITY',
+              agencyName: 'CITES Authority',
+              lastUpdated: new Date(),
+              comments: null,
+              documentUrl: null
+            },
+            'Quarantine Clearance Certificate': {
+              name: 'Quarantine Clearance Certificate',
+              status: 'PENDING',
+              agencyType: 'VETERINARY',
+              agencyName: 'Quarantine Department',
+              lastUpdated: new Date(),
+              comments: null,
+              documentUrl: null
+            }
+          };
+          break;
+  
+        case '08': // Fresh Fruits
+          documentStatus = {
+            'Phytosanitary Certificate': {
+              name: 'Phytosanitary Certificate',
+              status: 'PENDING',
+              agencyType: 'PHYTOSANITARY',
+              agencyName: 'Phytosanitary Department',
+              lastUpdated: new Date(),
+              comments: null,
+              documentUrl: null
+            },
+            'Pesticide Residue Test Report': {
+              name: 'Pesticide Residue Test Report',
+              status: 'PENDING',
+              agencyType: 'PHYTOSANITARY',
+              agencyName: 'Phytosanitary Department',
+              lastUpdated: new Date(),
+              comments: null,
+              documentUrl: null
+            },
+            'Cold Chain Compliance Certificate': {
+              name: 'Cold Chain Compliance Certificate',
+              status: 'PENDING',
+              agencyType: 'QUALITY',
+              agencyName: 'Quality Control Department',
+              lastUpdated: new Date(),
+              comments: null,
+              documentUrl: null
+            },
+            'Packaging Declaration': {
+              name: 'Packaging Declaration',
+              status: 'PENDING',
+              agencyType: 'QUALITY',
+              agencyName: 'Quality Control Department',
+              lastUpdated: new Date(),
+              comments: null,
+              documentUrl: null
+            }
+          };
+          break;
+  
+        case '30': // Pharmaceuticals
+          documentStatus = {
+            'GMP Certificate': {
+              name: 'GMP Certificate',
+              status: 'PENDING',
+              agencyType: 'PHARMA',
+              agencyName: 'Pharmaceutical Control Board',
+              lastUpdated: new Date(),
+              comments: null,
+              documentUrl: null
+            },
+            'Drug Registration Certificate': {
+              name: 'Drug Registration Certificate',
+              status: 'PENDING',
+              agencyType: 'PHARMA',
+              agencyName: 'Pharmaceutical Control Board',
+              lastUpdated: new Date(),
+              comments: null,
+              documentUrl: null
+            },
+            'Certificate of Pharmaceutical Product': {
+              name: 'Certificate of Pharmaceutical Product',
+              status: 'PENDING',
+              agencyType: 'PHARMA',
+              agencyName: 'Pharmaceutical Control Board',
+              lastUpdated: new Date(),
+              comments: null,
+              documentUrl: null
+            },
+            'Stability Study Report': {
+              name: 'Stability Study Report',
+              status: 'PENDING',
+              agencyType: 'PHARMA',
+              agencyName: 'Pharmaceutical Control Board',
+              lastUpdated: new Date(),
+              comments: null,
+              documentUrl: null
+            }
+          };
+          break;
+      }
+  
+      // Add the processed cargo with document status
+      processedCargo[cargoId] = {
+        ...cargo,
+        documentStatus,
+        isCustomsCleared: false,
+        documents: cargo.documents || {}
+      };
+    });
+  
+    // Prepare the booking data
+    const bookingData = {
       ...formData,
+      cargo: processedCargo,
       userEmail: user.email,
     };
-
+  
     try {
       if (editingId) {
-        const updatedBooking = await updateBooking(editingId, newBooking);
-        setBookingData(prevBookings =>
-          prevBookings.map(booking =>
-            booking.bookingId === editingId ? updatedBooking : booking
+        // Update existing booking
+        const response = await updateBooking(editingId, bookingData);
+        setBookingData((prev) =>
+          prev.map((booking) =>
+            booking.bookingId === editingId ? { ...bookingData, bookingId: editingId } : booking
           )
         );
       } else {
-        const createdBooking = await createBooking(newBooking);
-        setBookingData(prev => [...prev, createdBooking]);
+        // Create new booking
+        const response = await createBooking(bookingData);
+        setBookingData((prev) => [...prev, { ...bookingData, bookingId: response.id }]);
       }
       handleCloseDialog();
     } catch (error) {
-      console.error('Error saving booking:', error);
+      console.error("Error saving booking:", error);
+      alert("Error saving booking: " + error.message);
     }
   };
 
@@ -401,140 +592,140 @@ const BookingForm = ({ user }) => {
             advancedDeclaration: null,
             exportDocument: null,
           },
-          documentStatus: {
-            // Fresh Fruits Documents
-            "Phytosanitary Certificate": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "PHYTOSANITARY",
-              agencyName: "Phytosanitary Department",
-              comments: null,
-              documentUrl: null,
-            },
-            "Pesticide Residue Test Report": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "PHYTOSANITARY",
-              agencyName: "Phytosanitary Department",
-              comments: null,
-              documentUrl: null,
-            },
-            "Cold Chain Compliance Certificate": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "QUALITY",
-              agencyName: "Quality Control Department",
-              comments: null,
-              documentUrl: null,
-            },
-            "Packaging Declaration": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "QUALITY",
-              agencyName: "Quality Control Department",
-              comments: null,
-              documentUrl: null,
-            },
-            // Live Animals Documents
-            "Veterinary Health Certificate": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "VETERINARY",
-              agencyName: "National Veterinary Authority",
-              comments: null,
-              documentUrl: null,
-            },
-            "Animal Welfare Certification": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "WELFARE",
-              agencyName: "Animal Welfare Board",
-              comments: null,
-              documentUrl: null,
-            },
-            "CITES Permit": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "SECURITY",
-              agencyName: "CITES Authority",
-              comments: null,
-              documentUrl: null,
-            },
-            "Quarantine Clearance Certificate": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "VETERINARY",
-              agencyName: "Quarantine Department",
-              comments: null,
-              documentUrl: null,
-            },
-            // Pharmaceutical Documents
-            "GMP Certificate": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "PHARMA",
-              agencyName: "Pharmaceutical Control Board",
-              comments: null,
-              documentUrl: null,
-            },
-            "Drug Registration Certificate": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "PHARMA",
-              agencyName: "Pharmaceutical Control Board",
-              comments: null,
-              documentUrl: null,
-            },
-            "Certificate of Pharmaceutical Product": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "PHARMA",
-              agencyName: "Pharmaceutical Control Board",
-              comments: null,
-              documentUrl: null,
-            },
-            "Stability Study Report": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "PHARMA",
-              agencyName: "Pharmaceutical Control Board",
-              comments: null,
-              documentUrl: null,
-            },
-            // Common Documents
-            "Export License": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "CUSTOMS",
-              agencyName: "Customs Department",
-              comments: null,
-              documentUrl: null,
-            },
-            "Commercial Invoice": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "CUSTOMS",
-              agencyName: "Customs Department",
-              comments: null,
-              documentUrl: null,
-            },
-            "Certificate of Origin": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "CUSTOMS",
-              agencyName: "Chamber of Commerce",
-              comments: null,
-              documentUrl: null,
-            },
-            "Packing List": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "CUSTOMS",
-              agencyName: "Customs Department",
-              comments: null,
-              documentUrl: null,
-            }
-          }
+          // documentStatus: {
+          //   // Fresh Fruits Documents
+          //   "Phytosanitary Certificate": {
+          //     status: "IN_PROGRESS",
+          //     lastUpdated: null,
+          //     agencyType: "PHYTOSANITARY",
+          //     agencyName: "Phytosanitary Department",
+          //     comments: null,
+          //     documentUrl: null,
+          //   },
+          //   "Pesticide Residue Test Report": {
+          //     status: "IN_PROGRESS",
+          //     lastUpdated: null,
+          //     agencyType: "PHYTOSANITARY",
+          //     agencyName: "Phytosanitary Department",
+          //     comments: null,
+          //     documentUrl: null,
+          //   },
+          //   "Cold Chain Compliance Certificate": {
+          //     status: "IN_PROGRESS",
+          //     lastUpdated: null,
+          //     agencyType: "QUALITY",
+          //     agencyName: "Quality Control Department",
+          //     comments: null,
+          //     documentUrl: null,
+          //   },
+          //   "Packaging Declaration": {
+          //     status: "IN_PROGRESS",
+          //     lastUpdated: null,
+          //     agencyType: "QUALITY",
+          //     agencyName: "Quality Control Department",
+          //     comments: null,
+          //     documentUrl: null,
+          //   },
+          //   // Live Animals Documents
+          //   "Veterinary Health Certificate": {
+          //     status: "IN_PROGRESS",
+          //     lastUpdated: null,
+          //     agencyType: "VETERINARY",
+          //     agencyName: "National Veterinary Authority",
+          //     comments: null,
+          //     documentUrl: null,
+          //   },
+          //   "Animal Welfare Certification": {
+          //     status: "IN_PROGRESS",
+          //     lastUpdated: null,
+          //     agencyType: "WELFARE",
+          //     agencyName: "Animal Welfare Board",
+          //     comments: null,
+          //     documentUrl: null,
+          //   },
+          //   "CITES Permit": {
+          //     status: "IN_PROGRESS",
+          //     lastUpdated: null,
+          //     agencyType: "SECURITY",
+          //     agencyName: "CITES Authority",
+          //     comments: null,
+          //     documentUrl: null,
+          //   },
+          //   "Quarantine Clearance Certificate": {
+          //     status: "IN_PROGRESS",
+          //     lastUpdated: null,
+          //     agencyType: "VETERINARY",
+          //     agencyName: "Quarantine Department",
+          //     comments: null,
+          //     documentUrl: null,
+          //   },
+          //   // Pharmaceutical Documents
+          //   "GMP Certificate": {
+          //     status: "IN_PROGRESS",
+          //     lastUpdated: null,
+          //     agencyType: "PHARMA",
+          //     agencyName: "Pharmaceutical Control Board",
+          //     comments: null,
+          //     documentUrl: null,
+          //   },
+          //   "Drug Registration Certificate": {
+          //     status: "IN_PROGRESS",
+          //     lastUpdated: null,
+          //     agencyType: "PHARMA",
+          //     agencyName: "Pharmaceutical Control Board",
+          //     comments: null,
+          //     documentUrl: null,
+          //   },
+          //   "Certificate of Pharmaceutical Product": {
+          //     status: "IN_PROGRESS",
+          //     lastUpdated: null,
+          //     agencyType: "PHARMA",
+          //     agencyName: "Pharmaceutical Control Board",
+          //     comments: null,
+          //     documentUrl: null,
+          //   },
+          //   "Stability Study Report": {
+          //     status: "IN_PROGRESS",
+          //     lastUpdated: null,
+          //     agencyType: "PHARMA",
+          //     agencyName: "Pharmaceutical Control Board",
+          //     comments: null,
+          //     documentUrl: null,
+          //   },
+          //   // Common Documents
+          //   "Export License": {
+          //     status: "IN_PROGRESS",
+          //     lastUpdated: null,
+          //     agencyType: "CUSTOMS",
+          //     agencyName: "Customs Department",
+          //     comments: null,
+          //     documentUrl: null,
+          //   },
+          //   "Commercial Invoice": {
+          //     status: "IN_PROGRESS",
+          //     lastUpdated: null,
+          //     agencyType: "CUSTOMS",
+          //     agencyName: "Customs Department",
+          //     comments: null,
+          //     documentUrl: null,
+          //   },
+          //   "Certificate of Origin": {
+          //     status: "IN_PROGRESS",
+          //     lastUpdated: null,
+          //     agencyType: "CUSTOMS",
+          //     agencyName: "Chamber of Commerce",
+          //     comments: null,
+          //     documentUrl: null,
+          //   },
+          //   "Packing List": {
+          //     status: "IN_PROGRESS",
+          //     lastUpdated: null,
+          //     agencyType: "CUSTOMS",
+          //     agencyName: "Customs Department",
+          //     comments: null,
+          //     documentUrl: null,
+          //   }
+          // }
         },
       },
     }));
@@ -889,7 +1080,7 @@ return (
                                                                     </Typography>
                                                                     <Typography>
                                                                         Quantity: {cargoItem.quantity}{" "}
-                                                                        {cargoItem.unit || "pieces"}
+                                                                        {cargoItem.unit}
                                                                     </Typography>
                                                                     <Typography>
                                                                         Description: {cargoItem.description}

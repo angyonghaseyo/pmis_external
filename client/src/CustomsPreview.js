@@ -20,6 +20,12 @@ import {
   Select,
   MenuItem,
   CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  Input,
+  DialogActions,
+  Button,
 } from "@mui/material";
 import {
   CheckCircle,
@@ -34,103 +40,108 @@ import {
   Assessment,
   LocalShipping,
 } from "@mui/icons-material";
-import { getBookings, getBookingById } from "./services/api";
-import DocumentStatusTracker from "./DocumentStatusTracker";
+import {
+  getBookings,
+  getBookingById,
+  uploadBookingDocument,
+} from "./services/api";
+import { validateDocumentWithOCR, DocumentKeywords } from "./OCRValidation.js";
+
 
 // HS Code Categories constants
 const HSCodeCategories = {
   LIVE_ANIMALS: {
-    chapter: '01',
-    description: 'Live Animals',
+    chapter: "01",
+    description: "Live Animals",
     processingOrder: [
-      'VETERINARY_INSPECTION',
-      'HEALTH_CERTIFICATION',
-      'CITES_CHECK',
-      'QUARANTINE_CLEARANCE',
-      'TRANSPORT_APPROVAL',
-      'CUSTOMS_DECLARATION',
-      'FINAL_VETERINARY_CHECK'
+      "VETERINARY_INSPECTION",
+      "HEALTH_CERTIFICATION",
+      "CITES_CHECK",
+      "QUARANTINE_CLEARANCE",
+      "TRANSPORT_APPROVAL",
+      "CUSTOMS_DECLARATION",
+      "FINAL_VETERINARY_CHECK",
     ],
     requiredDocuments: [
-      'Veterinary Health Certificate',
-      'Animal Welfare Certification',
-      'CITES Permit (if applicable)',
-      'Quarantine Clearance Certificate',
-      'Live Animal Transport Declaration',
-      'Export License',
-      'Commercial Invoice',
-      'Packing List'
+      "Veterinary Health Certificate",
+      "Animal Welfare Certification",
+      "CITES Permit (if applicable)",
+      "Quarantine Clearance Certificate",
+      "Live Animal Transport Declaration",
+      "Export License",
+      "Commercial Invoice",
+      "Packing List",
     ],
     validations: {
       transportConditions: true,
       healthStatus: true,
       speciesRestrictions: true,
-      quarantinePeriod: true
-    }
+      quarantinePeriod: true,
+    },
   },
   FRESH_FRUITS: {
-    chapter: '08',
-    description: 'Fresh Fruits',
+    chapter: "08",
+    description: "Fresh Fruits",
     processingOrder: [
-      'PHYTOSANITARY_INSPECTION',
-      'PESTICIDE_TESTING',
-      'COLD_CHAIN_VERIFICATION',
-      'PACKAGING_INSPECTION',
-      'CUSTOMS_DECLARATION',
-      'FINAL_QUALITY_CHECK'
+      "PHYTOSANITARY_INSPECTION",
+      "PESTICIDE_TESTING",
+      "COLD_CHAIN_VERIFICATION",
+      "PACKAGING_INSPECTION",
+      "CUSTOMS_DECLARATION",
+      "FINAL_QUALITY_CHECK",
     ],
     requiredDocuments: [
-      'Phytosanitary Certificate',
-      'Pesticide Residue Test Report',
-      'Cold Chain Compliance Certificate',
-      'Packaging Declaration',
-      'Export License',
-      'Certificate of Origin',
-      'Commercial Invoice',
-      'Packing List'
+      "Phytosanitary Certificate",
+      "Pesticide Residue Test Report",
+      "Cold Chain Compliance Certificate",
+      "Packaging Declaration",
+      "Export License",
+      "Certificate of Origin",
+      "Commercial Invoice",
+      "Packing List",
     ],
     validations: {
       pesticideLevel: true,
       coldChainMaintenance: true,
       packagingStandards: true,
-      shelfLife: true
-    }
+      shelfLife: true,
+    },
   },
   PHARMACEUTICALS: {
-    chapter: '30',
-    description: 'Pharmaceutical Products',
+    chapter: "30",
+    description: "Pharmaceutical Products",
     processingOrder: [
-      'GMP_VERIFICATION',
-      'DRUG_REGISTRATION_CHECK',
-      'CONTROLLED_SUBSTANCE_CHECK',
-      'STABILITY_VERIFICATION',
-      'CUSTOMS_DECLARATION',
-      'FINAL_QUALITY_ASSURANCE'
+      "GMP_VERIFICATION",
+      "DRUG_REGISTRATION_CHECK",
+      "CONTROLLED_SUBSTANCE_CHECK",
+      "STABILITY_VERIFICATION",
+      "CUSTOMS_DECLARATION",
+      "FINAL_QUALITY_ASSURANCE",
     ],
     requiredDocuments: [
-      'GMP Certificate',
-      'Drug Registration Certificate',
-      'Export License for Pharmaceuticals',
-      'Certificate of Pharmaceutical Product (CPP)',
-      'Batch Analysis Certificate',
-      'Stability Study Report',
-      'Commercial Invoice',
-      'Packing List'
+      "GMP Certificate",
+      "Drug Registration Certificate",
+      "Export License for Pharmaceuticals",
+      "Certificate of Pharmaceutical Product (CPP)",
+      "Batch Analysis Certificate",
+      "Stability Study Report",
+      "Commercial Invoice",
+      "Packing List",
     ],
     validations: {
       controlledSubstance: true,
       storageConditions: true,
       expiryDates: true,
-      batchTracking: true
-    }
-  }
+      batchTracking: true,
+    },
+  },
 };
 
 const ProcessStatus = {
-  NOT_STARTED: 'NOT_STARTED',
-  IN_PROGRESS: 'IN_PROGRESS',
-  COMPLETED: 'COMPLETED',
-  REJECTED: 'REJECTED'
+  NOT_STARTED: "NOT_STARTED",
+  IN_PROGRESS: "IN_PROGRESS",
+  COMPLETED: "COMPLETED",
+  REJECTED: "REJECTED",
 };
 
 const CategoryIcon = ({ category }) => {
@@ -143,23 +154,6 @@ const CategoryIcon = ({ category }) => {
       return <Medication />;
     default:
       return null;
-  }
-};
-
-const getAgencyIcon = (agencyType) => {
-  switch (agencyType) {
-    case 'VETERINARY':
-      return <LocalHospital />;
-    case 'WELFARE':
-      return <Pets />;
-    case 'SECURITY':
-      return <Security />;
-    case 'CUSTOMS':
-      return <Assessment />;
-    case 'TRANSPORT':
-      return <LocalShipping />;
-    default:
-      return <InfoOutlined />;
   }
 };
 
@@ -179,13 +173,73 @@ const StatusChip = ({ status }) => {
 
   const displayStatus = status ? status.replace(/_/g, " ") : "NOT STARTED";
 
+  return <Chip label={displayStatus} color={getStatusColor()} size="small" />;
+};
+const UploadDialog = ({ open, onClose, onUpload, documentType }) => (
+  <Dialog open={open} onClose={onClose}>
+    <DialogTitle>Upload {documentType}</DialogTitle>
+    <DialogContent>
+      <Input
+        type="file"
+        accept="image/*"
+        onChange={(e) => {
+          const file = e.target.files[0];
+          if (file) {
+            onUpload(file);
+          }
+        }}
+      />
+    </DialogContent>
+    <DialogActions>
+      <Button onClick={onClose}>Cancel</Button>
+    </DialogActions>
+  </Dialog>
+);
+
+const DocumentListItem = ({ doc, status, onUploadClick }) => {
+  const uploadableDocuments = [
+    "Export License",
+    "Certificate of Origin",
+    "Commercial Invoice",
+    "Packing List",
+  ];
+
+  const isUploadable = uploadableDocuments.includes(doc);
+  const currentStatus = status?.status || "NOT_STARTED";
+  const isClickable = isUploadable && currentStatus === "NOT_STARTED";
+
   return (
-    <Chip
-      label={displayStatus}
-      color={getStatusColor()}
-      size="small"
-    />
+    <ListItem>
+      <ListItemIcon>
+        <PendingActions />
+      </ListItemIcon>
+      <ListItemText primary={doc} />
+      <Chip
+        label={currentStatus.replace(/_/g, " ")}
+        color={getStatusColor(currentStatus)}
+        onClick={() => isClickable && onUploadClick(doc)}
+        sx={{
+          cursor: isClickable ? "pointer" : "default",
+          "&:hover": {
+            backgroundColor: isClickable ? "rgba(0, 0, 0, 0.08)" : undefined,
+          },
+        }}
+      />
+    </ListItem>
   );
+};
+
+const getStatusColor = (status) => {
+  switch (status) {
+    case ProcessStatus.COMPLETED:
+      return "success";
+    case ProcessStatus.IN_PROGRESS:
+      return "primary";
+    case ProcessStatus.REJECTED:
+      return "error";
+    default:
+      return "default";
+  }
 };
 
 const CustomsPreview = () => {
@@ -195,6 +249,8 @@ const CustomsPreview = () => {
   const [cargoDetails, setCargoDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState(null);
 
   // Fetch bookings on component mount
   useEffect(() => {
@@ -219,11 +275,11 @@ const CustomsPreview = () => {
     setSelectedBooking(bookingId);
     setSelectedCargo(""); // Reset cargo selection
     setCargoDetails(null); // Reset cargo details
-    
+
     if (bookingId) {
       try {
         const bookingData = await getBookingById(bookingId);
-        const booking = bookings.find(b => b.bookingId === bookingId);
+        const booking = bookings.find((b) => b.bookingId === bookingId);
         if (booking) {
           booking.cargo = bookingData.cargo;
         }
@@ -256,13 +312,66 @@ const CustomsPreview = () => {
     return null;
   };
 
-  const category = cargoDetails?.hsCode
+  const category = cargoDetails?.hsCode //check if cargoDetails exists and has an hsCode property
     ? HSCodeCategories[determineCategory(cargoDetails.hsCode)]
     : null;
 
+  const handleUploadClick = (documentType) => {
+    setSelectedDocument(documentType);
+    setUploadDialogOpen(true);
+  };
+
+  const handleUpload = async (file) => {
+    try {
+      if (!selectedBooking || !selectedCargo) return;
+
+      // Validate document using OCR
+      const validationResult = await validateDocumentWithOCR(
+        file,
+        DocumentKeywords[selectedDocument]
+      );
+
+      if (!validationResult.isValid) {
+        setError(
+          `Invalid document: Expected ${selectedDocument}. Missing keywords: ${validationResult.missingKeywords.join(
+            ", "
+          )}`
+        );
+        return;
+      }
+
+      await uploadBookingDocument(
+        selectedBooking,
+        selectedCargo,
+        selectedDocument,
+        file
+      );
+
+      // Update local state to show pending status
+      const updatedCargoDetails = {
+        ...cargoDetails,
+        documentStatus: {
+          ...cargoDetails.documentStatus,
+          [selectedDocument]: { status: ProcessStatus.IN_PROGRESS },
+        },
+      };
+      setCargoDetails(updatedCargoDetails);
+
+      setUploadDialogOpen(false);
+    } catch (error) {
+      console.error("Upload error:", error);
+      setError("Failed to upload document: " + error.message);
+    }
+  };
+
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="400px"
+      >
         <CircularProgress />
       </Box>
     );
@@ -306,7 +415,8 @@ const CustomsPreview = () => {
                 label="Select Cargo"
               >
                 {selectedBooking &&
-                  bookings.find((b) => b.bookingId === selectedBooking)?.cargo &&
+                  bookings.find((b) => b.bookingId === selectedBooking)
+                    ?.cargo &&
                   Object.entries(
                     bookings.find((b) => b.bookingId === selectedBooking).cargo
                   ).map(([cargoId, cargo]) => (
@@ -377,9 +487,6 @@ const CustomsPreview = () => {
                   ))}
                 </Stepper>
               </Grid>
-              {/* <Grid item xs={12}>
-                <DocumentStatusTracker cargo={cargoDetails} />
-              </Grid> */}
               <Grid item xs={12} md={6}>
                 <Card>
                   <CardContent>
@@ -388,17 +495,12 @@ const CustomsPreview = () => {
                     </Typography>
                     <List>
                       {category.requiredDocuments.map((doc, index) => (
-                        <ListItem key={index}>
-                          <ListItemIcon>
-                            <PendingActions />
-                          </ListItemIcon>
-                          <ListItemText primary={doc} />
-                          <StatusChip
-                            status={
-                              cargoDetails.documentStatus?.[doc]?.status || ProcessStatus.NOT_STARTED
-                            }
-                          />
-                        </ListItem>
+                        <DocumentListItem
+                          key={index}
+                          doc={doc}
+                          status={cargoDetails.documentStatus?.[doc]}
+                          onUploadClick={handleUploadClick}
+                        />
                       ))}
                     </List>
                   </CardContent>
@@ -437,6 +539,12 @@ const CustomsPreview = () => {
           )}
         </Grid>
       </Paper>
+      <UploadDialog
+        open={uploadDialogOpen}
+        onClose={() => setUploadDialogOpen(false)}
+        onUpload={handleUpload}
+        documentType={selectedDocument}
+      />
     </Box>
   );
 };

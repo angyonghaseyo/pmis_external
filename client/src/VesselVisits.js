@@ -29,7 +29,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { db } from "./firebaseConfig";
 import { getUserUpdatedData } from "./services/api";
-import { useAuth } from './AuthContext';
+import { useAuth } from "./AuthContext";
 import { CircularProgress } from "@mui/material";
 import Papa from "papaparse";
 import {
@@ -94,11 +94,13 @@ const VesselVisits = () => {
     vesselTierCount: 0,
     stowageplanURL: "",
     //Denzel
-    voyages: [{
-      voyageNumber: '',
-      departurePort: '',
-      arrivalPort: ''
-    }],
+    voyages: [
+      {
+        voyageNumber: "",
+        departurePort: "",
+        arrivalPort: "",
+      },
+    ],
   });
   const [vesselVisitsData, setVesselVisitsData] = useState([]);
   const [error, setError] = useState({});
@@ -114,13 +116,14 @@ const VesselVisits = () => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        if (user) {  // Change from auth.currentUser to user
+        if (user) {
+          // Change from auth.currentUser to user
           await Promise.all([
             fetchVesselVisits(),
-            fetchUserProfile(user.email),  // Change from auth.currentUser.uid to user.email
+            fetchUserProfile(user.email), // Change from auth.currentUser.uid to user.email
           ]);
         } else {
-          setError('No authenticated user found');
+          setError("No authenticated user found");
         }
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -178,24 +181,47 @@ const VesselVisits = () => {
     );
 
     // Helper function to check if assets are available during a time range
-    function isAssetAvailable(asset, eta, etd) {
-      for (const [key, period] of Object.entries(asset.bookedPeriod)) {
-        const [bookedEta, bookedEtd] = period;
-        // If the asset's booked period overlaps with the requested period, it's unavailable
+    /**
+     * Checks if an asset is available during a requested time period
+     * @param {Object} asset - The asset object with bookedPeriod map
+     * @param {string} requestedEta - Requested start time in ISO format
+     * @param {string} requestedEtd - Requested end time in ISO format
+     * @returns {boolean} - True if asset is available, false otherwise
+     */
+    function isAssetAvailable(asset, requestedEta, requestedEtd) {
+      console.log("Checking availability for asset:", asset.name);
+
+      // Input validation
+      if (!asset?.bookedPeriod || !requestedEta || !requestedEtd) {
+        throw new Error("Missing required parameters");
+      }
+
+      // Convert requested dates once
+      const requestStart = new Date(requestedEta);
+      const requestEnd = new Date(requestedEtd);
+
+      // Iterate through each booking in bookedPeriod
+      for (const [bookingId, booking] of Object.entries(asset.bookedPeriod)) {
+        // Get eta and etd from the nested booking object
+        const bookedStart = new Date(booking.eta);
+        const bookedEnd = new Date(booking.etd);
+
+        // Check for overlap
         if (
           !(
-            new Date(etd) <= new Date(bookedEta) ||
-            new Date(eta) >= new Date(bookedEtd)
+            (
+              bookedEnd <= requestStart || // Booked period ends before requested period starts
+              requestEnd <= bookedStart
+            ) // Requested period ends before booked period starts
           )
         ) {
           console.log(
-            "Berth " +
-            asset.name +
-            "is not available because it has been reserved"
+            `${asset.name} is not available because it has been reserved for booking ${bookingId}`
           );
           return false;
         }
       }
+
       return true;
     }
 
@@ -207,8 +233,8 @@ const VesselVisits = () => {
       if (isAssetAvailable(crane, eta, etd)) {
         console.log(
           "Crane with id " +
-          crane.name +
-          " is available time-wise and is being demand checked"
+            crane.name +
+            " is available time-wise and is being demand checked"
         );
         craneArray.push(crane);
         craneCapacityPerHour += +crane.numberOfContainers; // Unary + to coerce to number
@@ -258,8 +284,8 @@ const VesselVisits = () => {
     for (const truck of trucks) {
       console.log(
         "Truck with id " +
-        truck.name +
-        "is available and is being demand checked"
+          truck.name +
+          "is available and is being demand checked"
       );
       if (isAssetAvailable(truck, eta, etd)) {
         truckCapacityPerHour += +truck.numberOfContainers;
@@ -318,7 +344,7 @@ const VesselVisits = () => {
         ) {
           console.log(
             "there is enough reach stackers with a quantity of " +
-            requiredReachStackers
+              requiredReachStackers
           );
           stacker.bookedPeriod[imoNumber] = [
             eta.toISOString(),
@@ -370,8 +396,8 @@ const VesselVisits = () => {
         ) {
           console.log(
             "Berth " +
-            facility.name +
-            "is not available because it has been reserved"
+              facility.name +
+              "is not available because it has been reserved"
           );
           return false;
         }
@@ -457,7 +483,7 @@ const VesselVisits = () => {
         let assignedBerth = matchedBerths.pop();
         console.log(
           "The berth that has been assigned to the vessel is " +
-          assignedBerth.name
+            assignedBerth.name
         );
         //I need to update the assignedBerth's bookedPeriod map. key: vessel's IMO number value: [eta, etd]
         assignedBerth.bookedPeriod[formData.imoNumber] = [
@@ -553,11 +579,6 @@ const VesselVisits = () => {
         return true; // Employee is available for the entire period from ETA to ETD
       }
 
-
-
-
-
-
       // Array to hold arrays of employee IDs per role
       const roleEmployeeIds = {};
 
@@ -623,7 +644,6 @@ const VesselVisits = () => {
           }
         }
       });
-
 
       if (missingRoles.length > 0) {
         return {
@@ -741,11 +761,14 @@ const VesselVisits = () => {
         vesselTierCount: visit.vesselTierCount,
         stowageplanURL: visit.stowageplanURL,
         visitType: type,
-        voyages: visit.voyages || [{ // Add default if voyages doesn't exist
-          voyageNumber: '',
-          departurePort: '',
-          arrivalPort: ''
-        }]
+        voyages: visit.voyages || [
+          {
+            // Add default if voyages doesn't exist
+            voyageNumber: "",
+            departurePort: "",
+            arrivalPort: "",
+          },
+        ],
       });
       setEditingId("Edit"); //  setEditingId(visit.id); Denzel
     } else {
@@ -772,11 +795,14 @@ const VesselVisits = () => {
         vesselTierCount: 0,
         stowageplanURL: "",
         visitType: type,
-        voyages: [{ // Make sure to include voyages here too
-          voyageNumber: '',
-          departurePort: '',
-          arrivalPort: ''
-        }],
+        voyages: [
+          {
+            // Make sure to include voyages here too
+            voyageNumber: "",
+            departurePort: "",
+            arrivalPort: "",
+          },
+        ],
       });
     }
     setOpenDialog(true);
@@ -924,6 +950,7 @@ const VesselVisits = () => {
 
     // Simulate resource check
     const resourceCheck = await checkResources();
+    // const resourceCheck = "";
     console.log(resourceCheck);
 
     // The dates are already stored in ISO format in formData
@@ -969,8 +996,8 @@ const VesselVisits = () => {
         // status for UI purposes
         status:
           resourceCheck.manpowerDemandCheckBoolean.success &&
-            resourceCheck.assetsDemandCheckBooleanAndQuantity.success &&
-            resourceCheck.facilitiesDemandCheckBooleanAndBerth.success
+          resourceCheck.assetsDemandCheckBooleanAndQuantity.success &&
+          resourceCheck.facilitiesDemandCheckBooleanAndBerth.success
             ? "confirmed"
             : "pending user intervention",
         vesselGridCount:
@@ -996,7 +1023,6 @@ const VesselVisits = () => {
         console.error("Error parsing the CSV file:", error);
         return; // Exit the function if CSV parsing fails
       }
-
 
       try {
         const docRef = doc(db, "vesselVisitRequests", formData.imoNumber);
@@ -1165,25 +1191,25 @@ const VesselVisits = () => {
                   <TableCell>
                     {visit.eta
                       ? new Date(visit.eta).toLocaleString("en-SG", {
-                        hour12: true,
-                        year: "numeric",
-                        month: "2-digit",
-                        day: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
+                          hour12: true,
+                          year: "numeric",
+                          month: "2-digit",
+                          day: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
                       : "Invalid Date"}
                   </TableCell>
                   <TableCell>
                     {visit.etd
                       ? new Date(visit.etd).toLocaleString("en-SG", {
-                        hour12: true,
-                        year: "numeric",
-                        month: "2-digit",
-                        day: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
+                          hour12: true,
+                          year: "numeric",
+                          month: "2-digit",
+                          day: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
                       : "Invalid Date"}
                   </TableCell>{" "}
                   {/* ISO string */}
@@ -1237,12 +1263,12 @@ const VesselVisits = () => {
                 onChange={handleChange}
                 fullWidth
                 required
-              // disabled={!!formData.vesselName}
-              // helperText={
-              //   formData.vesselName
-              //     ? "This field cannot be edited after it is set"
-              //     : ""
-              // }
+                // disabled={!!formData.vesselName}
+                // helperText={
+                //   formData.vesselName
+                //     ? "This field cannot be edited after it is set"
+                //     : ""
+                // }
               />
             </Grid>
             <Grid item xs={6}>
@@ -1254,12 +1280,12 @@ const VesselVisits = () => {
                 onChange={handleChange}
                 fullWidth
                 required
-              // disabled={!!formData.imoNumber}
-              // helperText={
-              //   formData.imoNumber
-              //     ? "This field cannot be edited after it is set"
-              //     : ""
-              // }
+                // disabled={!!formData.imoNumber}
+                // helperText={
+                //   formData.imoNumber
+                //     ? "This field cannot be edited after it is set"
+                //     : ""
+                // }
               />
             </Grid>
             <Grid item xs={6}>
@@ -1371,7 +1397,9 @@ const VesselVisits = () => {
                     <Button
                       color="error"
                       onClick={() => {
-                        const newVoyages = formData.voyages.filter((_, i) => i !== index);
+                        const newVoyages = formData.voyages.filter(
+                          (_, i) => i !== index
+                        );
                         setFormData({ ...formData, voyages: newVoyages });
                       }}
                       sx={{ mt: 1 }}
@@ -1386,7 +1414,10 @@ const VesselVisits = () => {
                 onClick={() => {
                   setFormData({
                     ...formData,
-                    voyages: [...formData.voyages, { voyageNumber: '', departurePort: '', arrivalPort: '' }]
+                    voyages: [
+                      ...formData.voyages,
+                      { voyageNumber: "", departurePort: "", arrivalPort: "" },
+                    ],
                   });
                 }}
                 sx={{ mt: 1 }}
@@ -1606,8 +1637,8 @@ const VesselVisits = () => {
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to delete this vessel visit request?
-            This action cannot be undone.
+            Are you sure you want to delete this vessel visit request? This
+            action cannot be undone.
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -1621,7 +1652,6 @@ const VesselVisits = () => {
           </Button>
         </DialogActions>
       </Dialog>
-
     </Container>
   );
 };
