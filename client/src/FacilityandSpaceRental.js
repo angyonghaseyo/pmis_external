@@ -80,6 +80,7 @@ const FacilityandSpaceRental = () => {
     const [openDialog, setOpenDialog] = useState(false);
     const [selectedFacility, setSelectedFacility] = useState(null);
     const [facilities, setFacilities] = useState([]);
+    const [company, setCompany] = useState(''); 
     const [formData, setFormData] = useState({
         facilityId: '',
         startTime: null,
@@ -259,6 +260,7 @@ const FacilityandSpaceRental = () => {
             }
 
             const rentalData = {
+                company: company,
                 facilityId: selectedFacility.id,
                 facilityName: selectedFacility.name,
                 warehouseId: selectedFacility.warehouseId,
