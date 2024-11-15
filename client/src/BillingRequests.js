@@ -15,12 +15,12 @@ import {
   MenuItem,
   CircularProgress,
   Alert,
-  Chip,
   Grid,
   Card,
   CardContent,
   TablePagination,
   TextField,
+  Chip
 } from '@mui/material';
 import { getBillingRequests } from './services/api';
 import { format, parseISO, isValid } from 'date-fns';
@@ -50,7 +50,18 @@ const BillingRequests = ({ companyId }) => {
   };
 
   const mapRequestTypeToDbValue = (type) => {
-    return type === 'OperatorRequisition' ? 'operatorrequisition' : 'adhocresource';
+    switch(type) {
+      case 'OperatorRequisition':
+        return 'operatorrequisition';
+      case 'AdHocResourceRequest':
+        return 'adhocresource';
+      case 'VesselVisit':
+        return 'vesselvisit';
+      case 'FacilityRental':
+        return 'facilityrental';
+      default:
+        return type.toLowerCase();
+    }
   };
 
   useEffect(() => {
@@ -61,14 +72,16 @@ const BillingRequests = ({ companyId }) => {
     setLoading(true);
     try {
       const mappedRequestType = mapRequestTypeToDbValue(requestType);
+  
       const data = await getBillingRequests(companyId, mappedRequestType);
+  
       const processedData = data.map(request => ({
         ...request,
         createdAt: request.createdAt ? new Date(request.createdAt) : new Date(),
       }));
-
+    
       setBillingRequests(processedData);
-
+  
       const stats = processedData.reduce((acc, request) => {
         acc.totalRequests++;
         if (request.status === 'ungenerated') {
@@ -76,7 +89,7 @@ const BillingRequests = ({ companyId }) => {
         }
         return acc;
       }, { totalRequests: 0, pendingAmount: 0 });
-
+  
       setSummaryStats(stats);
       setError(null);
     } catch (error) {
@@ -85,6 +98,40 @@ const BillingRequests = ({ companyId }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const getServiceDetails = (request) => {
+    const defaultDetails = {
+      berthHours: 0,
+      berthRate: 0,
+      containerCount: 0,
+      containerRate: 0,
+      rate: 0,
+      quantity: 0
+    };
+
+    if (!request || !request.requestType) {
+      return defaultDetails;
+    }
+
+    if (request.requestType === 'vesselvisit' && Array.isArray(request.services)) {
+      const berthService = request.services.find(s => s?.service === 'Berth Usage') || {};
+      const containerService = request.services.find(s => s?.service === 'Container Handling') || {};
+      
+      return {
+        ...defaultDetails,
+        berthHours: berthService.quantity || 0,
+        berthRate: berthService.rate || 0,
+        containerCount: containerService.quantity || 0,
+        containerRate: containerService.rate || 0
+      };
+    }
+
+    return {
+      ...defaultDetails,
+      rate: request.rate || 0,
+      quantity: request.quantity || 0
+    };
   };
 
   const handleRequestTypeChange = (event) => {
@@ -99,19 +146,6 @@ const BillingRequests = ({ companyId }) => {
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
-  };
-
-  const getStatusChipColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'pending':
-        return 'warning';
-      case 'approved':
-        return 'success';
-      case 'rejected':
-        return 'error';
-      default:
-        return 'default';
-    }
   };
 
   const filteredRequests = billingRequests.filter(request => {
@@ -144,13 +178,16 @@ const BillingRequests = ({ companyId }) => {
     );
   }
 
+  const getVisitTypeColor = (visitType) => {
+    return visitType === 'Scheduled' ? 'primary' : 'secondary';
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
         Billing Requests
       </Typography>
 
-      {/* Summary Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid item xs={12} sm={6}>
           <Card>
@@ -171,27 +208,28 @@ const BillingRequests = ({ companyId }) => {
                 Pending Amount
               </Typography>
               <Typography variant="h4">
-                ${summaryStats.pendingAmount.toLocaleString()}
+                ${(summaryStats.pendingAmount || 0).toLocaleString()}
               </Typography>
             </CardContent>
           </Card>
         </Grid>
       </Grid>
 
-      {/* Filters */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item xs={12} sm={6}>
-          <FormControl fullWidth>
-            <InputLabel>Request Type</InputLabel>
-            <Select
-              value={requestType}
-              onChange={handleRequestTypeChange}
-              label="Request Type"
-            >
-              <MenuItem value="OperatorRequisition">Operator Requisition</MenuItem>
-              <MenuItem value="AdHocResourceRequest">Ad Hoc Resource Request</MenuItem>
-            </Select>
-          </FormControl>
+        <FormControl fullWidth>
+          <InputLabel>Request Type</InputLabel>
+          <Select
+            value={requestType}
+            onChange={handleRequestTypeChange}
+            label="Request Type"
+          >
+            <MenuItem value="OperatorRequisition">Operator Requisition</MenuItem>
+            <MenuItem value="AdHocResourceRequest">Ad Hoc Resource Request</MenuItem>
+            <MenuItem value="VesselVisit">Vessel Visit</MenuItem>
+            <MenuItem value="FacilityRental">Facility Rental</MenuItem>
+          </Select>
+        </FormControl>
         </Grid>
         <Grid item xs={12} sm={6}>
           <TextField
@@ -204,41 +242,102 @@ const BillingRequests = ({ companyId }) => {
         </Grid>
       </Grid>
 
-      {/* Main Table */}
+      {/* Updated table with Visit Type column */}
       <TableContainer component={Paper}>
         <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Request ID</TableCell>
-              <TableCell>Type</TableCell>
-              <TableCell>Date Completed</TableCell>
-              <TableCell>Rate</TableCell>
-              <TableCell>Quantity</TableCell>
-              <TableCell>Total Amount</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {paginatedRequests.length > 0 ? (
-              paginatedRequests.map((request) => (
-                <TableRow key={request.id}>
-                  <TableCell>{request.requestId || request.id}</TableCell>
-                  <TableCell>
-                    {requestType === 'AdHocResourceRequest' ? request.resourceType : request.operatorSkill}
-                  </TableCell>
-                  <TableCell>{formatDate(request.createdAt)}</TableCell>
-                  <TableCell>${(request.rate || 0).toLocaleString()}</TableCell>
-                  <TableCell>{request.quantity || 0}</TableCell>
-                  <TableCell>${(request.totalAmount || 0).toLocaleString()}</TableCell>
-                </TableRow>
-              ))
+        <TableHead>
+          <TableRow>
+            {requestType !== 'FacilityRental' && <TableCell>Vessel Visit</TableCell>}
+            {requestType === 'VesselVisit' ? (
+              <>
+                <TableCell>Visit Type</TableCell>
+                <TableCell>Date Completed</TableCell>
+                <TableCell>Berth Usage</TableCell>
+                <TableCell>Container Handling</TableCell>
+                <TableCell>Total Amount</TableCell>
+              </>
+            ) : requestType === 'FacilityRental' ? (
+              <>
+                <TableCell>Facility Name</TableCell>
+                <TableCell>Date Completed</TableCell>
+                <TableCell>Rate per Hour</TableCell>
+                <TableCell>Hours Rented</TableCell>
+                <TableCell>Total Amount</TableCell>
+              </>
             ) : (
-              <TableRow>
-                <TableCell colSpan={7} align="center">
-                  No billing requests found
-                </TableCell>
-              </TableRow>
+              <>
+                <TableCell>Type</TableCell>
+                <TableCell>Date Completed</TableCell>
+                <TableCell>Rate</TableCell>
+                <TableCell>Quantity</TableCell>
+                <TableCell>Total Amount</TableCell>
+              </>
             )}
-          </TableBody>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {paginatedRequests.length > 0 ? (
+            paginatedRequests.map((request) => {
+              const serviceDetails = getServiceDetails(request);
+              const amount = request.totalAmount || 0;
+
+              if (requestType === 'VesselVisit') {
+                const berthAmount = (serviceDetails.berthHours * serviceDetails.berthRate) || 0;
+                const containerAmount = (serviceDetails.containerCount * serviceDetails.containerRate) || 0;
+
+                return (
+                  <TableRow key={request.id || Math.random()}>
+                    <TableCell>{request.vesselVisit || '-'}</TableCell>
+                    <TableCell>
+                      <Chip 
+                        label={request.visitType || 'Unknown'} 
+                        color={getVisitTypeColor(request.visitType)}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>{formatDate(request.dateCompleted)}</TableCell>
+                    <TableCell>
+                      {`${serviceDetails.berthHours} hours @ $${serviceDetails.berthRate}/hour ($${berthAmount.toLocaleString()})`}
+                    </TableCell>
+                    <TableCell>
+                      {`${serviceDetails.containerCount} containers @ $${serviceDetails.containerRate}/container ($${containerAmount.toLocaleString()})`}
+                    </TableCell>
+                    <TableCell>${amount.toLocaleString()}</TableCell>
+                  </TableRow>
+                );
+              } else if (requestType === 'FacilityRental') {
+                return (
+                  <TableRow key={request.id || Math.random()}>
+                    <TableCell>{request.facilityName || '-'}</TableCell>
+                    <TableCell>{formatDate(request.dateCompleted)}</TableCell>
+                    <TableCell>${(request.rate || 0).toLocaleString()}</TableCell>
+                    <TableCell>{request.quantity || 0}</TableCell>
+                    <TableCell>${amount.toLocaleString()}</TableCell>
+                  </TableRow>
+                );
+              } else {
+                return (
+                  <TableRow key={request.id || Math.random()}>
+                    <TableCell>{request.vesselVisit || '-'}</TableCell>
+                    <TableCell>
+                      {request.requestType === 'adhocresource' ? request.resourceType : request.operatorSkill}
+                    </TableCell>
+                    <TableCell>{formatDate(request.dateCompleted)}</TableCell>
+                    <TableCell>${(serviceDetails.rate || 0).toLocaleString()}</TableCell>
+                    <TableCell>{serviceDetails.quantity || 0}</TableCell>
+                    <TableCell>${amount.toLocaleString()}</TableCell>
+                  </TableRow>
+                );
+              }
+            })
+          ) : (
+            <TableRow>
+              <TableCell colSpan={6} align="center">
+                No billing requests found
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
         </Table>
         <TablePagination
           component="div"
