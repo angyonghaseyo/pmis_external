@@ -26,6 +26,7 @@ import {
   Input,
   DialogActions,
   Button,
+  Snackbar,
 } from "@mui/material";
 import {
   CheckCircle,
@@ -47,36 +48,36 @@ import {
 } from "./services/api";
 import { validateDocumentWithOCR, DocumentKeywords } from "./OCRValidation.js";
 
-
 // HS Code Categories constants
 const HSCodeCategories = {
-  LIVE_ANIMALS: {
-    chapter: "01",
-    description: "Live Animals",
+  EXPLOSIVES_AND_PYROTECHNICS: {
+    chapter: "36",
+    description: "Explosives and Pyrotechnics",
     processingOrder: [
-      "VETERINARY_INSPECTION",
-      "HEALTH_CERTIFICATION",
-      "CITES_CHECK",
-      "QUARANTINE_CLEARANCE",
-      "TRANSPORT_APPROVAL",
+      "DANGEROUS_GOODS_CLASSIFICATION",
+      "SAFETY_DATA_VERIFICATION",
+      "EXPLOSIVE_LICENSE_CHECK",
+      "PACKAGING_CERTIFICATION",
+      "TRANSPORT_SAFETY_APPROVAL",
       "CUSTOMS_DECLARATION",
-      "FINAL_VETERINARY_CHECK",
+      "FINAL_SAFETY_INSPECTION",
     ],
     requiredDocuments: [
-      "Veterinary Health Certificate",
-      "Animal Welfare Certification",
-      "CITES Permit (if applicable)",
-      "Quarantine Clearance Certificate",
-      "Live Animal Transport Declaration",
+      "Dangerous Goods Declaration",
+      "Safety Data Sheet",
+      "Explosives License",
+      "UN Classification Certificate",
+      "Packaging Certification",
+      "Transport Safety Permit",
       "Export License",
       "Commercial Invoice",
       "Packing List",
     ],
     validations: {
-      transportConditions: true,
-      healthStatus: true,
-      speciesRestrictions: true,
-      quarantinePeriod: true,
+      hazardClassification: true,
+      packagingCompliance: true,
+      handlingInstructions: true,
+      emergencyProcedures: true,
     },
   },
   FRESH_FRUITS: {
@@ -146,8 +147,8 @@ const ProcessStatus = {
 
 const CategoryIcon = ({ category }) => {
   switch (category) {
-    case "LIVE_ANIMALS":
-      return <Pets />;
+    case 'EXPLOSIVES_AND_PYROTECHNICS':
+      return <Warning />; 
     case "FRESH_FRUITS":
       return <LocalFlorist />;
     case "PHARMACEUTICALS":
@@ -248,9 +249,21 @@ const CustomsPreview = () => {
   const [selectedCargo, setSelectedCargo] = useState("");
   const [cargoDetails, setCargoDetails] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "error",
+  });
+
+  // Handle Snackbar close
+  const handleSnackbarClose = (event, reason) => {
+    if (reason === "clickaway") {
+      return;
+    }
+    setSnackbar((prev) => ({ ...prev, open: false }));
+  };
 
   // Fetch bookings on component mount
   useEffect(() => {
@@ -260,7 +273,11 @@ const CustomsPreview = () => {
         const bookingsData = await getBookings();
         setBookings(bookingsData);
       } catch (error) {
-        setError("Error fetching bookings: " + error.message);
+        setSnackbar({
+          open: true,
+          message: "Error fetching bookings: " + error.message,
+          severity: "error", // or "success", "info", "warning"
+        });
       } finally {
         setLoading(false);
       }
@@ -284,7 +301,11 @@ const CustomsPreview = () => {
           booking.cargo = bookingData.cargo;
         }
       } catch (error) {
-        setError("Error fetching booking details: " + error.message);
+        setSnackbar({
+          open: true,
+          message: "Error fetching booking details: " + error.message,
+          severity: "error",
+        });
       }
     }
   };
@@ -306,7 +327,7 @@ const CustomsPreview = () => {
     if (!hsCode) return null;
     const chapter = hsCode.substring(0, 2);
 
-    if (chapter === "01") return "LIVE_ANIMALS";
+    if (chapter === '36') return 'EXPLOSIVES_AND_PYROTECHNICS';
     if (chapter === "08") return "FRESH_FRUITS";
     if (chapter === "30") return "PHARMACEUTICALS";
     return null;
@@ -332,11 +353,22 @@ const CustomsPreview = () => {
       );
 
       if (!validationResult.isValid) {
-        setError(
-          `Invalid document: Expected ${selectedDocument}. Missing keywords: ${validationResult.missingKeywords.join(
-            ", "
-          )}`
-        );
+        // Show error in Snackbar instead of setting error state
+        setSnackbar({
+          open: true,
+          message: (
+            <Box sx={{ textAlign: "center" }}>
+              <Typography>
+                Invalid document: Expected {selectedDocument}
+              </Typography>
+              <Typography sx={{ mt: 1 }}>
+                Your document is missing the following keywords:
+                {validationResult.missingKeywords.join(", ")}
+              </Typography>
+            </Box>
+          ),
+          severity: "error",
+        });
         return;
       }
 
@@ -357,12 +389,56 @@ const CustomsPreview = () => {
       };
       setCargoDetails(updatedCargoDetails);
 
+      // Show success message
+      setSnackbar({
+        open: true,
+        message: "Document uploaded successfully",
+        severity: "success",
+      });
+
       setUploadDialogOpen(false);
     } catch (error) {
       console.error("Upload error:", error);
-      setError("Failed to upload document: " + error.message);
+      setSnackbar({
+        open: true,
+        message: `Failed to upload document: ${error.message}`,
+        severity: "error",
+      });
     }
   };
+
+  useEffect(() => {
+    if (cargoDetails && !category) {
+      setSnackbar({
+        open: true,
+        message: (
+          <Box sx={{ textAlign: "center" }}>
+            <Typography>
+              The selected cargo's HS code ({cargoDetails.hsCode}) does not
+              match any supported categories.
+            </Typography>
+            <Typography sx={{ mt: 1 }}>Supported categories are:</Typography>
+            <Typography sx={{ mt: 0.5 }}>
+              Explosives and Pyrotechnics (36), Fresh Fruits (08), and Pharmaceuticals (30)
+            </Typography>
+          </Box>
+        ),
+        severity: "warning",
+      });
+    }
+  }, [cargoDetails, category]); // Dependencies array
+
+  // For the no cargo details warning
+  useEffect(() => {
+    if (selectedBooking && selectedCargo && !cargoDetails) {
+      setSnackbar({
+        open: true,
+        message:
+          "Please select a booking and cargo to view export process details.",
+        severity: "info",
+      });
+    }
+  }, [selectedBooking, selectedCargo, cargoDetails]);
 
   if (loading) {
     return (
@@ -373,14 +449,6 @@ const CustomsPreview = () => {
         minHeight="400px"
       >
         <CircularProgress />
-      </Box>
-    );
-  }
-
-  if (error) {
-    return (
-      <Box sx={{ maxWidth: 1200, margin: "auto", padding: 4 }}>
-        <Alert severity="error">{error}</Alert>
       </Box>
     );
   }
@@ -430,14 +498,14 @@ const CustomsPreview = () => {
 
           {!cargoDetails && (
             <Grid item xs={12}>
-              <Alert severity="info">
+              <Alert severity="warning">
                 Please select a booking and cargo to view export process
                 details.
               </Alert>
             </Grid>
           )}
 
-          {cargoDetails && !category && (
+          {/* {cargoDetails && !category && (
             <Grid item xs={12}>
               <Alert severity="warning">
                 The selected cargo's HS code ({cargoDetails.hsCode}) does not
@@ -445,7 +513,7 @@ const CustomsPreview = () => {
                 Animals (01), Fresh Fruits (08), and Pharmaceuticals (30).
               </Alert>
             </Grid>
-          )}
+          )} */}
 
           {cargoDetails && category && (
             <>
@@ -545,6 +613,20 @@ const CustomsPreview = () => {
         onUpload={handleUpload}
         documentType={selectedDocument}
       />
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={handleSnackbarClose}
+          severity={snackbar.severity}
+          sx={{ width: "100%" }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

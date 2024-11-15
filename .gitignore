@@ -1,4 +1,6 @@
 /server/config/serviceAccountKey.json
+.tmp.driveupload/*
+
 # Ignore node_modules in client
 client/node_modules/
 

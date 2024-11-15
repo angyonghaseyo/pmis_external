@@ -381,9 +381,9 @@ const BookingForm = ({ user }) => {
       }
       
       const hsCodePrefix = cargo.hsCode.substring(0, 2);
-      if (!['01', '08', '30'].includes(hsCodePrefix)) {
+      if (!['36', '08', '30'].includes(hsCodePrefix)) {
         cargoValidationErrors.push(
-          `Cargo ${cargoId}: HS Code must start with 01 (Live Animals), 08 (Fresh Fruits), or 30 (Pharmaceuticals)`
+          `Cargo ${cargoId}: HS Code must start with 36 (Explosives/Pyrotechnics), 08 (Fresh Fruits), or 30 (Pharmaceuticals)`
         );
       }
     });
@@ -400,46 +400,46 @@ const BookingForm = ({ user }) => {
       let documentStatus = {};
   
       switch (hsCodePrefix) {
-        case '01': // Live Animals
-          documentStatus = {
-            'Veterinary Health Certificate': {
-              name: 'Veterinary Health Certificate',
-              status: 'PENDING',
-              agencyType: 'VETERINARY',
-              agencyName: 'National Veterinary Authority',
-              lastUpdated: new Date(),
-              comments: null,
-              documentUrl: null
-            },
-            'Animal Welfare Certification': {
-              name: 'Animal Welfare Certification',
-              status: 'PENDING',
-              agencyType: 'WELFARE',
-              agencyName: 'Animal Welfare Board',
-              lastUpdated: new Date(),
-              comments: null,
-              documentUrl: null
-            },
-            'CITES Permit': {
-              name: 'CITES Permit',
-              status: 'PENDING',
-              agencyType: 'SECURITY',
-              agencyName: 'CITES Authority',
-              lastUpdated: new Date(),
-              comments: null,
-              documentUrl: null
-            },
-            'Quarantine Clearance Certificate': {
-              name: 'Quarantine Clearance Certificate',
-              status: 'PENDING',
-              agencyType: 'VETERINARY',
-              agencyName: 'Quarantine Department',
-              lastUpdated: new Date(),
-              comments: null,
-              documentUrl: null
-            }
-          };
-          break;
+        case '36': // Explosives and Pyrotechnics
+        documentStatus = {
+          'Dangerous Goods Declaration': {
+            name: 'Dangerous Goods Declaration',
+            status: 'PENDING',
+            agencyType: 'DANGEROUS_GOODS',
+            agencyName: 'Dangerous Goods Safety Authority',
+            lastUpdated: new Date(),
+            comments: null,
+            documentUrl: null
+          },
+          'Safety Data Sheet': {
+            name: 'Safety Data Sheet',
+            status: 'PENDING',
+            agencyType: 'DANGEROUS_GOODS',
+            agencyName: 'Dangerous Goods Safety Authority',
+            lastUpdated: new Date(),
+            comments: null,
+            documentUrl: null
+          },
+          'Explosives License': {
+            name: 'Explosives License',
+            status: 'PENDING',
+            agencyType: 'DANGEROUS_GOODS',
+            agencyName: 'Dangerous Goods Safety Authority',
+            lastUpdated: new Date(),
+            comments: null,
+            documentUrl: null
+          },
+          'Transport Safety Permit': {
+            name: 'Transport Safety Permit',
+            status: 'PENDING',
+            agencyType: 'SAFETY',
+            agencyName: 'Transport Safety Board',
+            lastUpdated: new Date(),
+            comments: null,
+            documentUrl: null
+          }
+        };
+        break;
   
         case '08': // Fresh Fruits
           documentStatus = {
