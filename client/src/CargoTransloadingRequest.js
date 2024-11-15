@@ -541,9 +541,9 @@ const CargoTransloadingRequest = ({ open, handleClose, editingId = null, onSubmi
             errors.quantity = 'Valid quantity is required';
         }
 
-        // Warehouse Requirement Validation
-        if (!formData.warehouseRequirement) {
-            errors.warehouseRequirement = 'Warehouse requirement is required';
+        // Destination Area Validation
+        if (!formData.destinationArea) {
+            errors.destinationArea = 'Destination area is required';
         }
 
         // Schedule Validation
@@ -559,11 +559,6 @@ const CargoTransloadingRequest = ({ open, handleClose, editingId = null, onSubmi
             if (formData.transloadingTimeWindow.endDate < formData.transloadingTimeWindow.startDate) {
                 errors.endDate = 'End date must be after start date';
             }
-        }
-
-        // Document Validation
-        if (!formData.documents.storageChecklist || formData.documents.storageChecklist.length === 0) {
-            errors.storageChecklist = 'Storage checklist is required';
         }
 
         setErrors(errors);
@@ -588,7 +583,8 @@ const CargoTransloadingRequest = ({ open, handleClose, editingId = null, onSubmi
                 documents: fileUrls,
                 status: 'Pending',
                 updatedAt: new Date(),
-                createdAt: editingId ? formData.createdAt : new Date()
+                createdAt: editingId ? formData.createdAt : new Date(),
+                requestType: "transloadingRequests"
             };
 
             if (editingId) {
