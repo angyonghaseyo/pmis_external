@@ -998,6 +998,31 @@ export const uploadBookingDocument = async (bookingId, cargoId, documentType, fi
   }
 };
 
+export const retrieveBookingDocument = async (bookingId, cargoId, documentType) => {
+  try {
+    const response = await fetch(
+      `${API_URL}/bookings/${bookingId}/cargo/${cargoId}/documents/${documentType}`,
+      {
+        method: 'GET',
+      }
+    );
+    console.log("d");
+    if (!response.ok) {
+      throw new Error('Failed to retrieve document');
+    }
+    
+    const blob = await response.blob();
+    return {
+      url: URL.createObjectURL(blob),
+      contentType: response.headers.get('content-type'),
+      fileName: response.headers.get('content-disposition')?.split('filename=')[1] || `${documentType}.pdf`
+    };
+  } catch (error) {
+    console.error('Error retrieving document:', error);
+    throw error;
+  }
+};
+
 export const registerTruckForCargo = async (cargoId, truckLicense) => {
   try {
     const response = await fetch(`${API_URL}/bookings/register-truck`, {
@@ -1321,6 +1346,8 @@ const api = {
   updateBooking,
   deleteBooking,
   getBillingRequestsByMonth1,
+  uploadBookingDocument,
+  retrieveBookingDocument,
 };
 
 export default api;

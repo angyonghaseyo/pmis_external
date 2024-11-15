@@ -32,7 +32,6 @@ import {
   CheckCircle,
   Warning,
   PendingActions,
-  Pets,
   LocalFlorist,
   Medication,
   InfoOutlined,
@@ -40,142 +39,49 @@ import {
   Security,
   Assessment,
   LocalShipping,
+  UploadFile,
 } from "@mui/icons-material";
 import {
   getBookings,
   getBookingById,
   uploadBookingDocument,
+  retrieveBookingDocument,
 } from "./services/api";
 import { validateDocumentWithOCR, DocumentKeywords } from "./OCRValidation.js";
+import { HSCodeCategories, ProcessStatus } from "./HSCodeCategories.js";
+ 
 
-// HS Code Categories constants
-const HSCodeCategories = {
-  EXPLOSIVES_AND_PYROTECHNICS: {
-    chapter: "36",
-    description: "Explosives and Pyrotechnics",
-    processingOrder: [
-      "DANGEROUS_GOODS_CLASSIFICATION",
-      "SAFETY_DATA_VERIFICATION",
-      "EXPLOSIVE_LICENSE_CHECK",
-      "PACKAGING_CERTIFICATION",
-      "TRANSPORT_SAFETY_APPROVAL",
-      "CUSTOMS_DECLARATION",
-      "FINAL_SAFETY_INSPECTION",
-    ],
-    requiredDocuments: [
-      "Dangerous Goods Declaration",
-      "Safety Data Sheet",
-      "Explosives License",
-      "UN Classification Certificate",
-      "Packaging Certification",
-      "Transport Safety Permit",
-      "Export License",
-      "Commercial Invoice",
-      "Packing List",
-    ],
-    validations: {
-      hazardClassification: true,
-      packagingCompliance: true,
-      handlingInstructions: true,
-      emergencyProcedures: true,
-    },
-  },
-  FRESH_FRUITS: {
-    chapter: "08",
-    description: "Fresh Fruits",
-    processingOrder: [
-      "PHYTOSANITARY_INSPECTION",
-      "PESTICIDE_TESTING",
-      "COLD_CHAIN_VERIFICATION",
-      "PACKAGING_INSPECTION",
-      "CUSTOMS_DECLARATION",
-      "FINAL_QUALITY_CHECK",
-    ],
-    requiredDocuments: [
-      "Phytosanitary Certificate",
-      "Pesticide Residue Test Report",
-      "Cold Chain Compliance Certificate",
-      "Packaging Declaration",
-      "Export License",
-      "Certificate of Origin",
-      "Commercial Invoice",
-      "Packing List",
-    ],
-    validations: {
-      pesticideLevel: true,
-      coldChainMaintenance: true,
-      packagingStandards: true,
-      shelfLife: true,
-    },
-  },
-  PHARMACEUTICALS: {
-    chapter: "30",
-    description: "Pharmaceutical Products",
-    processingOrder: [
-      "GMP_VERIFICATION",
-      "DRUG_REGISTRATION_CHECK",
-      "CONTROLLED_SUBSTANCE_CHECK",
-      "STABILITY_VERIFICATION",
-      "CUSTOMS_DECLARATION",
-      "FINAL_QUALITY_ASSURANCE",
-    ],
-    requiredDocuments: [
-      "GMP Certificate",
-      "Drug Registration Certificate",
-      "Export License for Pharmaceuticals",
-      "Certificate of Pharmaceutical Product (CPP)",
-      "Batch Analysis Certificate",
-      "Stability Study Report",
-      "Commercial Invoice",
-      "Packing List",
-    ],
-    validations: {
-      controlledSubstance: true,
-      storageConditions: true,
-      expiryDates: true,
-      batchTracking: true,
-    },
-  },
-};
+// const CategoryIcon = ({ category }) => {
+//   switch (category) {
+//     case "EXPLOSIVES_AND_PYROTECHNICS":
+//       return <Warning />;
+//     case "FRESH_FRUITS":
+//       return <LocalFlorist />;
+//     case "PHARMACEUTICALS":
+//       return <Medication />;
+//     default:
+//       return null;
+//   }
+// };
 
-const ProcessStatus = {
-  NOT_STARTED: "NOT_STARTED",
-  IN_PROGRESS: "IN_PROGRESS",
-  COMPLETED: "COMPLETED",
-  REJECTED: "REJECTED",
-};
+// const StatusChip = ({ status }) => {
+//   const getStatusColor = () => {
+//     switch (status) {
+//       case ProcessStatus.COMPLETED:
+//         return "success";
+//       case ProcessStatus.IN_PROGRESS:
+//         return "primary";
+//       case ProcessStatus.REJECTED:
+//         return "error";
+//       default:
+//         return "default";
+//     }
+//   };
 
-const CategoryIcon = ({ category }) => {
-  switch (category) {
-    case 'EXPLOSIVES_AND_PYROTECHNICS':
-      return <Warning />; 
-    case "FRESH_FRUITS":
-      return <LocalFlorist />;
-    case "PHARMACEUTICALS":
-      return <Medication />;
-    default:
-      return null;
-  }
-};
+//   const displayStatus = status ? status.replace(/_/g, " ") : "NOT STARTED";
 
-const StatusChip = ({ status }) => {
-  const getStatusColor = () => {
-    switch (status) {
-      case ProcessStatus.COMPLETED:
-        return "success";
-      case ProcessStatus.IN_PROGRESS:
-        return "primary";
-      case ProcessStatus.REJECTED:
-        return "error";
-      default:
-        return "default";
-    }
-  };
-
-  const displayStatus = status ? status.replace(/_/g, " ") : "NOT STARTED";
-
-  return <Chip label={displayStatus} color={getStatusColor()} size="small" />;
-};
+//   return <Chip label={displayStatus} color={getStatusColor()} size="small" />;
+// };
 const UploadDialog = ({ open, onClose, onUpload, documentType }) => (
   <Dialog open={open} onClose={onClose}>
     <DialogTitle>Upload {documentType}</DialogTitle>
@@ -197,32 +103,124 @@ const UploadDialog = ({ open, onClose, onUpload, documentType }) => (
   </Dialog>
 );
 
-const DocumentListItem = ({ doc, status, onUploadClick }) => {
-  const uploadableDocuments = [
-    "Export License",
-    "Certificate of Origin",
-    "Commercial Invoice",
-    "Packing List",
-  ];
 
-  const isUploadable = uploadableDocuments.includes(doc);
+
+const DocumentListItem = ({ doc, status, onUploadClick,  onViewDocument, category }) => {
+  const isExporterDoc = category.documents.exporter.some(d => d.name === doc.name);
+  const isAgencyDoc = category.documents.agency.some(d => d.name === doc.name);
+  const docDetails = isExporterDoc
+    ? category.documents.exporter.find(d => d.name === doc.name)
+    : category.documents.agency.find(d => d.name === doc.name);
+
   const currentStatus = status?.status || "NOT_STARTED";
-  const isClickable = isUploadable && currentStatus === "NOT_STARTED";
+  const isClickable = isExporterDoc && currentStatus === "PENDING";
+  const isViewable = status?.status === "COMPLETED" || status?.status === "IN_PROGRESS";
+
+
+
+  const getChipColor = (status) => {
+    switch (status) {
+      case "COMPLETED":
+        return "success";
+      case "REJECTED":
+        return "error";
+      case "IN_PROGRESS":
+        return "primary";
+      case "PENDING":
+        return "secondary";
+      default:
+        return "default";
+    }
+  };
+
+  const getIcon = () => {
+    if (isAgencyDoc) {
+      switch (currentStatus) {
+        case "COMPLETED":
+          return <CheckCircle />;
+        case "REJECTED":
+          return <Warning />;
+        case "IN_PROGRESS":
+          return <PendingActions />;
+        default:
+          return <PendingActions />;
+      }
+    } else {
+      switch (currentStatus) {
+        case "COMPLETED":
+          return <CheckCircle />;
+        case "REJECTED":
+          return <Warning />;
+        case "IN_PROGRESS":
+          return <Assessment />;
+        case "PENDING":
+          return <PendingActions />;
+        default:
+          return <UploadFile />;
+      }
+    }
+  };
+
+  const getSecondaryText = () => {
+    if (isAgencyDoc) {
+      const prerequisites = docDetails.requiresDocuments;
+      if (prerequisites?.length > 0) {
+        return `Requires: ${prerequisites.join(", ")}`;
+      }
+      return `To be issued by: ${docDetails.issuedBy}`;
+    } else {
+      return `To be reviewed by: ${docDetails.reviewedBy}`;
+    }
+  };
+
+  const handleClick = () => {
+    if (isClickable) {
+      onUploadClick(doc.name);
+    }
+  };
+
+  
 
   return (
-    <ListItem>
-      <ListItemIcon>
-        <PendingActions />
-      </ListItemIcon>
-      <ListItemText primary={doc} />
-      <Chip
-        label={currentStatus.replace(/_/g, " ")}
-        color={getStatusColor(currentStatus)}
-        onClick={() => isClickable && onUploadClick(doc)}
-        sx={{
-          cursor: isClickable ? "pointer" : "default",
-          "&:hover": {
-            backgroundColor: isClickable ? "rgba(0, 0, 0, 0.08)" : undefined,
+    <ListItem
+    sx={{
+      width: '100%',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      pr: 20 // Add right padding to make room for the chip
+    }}
+      secondaryAction={
+        <>
+        <Chip
+          label={currentStatus.replace(/_/g, " ")}
+          color={getChipColor(currentStatus)}
+          onClick={handleClick}
+          sx={{
+            cursor: isClickable ? "pointer" : "default",
+            "&:hover": {
+              backgroundColor: isClickable ? "rgba(0, 0, 0, 0.08)" : undefined,
+            },
+          }}
+        />
+         {isViewable && (
+            <Button 
+              size="small"
+              onClick={() => onViewDocument(doc.name)}
+            >
+              View
+            </Button>
+          )}
+          </>
+      }
+    >
+      <ListItemIcon>{getIcon()}</ListItemIcon>
+      <ListItemText
+        primary={doc.name}
+        secondary={getSecondaryText()}
+        primaryTypographyProps={{
+          style: {
+            fontWeight: isAgencyDoc ? 500 : 400,
           },
         }}
       />
@@ -230,18 +228,6 @@ const DocumentListItem = ({ doc, status, onUploadClick }) => {
   );
 };
 
-const getStatusColor = (status) => {
-  switch (status) {
-    case ProcessStatus.COMPLETED:
-      return "success";
-    case ProcessStatus.IN_PROGRESS:
-      return "primary";
-    case ProcessStatus.REJECTED:
-      return "error";
-    default:
-      return "default";
-  }
-};
 
 const CustomsPreview = () => {
   const [bookings, setBookings] = useState([]);
@@ -286,6 +272,23 @@ const CustomsPreview = () => {
     fetchBookings();
   }, []);
 
+  const handleViewDocument = async (documentType) => {
+    console.log("sdfs" + documentType);
+    try {
+      const doc = await retrieveBookingDocument(selectedBooking, selectedCargo, documentType);
+      // Open document in new tab
+      window.open(doc.url);
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: `Failed to retrieve document: ${error.message}`,
+        severity: "error"
+      });
+    }
+  };
+
+  
+
   // Handle booking selection
   const handleBookingChange = async (event) => {
     const bookingId = event.target.value;
@@ -327,7 +330,7 @@ const CustomsPreview = () => {
     if (!hsCode) return null;
     const chapter = hsCode.substring(0, 2);
 
-    if (chapter === '36') return 'EXPLOSIVES_AND_PYROTECHNICS';
+    if (chapter === "36") return "EXPLOSIVES_AND_PYROTECHNICS";
     if (chapter === "08") return "FRESH_FRUITS";
     if (chapter === "30") return "PHARMACEUTICALS";
     return null;
@@ -337,13 +340,22 @@ const CustomsPreview = () => {
     ? HSCodeCategories[determineCategory(cargoDetails.hsCode)]
     : null;
 
+  // const handleUploadClick = (documentType) => {
+  //   console.log("click");
+  //   setSelectedDocument(documentType);
+  //   setUploadDialogOpen(true);
+  // };
+
+  //Denzel
   const handleUploadClick = (documentType) => {
+    console.log("handleUploadClick called with:", documentType);
     setSelectedDocument(documentType);
     setUploadDialogOpen(true);
   };
 
   const handleUpload = async (file) => {
     try {
+      console.log("a");
       if (!selectedBooking || !selectedCargo) return;
 
       // Validate document using OCR
@@ -419,7 +431,8 @@ const CustomsPreview = () => {
             </Typography>
             <Typography sx={{ mt: 1 }}>Supported categories are:</Typography>
             <Typography sx={{ mt: 0.5 }}>
-              Explosives and Pyrotechnics (36), Fresh Fruits (08), and Pharmaceuticals (30)
+              Explosives and Pyrotechnics (36), Fresh Fruits (08), and
+              Pharmaceuticals (30)
             </Typography>
           </Box>
         ),
@@ -439,6 +452,8 @@ const CustomsPreview = () => {
       });
     }
   }, [selectedBooking, selectedCargo, cargoDetails]);
+
+  
 
   if (loading) {
     return (
@@ -517,92 +532,48 @@ const CustomsPreview = () => {
 
           {cargoDetails && category && (
             <>
-              <Grid item xs={12}>
-                <Box display="flex" alignItems="center" gap={2} mb={3}>
-                  <CategoryIcon
-                    category={determineCategory(cargoDetails.hsCode)}
-                  />
-                  <Typography variant="h5">
-                    {category.description} Export Process
+               <Grid item xs={12} md={6}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>
+                    Required Exporter Documents
                   </Typography>
-                  <Chip
-                    label={`HS Code: ${cargoDetails.hsCode}`}
-                    variant="outlined"
-                  />
-                </Box>
-              </Grid>
+                  <List>
+                    {category.documents.exporter.map((doc) => (
+                      <DocumentListItem
+                        key={doc.name}
+                        doc={doc}
+                        status={cargoDetails.documentStatus[doc.name]}
+                        onUploadClick={handleUploadClick}
+                        onViewDocument = {handleViewDocument}
+                        category={category}
+                      />
+                    ))}
+                  </List>
+                </CardContent>
+              </Card>
+            </Grid>
 
-              <Grid item xs={12}>
-                <Stepper
-                  activeStep={
-                    cargoDetails.isCustomsCleared
-                      ? category.processingOrder.length
-                      : 0
-                  }
-                >
-                  {category.processingOrder.map((step, index) => (
-                    <Step key={step} completed={cargoDetails.isCustomsCleared}>
-                      <StepLabel>
-                        {step
-                          .split("_")
-                          .map(
-                            (word) =>
-                              word.charAt(0) + word.slice(1).toLowerCase()
-                          )
-                          .join(" ")}
-                      </StepLabel>
-                    </Step>
-                  ))}
-                </Stepper>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      Required Documents
-                    </Typography>
-                    <List>
-                      {category.requiredDocuments.map((doc, index) => (
-                        <DocumentListItem
-                          key={index}
-                          doc={doc}
-                          status={cargoDetails.documentStatus?.[doc]}
-                          onUploadClick={handleUploadClick}
-                        />
-                      ))}
-                    </List>
-                  </CardContent>
-                </Card>
-              </Grid>
-
-              <Grid item xs={12} md={6}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      Required Validations
-                    </Typography>
-                    <List>
-                      {Object.entries(category.validations).map(
-                        ([key, required]) => (
-                          <ListItem key={key}>
-                            <ListItemIcon>
-                              {required ? (
-                                <CheckCircle color="success" />
-                              ) : (
-                                <Warning color="error" />
-                              )}
-                            </ListItemIcon>
-                            <ListItemText
-                              primary={key.split(/(?=[A-Z])/).join(" ")}
-                              secondary={required ? "Required" : "Optional"}
-                            />
-                          </ListItem>
-                        )
-                      )}
-                    </List>
-                  </CardContent>
-                </Card>
-              </Grid>
+            <Grid item xs={12} md={6}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>
+                    Agency Issued Documents
+                  </Typography>
+                  <List>
+                    {category.documents.agency.map((doc) => (
+                      <DocumentListItem
+                        key={doc.name}
+                        doc={doc}
+                        status={cargoDetails.documentStatus[doc.name]}
+                        onViewDocument = {handleViewDocument}
+                        category={category}
+                      />
+                    ))}
+                  </List>
+                </CardContent>
+              </Card>
+            </Grid>
             </>
           )}
         </Grid>

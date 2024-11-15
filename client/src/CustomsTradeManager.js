@@ -1,5 +1,7 @@
 import { db } from "./firebaseConfig";
 import { collection, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { HSCodeCategories, ProcessStatus } from './HSCodeCategories.js';
+
 
 export const initializeAgencies = async () => {
   // Define agencies with their API keys and permissions
@@ -159,104 +161,6 @@ export const updateDocumentStatus = async (
   }
 };
 
-// HS Code Categories and their specific requirements
-export const HSCodeCategories = {
-  EXPLOSIVES_AND_PYROTECHNICS: {
-    chapter: '36',
-    description: 'Explosives and Pyrotechnics',
-    processingOrder: [
-      'DANGEROUS_GOODS_CLASSIFICATION',
-      'SAFETY_DATA_VERIFICATION',
-      'EXPLOSIVE_LICENSE_CHECK',
-      'PACKAGING_CERTIFICATION',
-      'TRANSPORT_SAFETY_APPROVAL',
-      'CUSTOMS_DECLARATION',
-      'FINAL_SAFETY_INSPECTION'
-    ],
-    requiredDocuments: [
-      'Dangerous Goods Declaration',
-      'Safety Data Sheet',
-      'Explosives License',
-      'UN Classification Certificate',
-      'Packaging Certification',
-      'Transport Safety Permit',
-      'Export License',
-      'Commercial Invoice',
-      'Packing List'
-    ],
-    validations: {
-      hazardClassification: true,
-      packagingCompliance: true,
-      handlingInstructions: true,
-      emergencyProcedures: true
-    }
-  },
-
-  FRESH_FRUITS: {
-    chapter: "08",
-    description: "Fresh Fruits",
-    processingOrder: [
-      "PHYTOSANITARY_INSPECTION",
-      "PESTICIDE_TESTING",
-      "COLD_CHAIN_VERIFICATION",
-      "PACKAGING_INSPECTION",
-      "CUSTOMS_DECLARATION",
-      "FINAL_QUALITY_CHECK",
-    ],
-    requiredDocuments: [
-      "Phytosanitary Certificate",
-      "Pesticide Residue Test Report",
-      "Cold Chain Compliance Certificate",
-      "Packaging Declaration",
-      "Export License",
-      "Certificate of Origin",
-      "Commercial Invoice",
-      "Packing List",
-    ],
-    validations: {
-      pesticideLevel: true,
-      coldChainMaintenance: true,
-      packagingStandards: true,
-      shelfLife: true,
-    },
-  },
-
-  PHARMACEUTICALS: {
-    chapter: "30",
-    description: "Pharmaceutical Products",
-    processingOrder: [
-      "GMP_VERIFICATION",
-      "DRUG_REGISTRATION_CHECK",
-      "CONTROLLED_SUBSTANCE_CHECK",
-      "STABILITY_VERIFICATION",
-      "CUSTOMS_DECLARATION",
-      "FINAL_QUALITY_ASSURANCE",
-    ],
-    requiredDocuments: [
-      "GMP Certificate",
-      "Drug Registration Certificate",
-      "Export License for Pharmaceuticals",
-      "Certificate of Pharmaceutical Product (CPP)",
-      "Batch Analysis Certificate",
-      "Stability Study Report",
-      "Commercial Invoice",
-      "Packing List",
-    ],
-    validations: {
-      controlledSubstance: true,
-      storageConditions: true,
-      expiryDates: true,
-      batchTracking: true,
-    },
-  },
-};
-
-export const ProcessStatus = {
-  PENDING: "IN_PROGRESS",
-  APPROVED: "COMPLETED",
-  REJECTED: "REJECTED",
-  NOT_STARTED: "NOT_STARTED",
-};
 
 class CustomsTradeManager {
   constructor() {

@@ -51,6 +51,8 @@ import {
   uploadBookingDocument, 
   getVesselVisits 
 } from './services/api';
+import { HSCodeCategories, ProcessStatus } from './HSCodeCategories.js';
+
 
 const HSCodeLookup = ({ value, onChange, error, helperText }) => {
   const [open, setOpen] = useState(false);
@@ -401,44 +403,29 @@ const BookingForm = ({ user }) => {
   
       switch (hsCodePrefix) {
         case '36': // Explosives and Pyrotechnics
-        documentStatus = {
-          'Dangerous Goods Declaration': {
-            name: 'Dangerous Goods Declaration',
+        HSCodeCategories.EXPLOSIVES_AND_PYROTECHNICS.documents.exporter.forEach(doc => {
+          documentStatus[doc.name] = {
+            name: doc.name,
             status: 'PENDING',
-            agencyType: 'DANGEROUS_GOODS',
-            agencyName: 'Dangerous Goods Safety Authority',
+            reviewedBy: doc.reviewedBy,
             lastUpdated: new Date(),
             comments: null,
             documentUrl: null
-          },
-          'Safety Data Sheet': {
-            name: 'Safety Data Sheet',
-            status: 'PENDING',
-            agencyType: 'DANGEROUS_GOODS',
-            agencyName: 'Dangerous Goods Safety Authority',
+          };
+        });
+
+        // Initialize agency document statuses
+        HSCodeCategories.EXPLOSIVES_AND_PYROTECHNICS.documents.agency.forEach(doc => {
+          documentStatus[doc.name] = {
+            name: doc.name,
+            status: 'NOT_STARTED',
+            issuedBy: doc.issuedBy,
+            requiresDocuments: doc.requiresDocuments,
             lastUpdated: new Date(),
             comments: null,
             documentUrl: null
-          },
-          'Explosives License': {
-            name: 'Explosives License',
-            status: 'PENDING',
-            agencyType: 'DANGEROUS_GOODS',
-            agencyName: 'Dangerous Goods Safety Authority',
-            lastUpdated: new Date(),
-            comments: null,
-            documentUrl: null
-          },
-          'Transport Safety Permit': {
-            name: 'Transport Safety Permit',
-            status: 'PENDING',
-            agencyType: 'SAFETY',
-            agencyName: 'Transport Safety Board',
-            lastUpdated: new Date(),
-            comments: null,
-            documentUrl: null
-          }
-        };
+          };
+        });
         break;
   
         case '08': // Fresh Fruits
