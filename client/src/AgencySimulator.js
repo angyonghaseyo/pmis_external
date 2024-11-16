@@ -1,245 +1,349 @@
 import React, { useState, useEffect } from 'react';
+import { HSCodeCategories } from './HSCodeCategories';
+import { db } from './firebaseConfig';
+import { 
+  doc, 
+  getDoc,
+  updateDoc,
+  serverTimestamp,
+} from 'firebase/firestore';
 import {
-  Box,
-  Paper,
-  Typography,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  TextField,
-  Button,
-  Alert,
-  Grid,
-  CircularProgress
-} from '@mui/material';
-import { getAgencies, getBookings} from './services/api';
-import {updateDocumentStatus} from './CustomsTradeManager.js'
+  getBookings,
+} from "./services/api";
 
 const AgencySimulator = () => {
-  const [agencies, setAgencies] = useState([]);
+  // State management
+  const [agencies, setAgencies] = useState({
+    "dangerous-goods-key-123": {
+      name: "Dangerous Goods Safety Authority",
+      type: "DANGEROUS_GOODS_AUTHORITY",
+      allowedDocuments: [
+        "Dangerous_Goods_Declaration",
+        "UN_Classification_Sheet",
+      ],
+    },
+    "transport-safety-key-456": {
+      name: "Transport Safety Board",
+      type: "TRANSPORT_SAFETY_BOARD",
+      allowedDocuments: [
+        "Packaging_Certification",
+        "Transport_Safety_Permit",
+      ],
+    },
+    "customs-key-789": {
+      name: "Customs Authority",
+      type: "CUSTOMS",
+      allowedDocuments: ["Customs_Clearance_Certificate"],
+    }
+  });
   const [bookings, setBookings] = useState([]);
-  const [selectedAgencyKey, setSelectedAgencyKey] = useState('');
+  const [selectedAgency, setSelectedAgency] = useState('');
   const [selectedBooking, setSelectedBooking] = useState('');
   const [selectedCargo, setSelectedCargo] = useState('');
   const [selectedDocument, setSelectedDocument] = useState('');
-  const [status, setStatus] = useState('PENDING');
+  const [documentStatus, setDocumentStatus] = useState('PENDING');
   const [comments, setComments] = useState('');
-  const [notification, setNotification] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [prerequisites, setPrerequisites] = useState([]);
 
-  // Fetch agencies and bookings on component mount
+  // Fetch bookings using api.js
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchBookings = async () => {
       try {
-        setLoading(true);
-        const [agenciesData, bookingsData] = await Promise.all([
-          getAgencies(),
-          getBookings()
-        ]);
-        
-        // Convert agencies array to object with key as index
-        const agenciesObj = agenciesData.reduce((acc, agency) => {
-          acc[agency.key] = agency;
-          return acc;
-        }, {});
-        
-        setAgencies(agenciesObj);
-        setBookings(bookingsData);
-      } catch (error) {
-        setNotification({
-          type: 'error',
-          message: 'Error loading data: ' + error.message
+        setIsLoading(true);
+        const bookingsData = await getBookings();
+        // Filter bookings for explosives based on HS code
+        const explosivesBookings = bookingsData.filter(booking => {
+          // Check if any cargo in the booking has an HS code starting with '36'
+          return Object.values(booking.cargo || {}).some(
+            cargo => cargo.hsCode?.startsWith('36')
+          );
         });
+        setBookings(explosivesBookings);
+      } catch (error) {
+        setError('Error fetching bookings: ' + error.message);
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
     };
 
-    fetchData();
+    fetchBookings();
   }, []);
 
-  const handleSubmit = async () => {
-    if (!selectedAgencyKey || !selectedBooking || !selectedCargo || !selectedDocument) {
-      setNotification({
-        type: 'error',
-        message: 'Please fill in all required fields'
-      });
+  // Get document requirements from HSCodeCategories
+  const getDocumentRequirements = (documentName) => {
+    const explosivesCategory = HSCodeCategories.EXPLOSIVES_AND_PYROTECHNICS;
+    const agencyDoc = explosivesCategory.documents.agency.find(
+      doc => doc.name === documentName
+    );
+    return agencyDoc ? agencyDoc.requiresDocuments : [];
+  };
+
+  // Check document prerequisites
+  const checkDocumentPrerequisites = (cargoData, documentName) => {
+    const requiredDocs = getDocumentRequirements(documentName);
+    if (!requiredDocs.length) return { isValid: true, missingDocs: [] };
+    
+    const missingDocs = requiredDocs.filter(docName => {
+      const docStatus = cargoData.documentStatus?.[docName];
+      return !docStatus || docStatus.status !== 'COMPLETED';
+    });
+
+    return {
+      isValid: missingDocs.length === 0,
+      missingDocs
+    };
+  };
+
+  // Update document status in Firebase
+  const updateDocumentStatus = async () => {
+    if (!selectedAgency || !selectedBooking || !selectedCargo || !selectedDocument) {
+      setError('Please fill in all required fields');
       return;
     }
 
     try {
-      setSubmitting(true);
-      const result = await updateDocumentStatus(
-        selectedAgencyKey,
-        selectedBooking,
-        selectedCargo,
-        selectedDocument,
-        status,
-        comments
-      );
+      setIsLoading(true);
+      setError('');
+      setSuccess('');
 
-      setNotification({
-        type: 'success',
-        message: result.message || 'Document status updated successfully'
-      });
+      // Get current booking data
+      const bookingRef = doc(db, 'bookings', selectedBooking);
+      const bookingDoc = await getDoc(bookingRef);
+      
+      if (!bookingDoc.exists()) {
+        throw new Error('Booking not found');
+      }
 
-      // Reset form fields except agency selection
-      setSelectedDocument('');
-      setStatus('PENDING');
+      const bookingData = bookingDoc.data();
+      const cargoData = bookingData.cargo[selectedCargo];
+
+      // Check if document type is allowed for this agency
+      if (!agencies[selectedAgency].allowedDocuments.includes(selectedDocument)) {
+        throw new Error('Agency not authorized to update this document type');
+      }
+
+      // If trying to approve, check prerequisites
+      if (documentStatus === 'APPROVED') {
+        const { isValid, missingDocs } = checkDocumentPrerequisites(cargoData, selectedDocument);
+        if (!isValid) {
+          throw new Error(`Missing required documents: ${missingDocs.join(', ')}`);
+        }
+      }
+
+      // Prepare update data
+      const updateData = {
+        [`cargo.${selectedCargo}.documentStatus.${selectedDocument}`]: {
+          status: documentStatus,
+          lastUpdated: serverTimestamp(),
+          updatedBy: agencies[selectedAgency].name,
+          agencyType: agencies[selectedAgency].type,
+          comments: comments
+        }
+      };
+
+      // Update document status
+      await updateDoc(bookingRef, updateData);
+
+      // If approved and this is Customs Clearance Certificate, update customs cleared status
+      if (documentStatus === 'APPROVED' && 
+          selectedDocument === 'Customs_Clearance_Certificate') {
+        await updateDoc(bookingRef, {
+          [`cargo.${selectedCargo}.isCustomsCleared`]: true
+        });
+      }
+
+      setSuccess('Document status updated successfully');
       setComments('');
 
+      // Reset form except agency selection
+      setSelectedDocument('');
+      setDocumentStatus('PENDING');
+
     } catch (error) {
-      setNotification({
-        type: 'error',
-        message: error.message || 'Error updating document status'
-      });
+      setError(error.message);
     } finally {
-      setSubmitting(false);
+      setIsLoading(false);
     }
   };
 
-  if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
-      </Box>
-    );
-  }
+  // Update prerequisites when document is selected
+  useEffect(() => {
+    if (selectedDocument) {
+      const reqs = getDocumentRequirements(selectedDocument);
+      setPrerequisites(reqs);
+    } else {
+      setPrerequisites([]);
+    }
+  }, [selectedDocument]);
 
   return (
-    <Box sx={{ maxWidth: 800, margin: 'auto', p: 3 }}>
-      <Paper elevation={3} sx={{ p: 3 }}>
-        <Typography variant="h5" gutterBottom>
-          Agency Document Update Simulator
-        </Typography>
-
-        {notification && (
-          <Alert 
-            severity={notification.type} 
-            sx={{ mb: 2 }}
-            onClose={() => setNotification(null)}
+    <div className="max-w-4xl mx-auto p-6">
+      <div className="bg-white rounded-lg shadow-lg p-6">
+        <h1 className="text-2xl font-bold mb-6">Dangerous Goods Document Simulator</h1>
+        
+        {/* Agency Selection */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Select Agency
+          </label>
+          <select 
+            className="w-full border border-gray-300 rounded-md p-2"
+            value={selectedAgency}
+            onChange={(e) => {
+              setSelectedAgency(e.target.value);
+              setSelectedDocument('');
+            }}
           >
-            {notification.message}
-          </Alert>
+            <option value="">Select an agency...</option>
+            {Object.entries(agencies).map(([key, agency]) => (
+              <option key={key} value={key}>
+                {agency.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Booking and Cargo Selection */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Select Booking
+            </label>
+            <select
+              className="w-full border border-gray-300 rounded-md p-2"
+              value={selectedBooking}
+              onChange={(e) => {
+                setSelectedBooking(e.target.value);
+                setSelectedCargo('');
+              }}
+            >
+              <option value="">Select a booking...</option>
+              {bookings.map(booking => (
+                <option key={booking.bookingId} value={booking.bookingId}>
+                  {booking.bookingId}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Select Cargo
+            </label>
+            <select
+              className="w-full border border-gray-300 rounded-md p-2"
+              value={selectedCargo}
+              onChange={(e) => setSelectedCargo(e.target.value)}
+              disabled={!selectedBooking}
+            >
+              <option value="">Select cargo...</option>
+              {selectedBooking && bookings
+                .find(b => b.bookingId === selectedBooking)?.cargo &&
+                Object.keys(bookings.find(b => b.bookingId === selectedBooking).cargo)
+                  .filter(cargoId => {
+                    const cargo = bookings.find(b => b.bookingId === selectedBooking).cargo[cargoId];
+                    return cargo.hsCode?.startsWith('36');
+                  })
+                  .map(cargoId => (
+                    <option key={cargoId} value={cargoId}>
+                      Cargo {cargoId} (HS: {bookings.find(b => b.bookingId === selectedBooking).cargo[cargoId].hsCode})
+                    </option>
+                  ))
+              }
+            </select>
+          </div>
+        </div>
+
+        {/* Document Selection and Status */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Document Type
+            </label>
+            <select
+              className="w-full border border-gray-300 rounded-md p-2"
+              value={selectedDocument}
+              onChange={(e) => setSelectedDocument(e.target.value)}
+              disabled={!selectedAgency}
+            >
+              <option value="">Select document...</option>
+              {selectedAgency && agencies[selectedAgency]?.allowedDocuments.map(doc => (
+                <option key={doc} value={doc}>
+                  {doc.replace(/_/g, ' ')}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Status
+            </label>
+            <select
+              className="w-full border border-gray-300 rounded-md p-2"
+              value={documentStatus}
+              onChange={(e) => setDocumentStatus(e.target.value)}
+            >
+              <option value="PENDING">Pending</option>
+              <option value="APPROVED">Approved</option>
+              <option value="REJECTED">Rejected</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Prerequisites Display */}
+        {prerequisites.length > 0 && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
+            <h3 className="font-medium text-blue-800 mb-2">Required Prerequisites:</h3>
+            <ul className="list-disc list-inside text-blue-700">
+              {prerequisites.map(doc => (
+                <li key={doc}>{doc.replace(/_/g, ' ')}</li>
+              ))}
+            </ul>
+          </div>
         )}
 
-        <Grid container spacing={3}>
-          <Grid item xs={12}>
-            <FormControl fullWidth>
-              <InputLabel>Select Agency</InputLabel>
-              <Select
-                value={selectedAgencyKey}
-                onChange={(e) => {
-                  setSelectedAgencyKey(e.target.value);
-                  setSelectedDocument('');
-                }}
-              >
-                {Object.entries(agencies).map(([key, agency]) => (
-                  <MenuItem key={key} value={key}>
-                    {agency.name} ({key})
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
+        {/* Comments */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Comments
+          </label>
+          <textarea
+            className="w-full border border-gray-300 rounded-md p-2"
+            rows="4"
+            value={comments}
+            onChange={(e) => setComments(e.target.value)}
+            placeholder="Enter review comments..."
+          />
+        </div>
 
-          <Grid item xs={12} md={6}>
-            <FormControl fullWidth>
-              <InputLabel>Select Booking</InputLabel>
-              <Select
-                value={selectedBooking}
-                onChange={(e) => {
-                  setSelectedBooking(e.target.value);
-                  setSelectedCargo('');
-                }}
-              >
-                {bookings.map(booking => (
-                  <MenuItem key={booking.bookingId} value={booking.bookingId}>
-                    Booking: {booking.bookingId}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
+        {/* Error Display */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-400 rounded-md text-red-700">
+            {error}
+          </div>
+        )}
 
-          <Grid item xs={12} md={6}>
-            <FormControl fullWidth disabled={!selectedBooking}>
-              <InputLabel>Select Cargo</InputLabel>
-              <Select
-                value={selectedCargo}
-                onChange={(e) => setSelectedCargo(e.target.value)}
-              >
-                {selectedBooking && 
-                  bookings.find(b => b.bookingId === selectedBooking)?.cargo &&
-                  Object.keys(bookings.find(b => b.bookingId === selectedBooking).cargo)
-                    .map(cargoId => (
-                      <MenuItem key={cargoId} value={cargoId}>
-                        Cargo: {cargoId}
-                      </MenuItem>
-                    ))
-                }
-              </Select>
-            </FormControl>
-          </Grid>
+        {/* Success Display */}
+        {success && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-400 rounded-md text-green-700">
+            {success}
+          </div>
+        )}
 
-          <Grid item xs={12} md={6}>
-            <FormControl fullWidth disabled={!selectedAgencyKey}>
-              <InputLabel>Document Type</InputLabel>
-              <Select
-                value={selectedDocument}
-                onChange={(e) => setSelectedDocument(e.target.value)}
-              >
-                {selectedAgencyKey && 
-                  agencies[selectedAgencyKey]?.allowedDocuments.map(doc => (
-                    <MenuItem key={doc} value={doc}>
-                      {doc}
-                    </MenuItem>
-                  ))
-                }
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={12} md={6}>
-            <FormControl fullWidth>
-              <InputLabel>Status</InputLabel>
-              <Select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-              >
-                <MenuItem value="PENDING">PENDING</MenuItem>
-                <MenuItem value="APPROVED">APPROVED</MenuItem>
-                <MenuItem value="REJECTED">REJECTED</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={12}>
-            <TextField
-              fullWidth
-              multiline
-              rows={4}
-              label="Comments"
-              value={comments}
-              onChange={(e) => setComments(e.target.value)}
-            />
-          </Grid>
-
-          <Grid item xs={12}>
-            <Button
-              variant="contained"
-              onClick={handleSubmit}
-              disabled={submitting || !selectedAgencyKey || !selectedBooking || !selectedCargo || !selectedDocument}
-              fullWidth
-            >
-              {submitting ? <CircularProgress size={24} /> : 'Update Document Status'}
-            </Button>
-          </Grid>
-        </Grid>
-      </Paper>
-    </Box>
+        {/* Submit Button */}
+        <button
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md disabled:bg-gray-400"
+          disabled={isLoading || !selectedAgency || !selectedBooking || !selectedCargo || !selectedDocument}
+          onClick={updateDocumentStatus}
+        >
+          {isLoading ? 'Updating...' : 'Update Document Status'}
+        </button>
+      </div>
+    </div>
   );
 };
 

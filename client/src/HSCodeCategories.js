@@ -189,4 +189,5 @@ export const ProcessStatus = {
   IN_PROGRESS: "IN_PROGRESS",
   COMPLETED: "COMPLETED",
   REJECTED: "REJECTED",
+  APPROVED: "APPROVED",
 };
