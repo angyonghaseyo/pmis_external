@@ -1001,7 +1001,7 @@ export const uploadBookingDocument = async (bookingId, cargoId, documentType, fi
 export const retrieveBookingDocument = async (bookingId, cargoId, documentType) => {
   try {
     const response = await fetch(
-      `${API_URL}/bookings/${bookingId}/cargo/${cargoId}/documents/${documentType}`,
+      `${API_URL}/bookings/${bookingId}/cargo/${cargoId}/documents/${documentType}`, //match in routes
       {
         method: 'GET',
       }

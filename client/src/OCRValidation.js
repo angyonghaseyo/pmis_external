@@ -63,6 +63,8 @@ export const DocumentKeywords = {
   "Certificate of Origin": ["certificate", "origin"],
   "Commercial Invoice": ["commercial", "invoice"],
   "Packing List": ["packing", "list"],
+  "UN Packaging Specification": ["un", "packaging", "specification"],
+
 };
 
 // Levenshtein distance for fuzzy matching

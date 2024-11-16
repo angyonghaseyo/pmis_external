@@ -355,7 +355,7 @@ const CustomsPreview = () => {
 
   const handleUpload = async (file) => {
     try {
-      console.log("a");
+      console.log(selectedDocument);
       if (!selectedBooking || !selectedCargo) return;
 
       // Validate document using OCR
