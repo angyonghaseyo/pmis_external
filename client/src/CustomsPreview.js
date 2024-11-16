@@ -518,38 +518,89 @@ const CustomsPreview = () => {
 
       setCargoDetails(updatedCargoDetails);
 
-      if (selectedDocument === "Safety_Data_Sheet") {
-        const updatedStatus = {
-          ...cargoDetails.documentStatus,
-          UN_Classification_Sheet: {
-            name: "UN_Classification_Sheet", // Keep existing fields
-            status: "IN_PROGRESS",
-            lastUpdated: new Date(),
-            comments: "Prerequisites met, waiting for agency review",
-            issuedBy:
-              cargoDetails.documentStatus["UN_Classification_Sheet"].issuedBy, // Preserve existing issuedBy
-            requiresDocuments:
-              cargoDetails.documentStatus["UN_Classification_Sheet"]
-                .requiresDocuments, // Preserve existing requiresDocuments
-          },
-        };
+      // if (selectedDocument === "Safety_Data_Sheet") {
+      //   const updatedStatus = {
+      //     ...cargoDetails.documentStatus,
+      //     UN_Classification_Sheet: {
+      //       name: "UN_Classification_Sheet", // Keep existing fields
+      //       status: "IN_PROGRESS",
+      //       lastUpdated: new Date(),
+      //       comments: "Prerequisites met, waiting for agency review",
+      //       issuedBy:
+      //         cargoDetails.documentStatus["UN_Classification_Sheet"].issuedBy, // Preserve existing issuedBy
+      //       requiresDocuments:
+      //         cargoDetails.documentStatus["UN_Classification_Sheet"]
+      //           .requiresDocuments, // Preserve existing requiresDocuments
+      //     },
+      //   };
 
+        
+
+      //   const updatedCargoDetails = {
+      //     ...cargoDetails,
+      //     documents: {
+      //       ...cargoDetails.documents,
+      //       [selectedDocument]: uploadResult.url,
+      //     },
+      //     documentStatus: updatedStatus  // Include the updated status with UN_Classification_Sheet
+      //   };
+
+       
+      //   setCargoDetails(updatedCargoDetails);
+
+
+      //   const bookingData = bookings.find(
+      //     (b) => b.bookingId === selectedBooking
+      //   );
+      //   await updateBooking(selectedBooking, {
+      //     ...bookingData,
+      //     cargo: {
+      //       ...bookingData.cargo,
+      //       [selectedCargo]: updatedCargoDetails
+      //     },
+      //   });
+      // }
+
+      if (selectedDocument) {
+        // Get all agency documents that require the uploaded document
+        const affectedAgencyDocs = category.documents.agency.filter(doc => 
+          doc.requiresDocuments.includes(selectedDocument)
+        );
+      
+        // Check each affected agency document
+        const updatedStatus = { ...cargoDetails.documentStatus };
+        
+        affectedAgencyDocs.forEach(agencyDoc => {
+          // Check if all required documents are now uploaded
+          const allRequiredDocsUploaded = agencyDoc.requiresDocuments.every(reqDoc => 
+            cargoDetails.documents[reqDoc] || reqDoc === selectedDocument
+          );
+      
+          // If all required docs are now available, update the agency doc status
+          if (allRequiredDocsUploaded) {
+            updatedStatus[agencyDoc.name] = {
+              ...cargoDetails.documentStatus[agencyDoc.name],
+              status: "IN_PROGRESS",
+              lastUpdated: new Date(),
+              comments: "Prerequisites met, waiting for agency review",
+              issuedBy: cargoDetails.documentStatus[agencyDoc.name].issuedBy,
+              requiresDocuments: cargoDetails.documentStatus[agencyDoc.name].requiresDocuments
+            };
+          }
+        });
+      
         const updatedCargoDetails = {
           ...cargoDetails,
           documents: {
             ...cargoDetails.documents,
             [selectedDocument]: uploadResult.url,
           },
-          documentStatus: updatedStatus  // Include the updated status with UN_Classification_Sheet
+          documentStatus: updatedStatus
         };
-
-       
+      
         setCargoDetails(updatedCargoDetails);
-
-
-        const bookingData = bookings.find(
-          (b) => b.bookingId === selectedBooking
-        );
+      
+        const bookingData = bookings.find(b => b.bookingId === selectedBooking);
         await updateBooking(selectedBooking, {
           ...bookingData,
           cargo: {
