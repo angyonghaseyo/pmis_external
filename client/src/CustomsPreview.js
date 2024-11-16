@@ -144,7 +144,7 @@ const DocumentListItem = ({
 
   const currentStatus = status?.status || "NOT_STARTED";
   const hasDocument = cargoDetails?.documents?.[doc.name];
-  console.log(hasDocument);
+  // console.log(hasDocument);
   const isClickable = isExporterDoc;
 
   const getStatusColor = (status) => {
@@ -181,6 +181,8 @@ const DocumentListItem = ({
         return "primary";
       case "PENDING":
         return "secondary";
+      case "APPROVED":
+        return "success";
       default:
         return "default";
     }
@@ -195,6 +197,8 @@ const DocumentListItem = ({
           return <Warning />;
         case "IN_PROGRESS":
           return <PendingActions />;
+        case "APPROVED":
+          return <CheckCircle sx={{ color: "green" }} />;
         default:
           return <PendingActions />;
       }
@@ -349,7 +353,7 @@ const CustomsPreview = () => {
     const fetchBookings = async () => {
       try {
         setLoading(true);
-        console.log("Fetching bookings..."); // Debug log
+        // console.log("Fetching bookings..."); // Debug log
 
         // Add timeout to prevent infinite loading
         const timeoutPromise = new Promise((_, reject) =>
@@ -362,7 +366,7 @@ const CustomsPreview = () => {
           timeoutPromise,
         ]);
 
-        console.log("Bookings received:", bookingsData); // Debug log
+        // console.log("Bookings received:", bookingsData); // Debug log
 
         if (!Array.isArray(bookingsData)) {
           throw new Error("Invalid data format received");
@@ -523,112 +527,87 @@ const CustomsPreview = () => {
         file
       );
 
-      // Update local state to reflect the upload
+      // First update: Update the main cargo details with new document and set status to COMPLETED
       const updatedCargoDetails = {
         ...cargoDetails,
         documents: {
           ...cargoDetails.documents,
-          [selectedDocument]: uploadResult.url, // Store the document URL
+          [selectedDocument]: uploadResult.url,
         },
         documentStatus: {
           ...cargoDetails.documentStatus,
           [selectedDocument]: {
             ...cargoDetails.documentStatus[selectedDocument],
-            status: "IN_PROGRESS",
+            status: "COMPLETED",
+            lastUpdated: new Date(),
+            comments: null,
           },
         },
       };
 
+      // Update local state with the first update
       setCargoDetails(updatedCargoDetails);
 
-      // if (selectedDocument === "Safety_Data_Sheet") {
-      //   const updatedStatus = {
-      //     ...cargoDetails.documentStatus,
-      //     UN_Classification_Sheet: {
-      //       name: "UN_Classification_Sheet", // Keep existing fields
-      //       status: "IN_PROGRESS",
-      //       lastUpdated: new Date(),
-      //       comments: "Prerequisites met, waiting for agency review",
-      //       issuedBy:
-      //         cargoDetails.documentStatus["UN_Classification_Sheet"].issuedBy, // Preserve existing issuedBy
-      //       requiresDocuments:
-      //         cargoDetails.documentStatus["UN_Classification_Sheet"]
-      //           .requiresDocuments, // Preserve existing requiresDocuments
-      //     },
-      //   };
+      // Get the current booking data
+      const bookingData = bookings.find((b) => b.bookingId === selectedBooking);
 
-      //   const updatedCargoDetails = {
-      //     ...cargoDetails,
-      //     documents: {
-      //       ...cargoDetails.documents,
-      //       [selectedDocument]: uploadResult.url,
-      //     },
-      //     documentStatus: updatedStatus  // Include the updated status with UN_Classification_Sheet
-      //   };
+      // First database update
+      await updateBooking(selectedBooking, {
+        ...bookingData,
+        cargo: {
+          ...bookingData.cargo,
+          [selectedCargo]: updatedCargoDetails,
+        },
+      });
 
-      //   setCargoDetails(updatedCargoDetails);
-
-      //   const bookingData = bookings.find(
-      //     (b) => b.bookingId === selectedBooking
-      //   );
-      //   await updateBooking(selectedBooking, {
-      //     ...bookingData,
-      //     cargo: {
-      //       ...bookingData.cargo,
-      //       [selectedCargo]: updatedCargoDetails
-      //     },
-      //   });
-      // }
-
-      if (selectedDocument) {
+      // Second update: Handle cascading updates for agency documents
+      if (selectedDocument && category) {
         // Get all agency documents that require the uploaded document
         const affectedAgencyDocs = category.documents.agency.filter((doc) =>
           doc.requiresDocuments.includes(selectedDocument)
         );
 
-        // Check each affected agency document
-        const updatedStatus = { ...cargoDetails.documentStatus };
+        // Start with the status from the first update
+        const updatedStatus = { ...updatedCargoDetails.documentStatus };
 
+        // Check each affected agency document
         affectedAgencyDocs.forEach((agencyDoc) => {
           // Check if all required documents are now uploaded
           const allRequiredDocsUploaded = agencyDoc.requiresDocuments.every(
             (reqDoc) =>
-              cargoDetails.documents[reqDoc] || reqDoc === selectedDocument
+              updatedCargoDetails.documents[reqDoc] ||
+              reqDoc === selectedDocument
           );
 
           // If all required docs are now available, update the agency doc status
           if (allRequiredDocsUploaded) {
             updatedStatus[agencyDoc.name] = {
-              ...cargoDetails.documentStatus[agencyDoc.name],
-              status: "IN_PROGRESS",
+              ...updatedStatus[agencyDoc.name],
+              status: "PENDING",
               lastUpdated: new Date(),
               comments: "Prerequisites met, waiting for agency review",
-              issuedBy: cargoDetails.documentStatus[agencyDoc.name].issuedBy,
+              issuedBy: updatedStatus[agencyDoc.name].issuedBy,
               requiresDocuments:
-                cargoDetails.documentStatus[agencyDoc.name].requiresDocuments,
+                updatedStatus[agencyDoc.name].requiresDocuments,
             };
           }
         });
 
-        const updatedCargoDetails = {
-          ...cargoDetails,
-          documents: {
-            ...cargoDetails.documents,
-            [selectedDocument]: uploadResult.url,
-          },
+        // Create final update that includes both the uploaded document and agency document changes
+        const finalUpdatedCargoDetails = {
+          ...updatedCargoDetails,
           documentStatus: updatedStatus,
         };
 
-        setCargoDetails(updatedCargoDetails);
+        // Update local state with the final version
+        setCargoDetails(finalUpdatedCargoDetails);
 
-        const bookingData = bookings.find(
-          (b) => b.bookingId === selectedBooking
-        );
+        // Second database update
         await updateBooking(selectedBooking, {
           ...bookingData,
           cargo: {
             ...bookingData.cargo,
-            [selectedCargo]: updatedCargoDetails,
+            [selectedCargo]: finalUpdatedCargoDetails,
           },
         });
       }
@@ -639,12 +618,14 @@ const CustomsPreview = () => {
         [selectedDocument]: "success",
       }));
 
+      // Show success message
       setSnackbar({
         open: true,
         message: "Document uploaded successfully",
         severity: "success",
       });
 
+      // Close the upload dialog
       setUploadDialogOpen(false);
 
       // Clear upload status after a delay
@@ -656,6 +637,7 @@ const CustomsPreview = () => {
         });
       }, 3000);
     } catch (error) {
+      // Error handling
       console.error("Upload error:", error);
       setUploadStatus((prev) => ({
         ...prev,
