@@ -29,14 +29,11 @@ import {
 } from '@mui/material';
 import { Edit, Delete, Visibility, Search, Download } from '@mui/icons-material';
 import { collection, query, where, getDocs, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { db } from './firebaseConfig';
 import CargoSamplingRequest from './CargoSamplingRequest';
 import { format } from 'date-fns';
 import ScienceIcon from '@mui/icons-material/Science';
 import CloseIcon from '@mui/icons-material/Close';
-import {
-    getSamplingRequests,
-    deleteSamplingRequest,
-} from './services/api';
 
 
 const CargoSampling = () => {
@@ -60,7 +57,18 @@ const CargoSampling = () => {
     const fetchRequests = async () => {
         try {
             setLoading(true);
-            const requestData = await getSamplingRequests();
+            let q = query(collection(db, 'samplingRequests'), orderBy('createdAt', 'desc'));
+
+            if (filters.status !== 'all') {
+                q = query(q, where('status', '==', filters.status));
+            }
+
+            const querySnapshot = await getDocs(q);
+            const requestData = querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+                createdAt: doc.data().createdAt?.toDate()
+            }));
 
             // Apply search filter
             const filteredData = requestData.filter(request => {
@@ -92,10 +100,32 @@ const CargoSampling = () => {
         fetchRequests();
     }, [filters]);
 
+    const handleStatusChange = async (requestId, newStatus) => {
+        try {
+            await updateDoc(doc(db, 'samplingRequests', requestId), {
+                status: newStatus,
+                updatedAt: new Date()
+            });
+            await fetchRequests();
+            setSnackbar({
+                open: true,
+                message: 'Status updated successfully',
+                severity: 'success'
+            });
+        } catch (error) {
+            console.error('Error updating status:', error);
+            setSnackbar({
+                open: true,
+                message: 'Error updating status',
+                severity: 'error'
+            });
+        }
+    };
 
     const handleDelete = async (requestId) => {
+
         try {
-            await deleteSamplingRequest(requestId);
+            await deleteDoc(doc(db, 'samplingRequests', requestId));
             await fetchRequests();
             setSnackbar({
                 open: true,
@@ -111,6 +141,7 @@ const CargoSampling = () => {
                 severity: 'error'
             });
         }
+
     };
 
     const getStatusColor = (status) => {

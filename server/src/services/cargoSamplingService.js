@@ -1,5 +1,6 @@
 const { Storage } = require('@google-cloud/storage');
 const path = require('path');
+const { Timestamp } = require('firebase-admin/firestore');
 
 class CargoSamplingService {
     constructor(db) {
@@ -9,6 +10,21 @@ class CargoSamplingService {
             keyFilename: path.join(__dirname, '../../config/serviceAccountKey.json')
         });
         this.bucket = this.storage.bucket('pmis-47493.appspot.com');
+    }
+
+    // Helper method to convert Firestore document
+    convertDocument(doc) {
+        const data = doc.data();
+        return {
+            id: doc.id,
+            ...data,
+            createdAt: data.createdAt?.toDate?.() || data.createdAt,
+            updatedAt: data.updatedAt?.toDate?.() || data.updatedAt,
+            schedule: data.schedule ? {
+                startDate: data.schedule.startDate?.toDate?.() || data.schedule.startDate,
+                endDate: data.schedule.endDate?.toDate?.() || data.schedule.endDate
+            } : null
+        };
     }
 
     async getSamplingRequests(status) {
@@ -21,10 +37,7 @@ class CargoSamplingService {
             }
 
             const snapshot = await query.orderBy('createdAt', 'desc').get();
-            return snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
+            return snapshot.docs.map(doc => this.convertDocument(doc));
         } catch (error) {
             console.error('Error fetching sampling requests:', error);
             throw error;
@@ -33,17 +46,27 @@ class CargoSamplingService {
 
     async createSamplingRequest(requestData) {
         try {
+            // Ensure proper Timestamp objects are created for dates
+            const timestamp = Timestamp.now();
+
+            // Convert schedule dates to Timestamps if they exist
+            const schedule = requestData.schedule ? {
+                startDate: Timestamp.fromDate(new Date(requestData.schedule.startDate)),
+                endDate: Timestamp.fromDate(new Date(requestData.schedule.endDate))
+            } : null;
+
             const docRef = await this.db.collection('samplingRequests').add({
                 ...requestData,
+                schedule,
                 status: 'Pending',
-                createdAt: new Date(),
-                updatedAt: new Date()
+                createdAt: timestamp,
+                updatedAt: timestamp
             });
 
             await docRef.update({ id: docRef.id });
 
             const newDoc = await docRef.get();
-            return { id: docRef.id, ...newDoc.data() };
+            return this.convertDocument(newDoc);
         } catch (error) {
             console.error('Error creating sampling request:', error);
             throw error;
@@ -53,13 +76,22 @@ class CargoSamplingService {
     async updateSamplingRequest(id, updateData) {
         try {
             const docRef = this.db.collection('samplingRequests').doc(id);
+
+            // Convert schedule dates to Timestamps if they exist in updateData
+            if (updateData.schedule) {
+                updateData.schedule = {
+                    startDate: Timestamp.fromDate(new Date(updateData.schedule.startDate)),
+                    endDate: Timestamp.fromDate(new Date(updateData.schedule.endDate))
+                };
+            }
+
             await docRef.update({
                 ...updateData,
-                updatedAt: new Date()
+                updatedAt: Timestamp.now()
             });
 
             const updatedDoc = await docRef.get();
-            return { id, ...updatedDoc.data() };
+            return this.convertDocument(updatedDoc);
         } catch (error) {
             console.error('Error updating sampling request:', error);
             throw error;
@@ -92,7 +124,7 @@ class CargoSamplingService {
             const docRef = this.db.collection('samplingRequests').doc(requestId);
             await docRef.update({
                 documentUrl: downloadUrl,
-                updatedAt: new Date()
+                updatedAt: Timestamp.now()
             });
 
             return { documentUrl: downloadUrl };
