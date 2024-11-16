@@ -848,6 +848,15 @@ const ContainerRequestsList = () => {
                                     />
                                 </TableCell>
                                 <TableCell>
+
+                                    <IconButton
+                                        size="small"
+
+                                        onClick={() => handleOpenDetails(request)}
+
+                                    >
+                                        <ViewIcon />
+                                    </IconButton>
                                     <IconButton
                                         size="small"
                                         onClick={() => handleRequestClick(request)}
@@ -855,15 +864,6 @@ const ContainerRequestsList = () => {
                                     >
                                         <EditIcon />
                                     </IconButton>
-
-                                    <Button
-                                        size="small"
-
-                                        onClick={() => handleOpenDetails(request)}
-
-                                    >
-                                        <ViewIcon />
-                                    </Button>
                                     {request.status === 'Assigned' && (
                                         <IconButton
                                             size="small"
