@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
     Box,
@@ -32,11 +33,6 @@ import { styled } from '@mui/material/styles';
 import { doc, getDoc, setDoc, addDoc, collection, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from './firebaseConfig';
-import {
-    createSamplingRequest,
-    updateSamplingRequest,
-    uploadSamplingDocument
-} from './services/api';
 
 const VisuallyHiddenInput = styled('input')`
   clip: rect(0 0 0 0);
@@ -76,7 +72,6 @@ const StyledPaper = styled(Paper)(({ theme }) => ({
 }));
 
 const steps = ['Overview', 'Cargo Details', 'Sampling Requirements', 'Schedule & Documents'];
-
 
 const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuccess }) => {
     const [formData, setFormData] = useState({
@@ -622,10 +617,9 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
 
     const handleSubmit = async () => {
         if (!validateForm()) {
-            setSubmitError('Please fill in all required fields correctly');
+            setSubmitError('Please fill in all required fields');
             return;
         }
-
         try {
             setLoading(true);
             setSubmitError(null);
@@ -641,25 +635,19 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
             };
 
             if (editingId) {
-                await updateSamplingRequest(editingId, requestData);
+                await setDoc(doc(db, 'samplingRequests', editingId), requestData);
             } else {
-                await createSamplingRequest(requestData);
+                const docRef = await addDoc(collection(db, 'samplingRequests'), requestData);
+                await setDoc(docRef, { id: docRef.id }, { merge: true });
             }
 
             onSubmitSuccess?.();
             handleClose();
-            setSnackbar({
-                open: true,
-                message: 'Sampling Request created successfully',
-                severity: 'success'
-            });
+            setSnackbar({ open: true, message: 'Sampling Request created successfully', severity: 'success' });
         } catch (error) {
             console.error('Error submitting request:', error);
-            setSnackbar({
-                open: true,
-                message: 'Failed to submit request. Please try again.',
-                severity: 'error'
-            });
+            setSubmitError('Failed to submit request. Please try again.');
+            setSnackbar({ open: true, message: 'Failed to submit request. Please try again.', severity: 'error' });
         } finally {
             setLoading(false);
         }
@@ -668,10 +656,19 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
     const uploadFiles = async () => {
         const uploads = {};
 
-        for (const [type, file] of Object.entries(formData.documents)) {
-            if (file instanceof File) {
-                uploads[type] = await uploadSamplingDocument(editingId, type, file);
-            }
+        if (formData.documents.safetyDataSheet) {
+            uploads.safetyDataSheet = await uploadFile(
+                formData.documents.safetyDataSheet,
+                'safety-sheets'
+            );
+        }
+
+        if (formData.documents.additionalDocs?.length > 0) {
+            uploads.additionalDocs = await Promise.all(
+                formData.documents.additionalDocs.map(
+                    file => uploadFile(file, 'additional')
+                )
+            );
         }
 
         return uploads;
@@ -754,7 +751,6 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
                     )}
                 </DialogActions>
             </Dialog>
-
             <Snackbar
                 open={snackbar.open}
                 autoHideDuration={6000}
