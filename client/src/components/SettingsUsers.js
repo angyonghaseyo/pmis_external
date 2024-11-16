@@ -83,6 +83,8 @@ const SettingsUsers = () => {
   });
 
   const accessRights = [
+    "View Assets",
+    "Manage Assets",
     "View Inquiries and Feedbacks",
     "Create Inquiries and Feedback",
     "Enrol Training Program",
@@ -92,16 +94,44 @@ const SettingsUsers = () => {
     "Create Vessel Visit Request",
     "Edit Vessel Visit Requests",
     "Delete Vessel Visit Requests",
+    "View Ad Hoc Resource Requests",
+    "Create Ad Hoc Resource Request",
+    "View Port Operations",
+    "Manage Port Operations",
+    "Create Cargo Booking",
+    "Create Facility Rental",
+    "View Cargo Manifests",
+    "Submit Cargo Manifest",
+    "Update Cargo Manifest",
+    "Delete Cargo Manifest",
+    "Create Container Request",
+    "View Container Request",
+    "Register Truck",
+    "View Truck Registrations",
+    "Create Container Pricings",
+    "View Container Pricings",
+    "Create Container Menu",
+    "View Container Menu",
+    "View Container Requests",
+    "Approve Container Requests",
+    "Create Sampling Request",
+    "Create Repacking Request",
+    "Create Storage Request",
+    "Create Transloading Request",
+    "View Documents",
+    "Manage Documents",
+    "View Billing Requests",
     "View Users List",
     "Delete User",
     "Invite User",
     "Delete User Invitations",
     "View Invitations List",
     "View Company Information",
-    "Edit Company Information",
-    'View Documents', 
-    'Manage Documents'
+    "Edit Company Information"
   ];
+
+
+
 
   useEffect(() => {
     const fetchData = async () => {

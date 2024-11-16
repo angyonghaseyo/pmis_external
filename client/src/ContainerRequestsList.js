@@ -463,12 +463,6 @@ const ContainerRequestsList = () => {
                             </Box>
                         )}
 
-                        <Typography variant="body1" color="primary">
-                            {selectedRequest?.consolidationService
-                                ? `$${parseFloat(container.consolidationPrice).toFixed(2)}/ft³`
-                                : `$${parseFloat(container.price).toFixed(2)}`
-                            }
-                        </Typography>
                     </Stack>
                 </CardContent>
                 <CardActions sx={{ mt: 'auto', p: 2 }}>
