@@ -77,6 +77,22 @@ class BookingController {
         }
     }
 
+    async retrieveDocument(req, res) {
+        try {
+            const { bookingId, cargoId, documentType } = req.params;
+            const result = await this.bookingService.retrieveDocument(bookingId, cargoId, documentType);
+            
+            if (!result) {
+                return res.status(404).json({ error: 'Document not found' });
+            }
+    
+            res.json(result);
+        } catch (error) {
+            console.error('Controller error:', error);
+            res.status(500).json({ error: 'Error retrieving document' });
+        }
+    }
+
     async registerTruckForCargo(req, res) {
         try {
             const { cargoId, truckLicense } = req.body;

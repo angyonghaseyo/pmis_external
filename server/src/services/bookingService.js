@@ -124,6 +124,30 @@ class BookingService {
         }
     }
 
+    async retrieveDocument(bookingId, cargoId, documentType) {
+        try {
+            console.log('Fetching document URL:', { bookingId, cargoId, documentType });
+            const doc = await this.db.collection('bookings').doc(bookingId).get();
+            
+            if (!doc.exists) {
+                console.log('Booking not found');
+                return null;
+            }
+    
+            const documentUrl = doc.data()?.cargo?.[cargoId]?.documents?.[documentType];
+            console.log('Document URL found:', documentUrl);
+    
+            if (!documentUrl) {
+                return null;
+            }
+    
+            return { documentUrl };
+        } catch (error) {
+            console.error('Service error:', error);
+            throw error;
+        }
+    }
+
     async registerTruckForCargo(cargoId, truckLicense) {
         try {
             // Fetch all bookings

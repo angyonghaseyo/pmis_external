@@ -15,6 +15,10 @@ router.post('/bookings', (req, res) => bookingController.createBooking(req, res)
 router.put('/bookings/:id', (req, res) => bookingController.updateBooking(req, res));
 router.delete('/bookings/:id', (req, res) => bookingController.deleteBooking(req, res));
 router.post('/bookings/:bookingId/cargo/:cargoId/documents', upload.single('document'), (req, res) => bookingController.uploadDocument(req, res));
+router.get('/bookings/:bookingId/cargo/:cargoId/documents/:documentType', (req, res) => {
+    console.log('Route hit with params:', req.params);
+    return bookingController.retrieveDocument(req, res);
+});
 router.post('/bookings/register-truck', (req, res) => bookingController.registerTruckForCargo(req, res));
 
 module.exports = router;

@@ -38,21 +38,21 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import BookingSteps from "./BookingSteps";
-import AttachFileIcon from "@mui/icons-material/AttachFile";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorIcon from "@mui/icons-material/Error";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import CancelIcon from "@mui/icons-material/Cancel";
-import { 
-  getBookings, 
-  createBooking, 
-  updateBooking, 
-  deleteBooking, 
-  uploadBookingDocument, 
-  getVesselVisits 
-} from './services/api';
-import { HSCodeCategories, ProcessStatus } from './HSCodeCategories.js';
-
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import {
+  getBookings,
+  createBooking,
+  updateBooking,
+  deleteBooking,
+  uploadBookingDocument,
+  retrieveBookingDocument,
+  getVesselVisits,
+} from "./services/api";
+import { HSCodeCategories, ProcessStatus } from "./HSCodeCategories.js";
 
 const HSCodeLookup = ({ value, onChange, error, helperText }) => {
   const [open, setOpen] = useState(false);
@@ -245,7 +245,7 @@ const BookingForm = ({ user }) => {
         const bookings = await getBookings();
         setBookingData(bookings);
       } catch (error) {
-        console.error('Error fetching bookings:', error);
+        console.error("Error fetching bookings:", error);
       }
     };
     fetchBookings();
@@ -257,7 +257,7 @@ const BookingForm = ({ user }) => {
         const visits = await getVesselVisits();
         setVesselVisits(visits);
       } catch (error) {
-        console.error('Error fetching vessel visits:', error);
+        console.error("Error fetching vessel visits:", error);
       }
     };
     fetchVesselVisits();
@@ -299,12 +299,12 @@ const BookingForm = ({ user }) => {
     if (booking) {
       // Set the vessel name first
       setSelectedVessel(booking.vesselName || "");
-      
+
       // Find the vessel data to get available voyages
       const selectedVesselData = vesselVisits.find(
         (visit) => visit.vesselName === booking.vesselName
       );
-      
+
       // Set available voyages for the selected vessel
       setAvailableVoyages(selectedVesselData?.voyages || []);
 
@@ -312,9 +312,9 @@ const BookingForm = ({ user }) => {
       setFormData({
         ...booking,
         cargo: booking.cargo || {},
-        voyageNumber: booking.voyageNumber || ""
+        voyageNumber: booking.voyageNumber || "",
       });
-      
+
       setEditingId(booking.bookingId);
     } else {
       // Reset everything for new booking
@@ -331,13 +331,12 @@ const BookingForm = ({ user }) => {
         freeTime: 0,
         bookingId: "",
         vesselName: "",
-        voyageNumber: ""
+        voyageNumber: "",
       });
       setEditingId(null);
     }
     setOpenDialog(true);
   };
-
 
   const handleCloseDialog = () => {
     setOpenDialog(false);
@@ -375,171 +374,180 @@ const BookingForm = ({ user }) => {
   const handleSubmit = async () => {
     // First validate all cargo items
     const cargoValidationErrors = [];
-    
+
     Object.entries(formData.cargo).forEach(([cargoId, cargo]) => {
       if (!cargo.hsCode) {
         cargoValidationErrors.push(`Cargo ${cargoId}: HS Code is required`);
         return;
       }
-      
+
       const hsCodePrefix = cargo.hsCode.substring(0, 2);
-      if (!['36', '08', '30'].includes(hsCodePrefix)) {
+      if (!["36", "08", "30"].includes(hsCodePrefix)) {
         cargoValidationErrors.push(
           `Cargo ${cargoId}: HS Code must start with 36 (Explosives/Pyrotechnics), 08 (Fresh Fruits), or 30 (Pharmaceuticals)`
         );
       }
     });
-  
+
     if (cargoValidationErrors.length > 0) {
-      alert(cargoValidationErrors.join('\n'));
+      alert(cargoValidationErrors.join("\n"));
       return;
     }
-  
+
     // Process cargo items and add document requirements
     const processedCargo = {};
     Object.entries(formData.cargo).forEach(([cargoId, cargo]) => {
       const hsCodePrefix = cargo.hsCode.substring(0, 2);
       let documentStatus = {};
-  
-      switch (hsCodePrefix) {
-        case '36': // Explosives and Pyrotechnics
-        HSCodeCategories.EXPLOSIVES_AND_PYROTECHNICS.documents.exporter.forEach(doc => {
-          documentStatus[doc.name] = {
-            name: doc.name,
-            status: 'PENDING',
-            reviewedBy: doc.reviewedBy,
-            lastUpdated: new Date(),
-            comments: null,
-            documentUrl: null
-          };
-        });
 
-        // Initialize agency document statuses
-        HSCodeCategories.EXPLOSIVES_AND_PYROTECHNICS.documents.agency.forEach(doc => {
-          documentStatus[doc.name] = {
-            name: doc.name,
-            status: 'NOT_STARTED',
-            issuedBy: doc.issuedBy,
-            requiresDocuments: doc.requiresDocuments,
-            lastUpdated: new Date(),
-            comments: null,
-            documentUrl: null
-          };
-        });
-        break;
-  
-        case '08': // Fresh Fruits
-          documentStatus = {
-            'Phytosanitary Certificate': {
-              name: 'Phytosanitary Certificate',
-              status: 'PENDING',
-              agencyType: 'PHYTOSANITARY',
-              agencyName: 'Phytosanitary Department',
-              lastUpdated: new Date(),
-              comments: null,
-              documentUrl: null
-            },
-            'Pesticide Residue Test Report': {
-              name: 'Pesticide Residue Test Report',
-              status: 'PENDING',
-              agencyType: 'PHYTOSANITARY',
-              agencyName: 'Phytosanitary Department',
-              lastUpdated: new Date(),
-              comments: null,
-              documentUrl: null
-            },
-            'Cold Chain Compliance Certificate': {
-              name: 'Cold Chain Compliance Certificate',
-              status: 'PENDING',
-              agencyType: 'QUALITY',
-              agencyName: 'Quality Control Department',
-              lastUpdated: new Date(),
-              comments: null,
-              documentUrl: null
-            },
-            'Packaging Declaration': {
-              name: 'Packaging Declaration',
-              status: 'PENDING',
-              agencyType: 'QUALITY',
-              agencyName: 'Quality Control Department',
-              lastUpdated: new Date(),
-              comments: null,
-              documentUrl: null
+      switch (hsCodePrefix) {
+        case "36": // Explosives and Pyrotechnics
+          HSCodeCategories.EXPLOSIVES_AND_PYROTECHNICS.documents.exporter.forEach(
+            (doc) => {
+              documentStatus[doc.name] = {
+                name: doc.name,
+                status: "PENDING",
+                reviewedBy: doc.reviewedBy,
+                lastUpdated: new Date(),
+                comments: null,
+                documentUrl: null,
+              };
             }
+          );
+
+          // Initialize agency document statuses
+          HSCodeCategories.EXPLOSIVES_AND_PYROTECHNICS.documents.agency.forEach(
+            (doc) => {
+              documentStatus[doc.name] = {
+                name: doc.name,
+                status: "NOT_STARTED",
+                issuedBy: doc.issuedBy,
+                requiresDocuments: doc.requiresDocuments,
+                lastUpdated: new Date(),
+                comments: null,
+                documentUrl: null,
+              };
+            }
+          );
+          break;
+
+        case "08": // Fresh Fruits
+          documentStatus = {
+            "Phytosanitary Certificate": {
+              name: "Phytosanitary Certificate",
+              status: "PENDING",
+              agencyType: "PHYTOSANITARY",
+              agencyName: "Phytosanitary Department",
+              lastUpdated: new Date(),
+              comments: null,
+              documentUrl: null,
+            },
+            "Pesticide Residue Test Report": {
+              name: "Pesticide Residue Test Report",
+              status: "PENDING",
+              agencyType: "PHYTOSANITARY",
+              agencyName: "Phytosanitary Department",
+              lastUpdated: new Date(),
+              comments: null,
+              documentUrl: null,
+            },
+            "Cold Chain Compliance Certificate": {
+              name: "Cold Chain Compliance Certificate",
+              status: "PENDING",
+              agencyType: "QUALITY",
+              agencyName: "Quality Control Department",
+              lastUpdated: new Date(),
+              comments: null,
+              documentUrl: null,
+            },
+            "Packaging Declaration": {
+              name: "Packaging Declaration",
+              status: "PENDING",
+              agencyType: "QUALITY",
+              agencyName: "Quality Control Department",
+              lastUpdated: new Date(),
+              comments: null,
+              documentUrl: null,
+            },
           };
           break;
-  
-        case '30': // Pharmaceuticals
+
+        case "30": // Pharmaceuticals
           documentStatus = {
-            'GMP Certificate': {
-              name: 'GMP Certificate',
-              status: 'PENDING',
-              agencyType: 'PHARMA',
-              agencyName: 'Pharmaceutical Control Board',
+            "GMP Certificate": {
+              name: "GMP Certificate",
+              status: "PENDING",
+              agencyType: "PHARMA",
+              agencyName: "Pharmaceutical Control Board",
               lastUpdated: new Date(),
               comments: null,
-              documentUrl: null
+              documentUrl: null,
             },
-            'Drug Registration Certificate': {
-              name: 'Drug Registration Certificate',
-              status: 'PENDING',
-              agencyType: 'PHARMA',
-              agencyName: 'Pharmaceutical Control Board',
+            "Drug Registration Certificate": {
+              name: "Drug Registration Certificate",
+              status: "PENDING",
+              agencyType: "PHARMA",
+              agencyName: "Pharmaceutical Control Board",
               lastUpdated: new Date(),
               comments: null,
-              documentUrl: null
+              documentUrl: null,
             },
-            'Certificate of Pharmaceutical Product': {
-              name: 'Certificate of Pharmaceutical Product',
-              status: 'PENDING',
-              agencyType: 'PHARMA',
-              agencyName: 'Pharmaceutical Control Board',
+            "Certificate of Pharmaceutical Product": {
+              name: "Certificate of Pharmaceutical Product",
+              status: "PENDING",
+              agencyType: "PHARMA",
+              agencyName: "Pharmaceutical Control Board",
               lastUpdated: new Date(),
               comments: null,
-              documentUrl: null
+              documentUrl: null,
             },
-            'Stability Study Report': {
-              name: 'Stability Study Report',
-              status: 'PENDING',
-              agencyType: 'PHARMA',
-              agencyName: 'Pharmaceutical Control Board',
+            "Stability Study Report": {
+              name: "Stability Study Report",
+              status: "PENDING",
+              agencyType: "PHARMA",
+              agencyName: "Pharmaceutical Control Board",
               lastUpdated: new Date(),
               comments: null,
-              documentUrl: null
-            }
+              documentUrl: null,
+            },
           };
           break;
       }
-  
+
       // Add the processed cargo with document status
       processedCargo[cargoId] = {
         ...cargo,
         documentStatus,
         isCustomsCleared: false,
-        documents: cargo.documents || {}
+        documents: cargo.documents || {},
       };
     });
-  
+
     // Prepare the booking data
     const bookingData = {
       ...formData,
       cargo: processedCargo,
       userEmail: user.email,
     };
-  
+
     try {
       if (editingId) {
         // Update existing booking
         const response = await updateBooking(editingId, bookingData);
         setBookingData((prev) =>
           prev.map((booking) =>
-            booking.bookingId === editingId ? { ...bookingData, bookingId: editingId } : booking
+            booking.bookingId === editingId
+              ? { ...bookingData, bookingId: editingId }
+              : booking
           )
         );
       } else {
         // Create new booking
         const response = await createBooking(bookingData);
-        setBookingData((prev) => [...prev, { ...bookingData, bookingId: response.id }]);
+        setBookingData((prev) => [
+          ...prev,
+          { ...bookingData, bookingId: response.id },
+        ]);
       }
       handleCloseDialog();
     } catch (error) {
@@ -551,9 +559,11 @@ const BookingForm = ({ user }) => {
   const handleDelete = async (id) => {
     try {
       await deleteBooking(id);
-      setBookingData(prev => prev.filter(booking => booking.bookingId !== id));
+      setBookingData((prev) =>
+        prev.filter((booking) => booking.bookingId !== id)
+      );
     } catch (error) {
-      console.error('Error deleting booking:', error);
+      console.error("Error deleting booking:", error);
     }
   };
 
@@ -579,140 +589,6 @@ const BookingForm = ({ user }) => {
             advancedDeclaration: null,
             exportDocument: null,
           },
-          // documentStatus: {
-          //   // Fresh Fruits Documents
-          //   "Phytosanitary Certificate": {
-          //     status: "IN_PROGRESS",
-          //     lastUpdated: null,
-          //     agencyType: "PHYTOSANITARY",
-          //     agencyName: "Phytosanitary Department",
-          //     comments: null,
-          //     documentUrl: null,
-          //   },
-          //   "Pesticide Residue Test Report": {
-          //     status: "IN_PROGRESS",
-          //     lastUpdated: null,
-          //     agencyType: "PHYTOSANITARY",
-          //     agencyName: "Phytosanitary Department",
-          //     comments: null,
-          //     documentUrl: null,
-          //   },
-          //   "Cold Chain Compliance Certificate": {
-          //     status: "IN_PROGRESS",
-          //     lastUpdated: null,
-          //     agencyType: "QUALITY",
-          //     agencyName: "Quality Control Department",
-          //     comments: null,
-          //     documentUrl: null,
-          //   },
-          //   "Packaging Declaration": {
-          //     status: "IN_PROGRESS",
-          //     lastUpdated: null,
-          //     agencyType: "QUALITY",
-          //     agencyName: "Quality Control Department",
-          //     comments: null,
-          //     documentUrl: null,
-          //   },
-          //   // Live Animals Documents
-          //   "Veterinary Health Certificate": {
-          //     status: "IN_PROGRESS",
-          //     lastUpdated: null,
-          //     agencyType: "VETERINARY",
-          //     agencyName: "National Veterinary Authority",
-          //     comments: null,
-          //     documentUrl: null,
-          //   },
-          //   "Animal Welfare Certification": {
-          //     status: "IN_PROGRESS",
-          //     lastUpdated: null,
-          //     agencyType: "WELFARE",
-          //     agencyName: "Animal Welfare Board",
-          //     comments: null,
-          //     documentUrl: null,
-          //   },
-          //   "CITES Permit": {
-          //     status: "IN_PROGRESS",
-          //     lastUpdated: null,
-          //     agencyType: "SECURITY",
-          //     agencyName: "CITES Authority",
-          //     comments: null,
-          //     documentUrl: null,
-          //   },
-          //   "Quarantine Clearance Certificate": {
-          //     status: "IN_PROGRESS",
-          //     lastUpdated: null,
-          //     agencyType: "VETERINARY",
-          //     agencyName: "Quarantine Department",
-          //     comments: null,
-          //     documentUrl: null,
-          //   },
-          //   // Pharmaceutical Documents
-          //   "GMP Certificate": {
-          //     status: "IN_PROGRESS",
-          //     lastUpdated: null,
-          //     agencyType: "PHARMA",
-          //     agencyName: "Pharmaceutical Control Board",
-          //     comments: null,
-          //     documentUrl: null,
-          //   },
-          //   "Drug Registration Certificate": {
-          //     status: "IN_PROGRESS",
-          //     lastUpdated: null,
-          //     agencyType: "PHARMA",
-          //     agencyName: "Pharmaceutical Control Board",
-          //     comments: null,
-          //     documentUrl: null,
-          //   },
-          //   "Certificate of Pharmaceutical Product": {
-          //     status: "IN_PROGRESS",
-          //     lastUpdated: null,
-          //     agencyType: "PHARMA",
-          //     agencyName: "Pharmaceutical Control Board",
-          //     comments: null,
-          //     documentUrl: null,
-          //   },
-          //   "Stability Study Report": {
-          //     status: "IN_PROGRESS",
-          //     lastUpdated: null,
-          //     agencyType: "PHARMA",
-          //     agencyName: "Pharmaceutical Control Board",
-          //     comments: null,
-          //     documentUrl: null,
-          //   },
-          //   // Common Documents
-          //   "Export License": {
-          //     status: "IN_PROGRESS",
-          //     lastUpdated: null,
-          //     agencyType: "CUSTOMS",
-          //     agencyName: "Customs Department",
-          //     comments: null,
-          //     documentUrl: null,
-          //   },
-          //   "Commercial Invoice": {
-          //     status: "IN_PROGRESS",
-          //     lastUpdated: null,
-          //     agencyType: "CUSTOMS",
-          //     agencyName: "Customs Department",
-          //     comments: null,
-          //     documentUrl: null,
-          //   },
-          //   "Certificate of Origin": {
-          //     status: "IN_PROGRESS",
-          //     lastUpdated: null,
-          //     agencyType: "CUSTOMS",
-          //     agencyName: "Chamber of Commerce",
-          //     comments: null,
-          //     documentUrl: null,
-          //   },
-          //   "Packing List": {
-          //     status: "IN_PROGRESS",
-          //     lastUpdated: null,
-          //     agencyType: "CUSTOMS",
-          //     agencyName: "Customs Department",
-          //     comments: null,
-          //     documentUrl: null,
-          //   }
-          // }
         },
       },
     }));
@@ -769,640 +645,698 @@ const BookingForm = ({ user }) => {
 
   const getStatusIcon = (status) => {
     switch (status) {
-        case "success":
-            return <CheckCircleIcon fontSize="small" />;
-        case "error":
-            return <ErrorIcon fontSize="small" />;
-        default:
-            return <UploadFileIcon fontSize="small" />;
+      case "success":
+        return <CheckCircleIcon fontSize="small" />;
+      case "error":
+        return <ErrorIcon fontSize="small" />;
+      default:
+        return <UploadFileIcon fontSize="small" />;
     }
-};
+  };
 
-const handleDocumentUpload = async (cargoId, documentType, file) => {
+  const handleDocumentUpload = async (cargoId, documentType, file) => {
     if (!file) return;
 
     try {
-        setUploadStatus((prev) => ({
-            ...prev,
-            [cargoId]: { ...prev[cargoId], [documentType]: "uploading" },
-        }));
+      setUploadStatus((prev) => ({
+        ...prev,
+        [cargoId]: { ...prev[cargoId], [documentType]: "uploading" },
+      }));
 
-        const result = await uploadBookingDocument(editingId, cargoId, documentType, file);
+      const result = await uploadBookingDocument(
+        editingId,
+        cargoId,
+        documentType,
+        file
+      );
 
-        const updatedFormData = {
-            ...formData,
-            cargo: {
-                ...formData.cargo,
-                [cargoId]: {
-                    ...formData.cargo[cargoId],
-                    documents: {
-                        ...formData.cargo[cargoId].documents,
-                        [documentType]: result.url
-                    }
-                }
-            }
-        };
+      const updatedFormData = {
+        ...formData,
+        cargo: {
+          ...formData.cargo,
+          [cargoId]: {
+            ...formData.cargo[cargoId],
+            documents: {
+              ...formData.cargo[cargoId].documents,
+              [documentType]: result.url,
+            },
+          },
+        },
+      };
 
-        const allDocsUploaded =
-            updatedFormData.cargo[cargoId].documents.vgm &&
-            updatedFormData.cargo[cargoId].documents.advancedDeclaration &&
-            updatedFormData.cargo[cargoId].documents.exportDocument;
+      const allDocsUploaded =
+        updatedFormData.cargo[cargoId].documents.vgm &&
+        updatedFormData.cargo[cargoId].documents.advancedDeclaration &&
+        updatedFormData.cargo[cargoId].documents.exportDocument;
 
-        updatedFormData.cargo[cargoId].isDocumentsChecked = allDocsUploaded;
+      updatedFormData.cargo[cargoId].isDocumentsChecked = allDocsUploaded;
 
-        setFormData(updatedFormData);
-        setUploadStatus((prev) => ({
-            ...prev,
-            [cargoId]: { ...prev[cargoId], [documentType]: "success" },
-        }));
+      setFormData(updatedFormData);
+      setUploadStatus((prev) => ({
+        ...prev,
+        [cargoId]: { ...prev[cargoId], [documentType]: "success" },
+      }));
     } catch (error) {
-        console.error("Error uploading document:", error);
-        setUploadStatus((prev) => ({
-            ...prev,
-            [cargoId]: { ...prev[cargoId], [documentType]: "error" },
-        }));
+      console.error("Error uploading document:", error);
+      setUploadStatus((prev) => ({
+        ...prev,
+        [cargoId]: { ...prev[cargoId], [documentType]: "error" },
+      }));
     }
-};
+  };
 
-const renderDocumentUpload = (cargoId) => {
+  const renderDocumentUpload = (cargoId) => {
     const documents = [
-        { type: "vgm", label: "Verified Gross Mass (VGM)" },
-        { type: "advancedDeclaration", label: "Advanced Declaration" },
-        { type: "exportDocument", label: "Export Document" },
+      { type: "vgm", label: "Verified Gross Mass (VGM)" },
+      { type: "advancedDeclaration", label: "Advanced Declaration" },
+      { type: "exportDocument", label: "Export Document" },
     ];
 
+    const handleViewDocument = async (cargoId, documentType) => {
+      try {
+          const document = await retrieveBookingDocument(editingId, cargoId, documentType);
+          // document now has {url: "https://storage...", fileName: "filename.pdf"}
+          
+          // Simply open in new tab
+          window.open(document.url, '_blank');
+  
+          // Or if you want to force download:
+          // const link = document.createElement('a');
+          // link.href = document.url;
+          // link.download = document.fileName;
+          // document.body.appendChild(link);
+          // link.click();
+          // document.body.removeChild(link);
+      } catch (error) {
+          console.error('Error viewing document:', error);
+          // Handle error - maybe show an alert or notification
+      }
+  };
+  
+
     return (
-        <Grid item xs={12}>
-            <Paper sx={{ p: 2, mt: 2, bgcolor: "background.default" }}>
-                <Typography variant="subtitle1" gutterBottom fontWeight="medium">
-                    Required Documents
-                </Typography>
-                {!formData.cargo[cargoId].isDocumentsChecked && (
-                    <Alert
-                        severity="error"
-                        sx={{ mt: 2, mb: 2, borderRadius: "8px" }}
-                        icon={<CancelIcon fontSize="small" />}
-                    >
-                        Please Submit All Documents
-                    </Alert>
-                )}
-                {formData.cargo[cargoId].isDocumentsChecked && (
-                    <Alert
-                        severity="success"
-                        sx={{ mt: 2, mb: 2, borderRadius: "8px" }}
-                        icon={<CheckCircleIcon fontSize="small" />}
-                    >
-                        All required documents have been uploaded and verified
-                    </Alert>
-                )}
-                <Stack spacing={2}>
-                    {documents.map(({ type, label }) => (
-                        <Box key={type}>
-                            <Grid container spacing={2} alignItems="center">
-                                <Grid item xs={12} sm={6}>
-                                    <Typography variant="body2" color="text.secondary">
-                                        {label}
-                                    </Typography>
-                                </Grid>
-                                <Grid item xs={12} sm={6}>
-                                    <Stack direction="row" spacing={1} alignItems="center">
-                                        <input
-                                            accept="application/pdf"
-                                            style={{ display: "none" }}
-                                            id={`${type}-upload-${cargoId}`}
-                                            type="file"
-                                            onChange={(e) =>
-                                                handleDocumentUpload(cargoId, type, e.target.files[0])
-                                            }
-                                        />
-                                        <label
-                                            htmlFor={`${type}-upload-${cargoId}`}
-                                            style={{ width: "100%" }}
-                                        >
-                                            <Button
-                                                variant="outlined"
-                                                component="span"
-                                                startIcon={
-                                                    formData.cargo[cargoId]?.documents?.[type] ? (
-                                                        <CheckCircleIcon fontSize="small" />
-                                                    ) : (
-                                                        <UploadFileIcon fontSize="small" />
-                                                    )
-                                                }
-                                                fullWidth
-                                                color={
-                                                    formData.cargo[cargoId]?.documents?.[type]
-                                                        ? "success"
-                                                        : "primary"
-                                                }
-                                                size="small"
-                                                sx={{
-                                                    borderRadius: "8px",
-                                                    textTransform: "none",
-                                                    minHeight: "36px",
-                                                }}
-                                            >
-                                                {formData.cargo[cargoId]?.documents?.[type]
-                                                    ? "Replace Document"
-                                                    : "Upload Document"}
-                                            </Button>
-                                        </label>
-                                        {uploadStatus[cargoId]?.[type] && (
-                                            <Chip
-                                                size="small"
-                                                label={uploadStatus[cargoId]?.[type]}
-                                                color={getStatusColor(uploadStatus[cargoId][type])}
-                                                icon={getStatusIcon(uploadStatus[cargoId][type])}
-                                            />
-                                        )}
-                                    </Stack>
-                                    {uploadStatus[cargoId]?.[type] === "uploading" && (
-                                        <LinearProgress sx={{ mt: 1 }} />
-                                    )}
-                                </Grid>
-                            </Grid>
-                        </Box>
-                    ))}
-                </Stack>
-            </Paper>
-        </Grid>
-    );
-};
-
-return (
-    <Container maxWidth="lg" sx={{ mt: 4 }}>
-        <Box
-            display="flex"
-            justifyContent="space-between"
-            alignItems="center"
-            mb={3}
-        >
-            <Typography variant="h4">Bookings</Typography>
-            <Button
-                variant="contained"
-                color="primary"
-                onClick={() => handleOpenDialog()}
+      <Grid item xs={12}>
+        <Paper sx={{ p: 2, mt: 2, bgcolor: "background.default" }}>
+          <Typography variant="subtitle1" gutterBottom fontWeight="medium">
+            Required Documents
+          </Typography>
+          {!formData.cargo[cargoId].isDocumentsChecked && (
+            <Alert
+              severity="error"
+              sx={{ mt: 2, mb: 2, borderRadius: "8px" }}
+              icon={<CancelIcon fontSize="small" />}
             >
-                Create Booking
-            </Button>
-        </Box>
-
-        <TableContainer component={Paper} sx={{ mt: 2 }}>
-            <Table>
-                <TableHead>
-                    <TableRow>
-                        <TableCell>Booking ID</TableCell>
-                        <TableCell>Port of Loading</TableCell>
-                        <TableCell>Port of Destination</TableCell>
-                        <TableCell>Cut-off Deadline</TableCell>
-                        <TableCell>ETA</TableCell>
-                        <TableCell>ETD</TableCell>
-                        <TableCell>Actions</TableCell>
-                    </TableRow>
-                </TableHead>
-                <TableBody>
-                    {bookingData.map((booking) => (
-                        <React.Fragment key={booking.bookingId}>
-                            <TableRow>
-                                <TableCell style={{ width: "100px", borderBottom: "none" }}>
-                                    {booking.bookingId}
-                                </TableCell>
-                                <TableCell style={{ borderBottom: "none" }}>
-                                    {booking.portLoading}
-                                </TableCell>
-                                <TableCell style={{ borderBottom: "none" }}>
-                                    {booking.portDestination}
-                                </TableCell>
-                                <TableCell style={{ borderBottom: "none" }}>
-                                    {booking.cutoffDeadline}
-                                </TableCell>
-                                <TableCell style={{ borderBottom: "none" }}>
-                                    {booking.eta}
-                                </TableCell>
-                                <TableCell style={{ borderBottom: "none" }}>
-                                    {booking.etd}
-                                </TableCell>
-                                <TableCell style={{ borderBottom: "none" }}>
-                                    <IconButton
-                                        onClick={() => handleOpenDialog(booking)}
-                                        color="primary"
-                                    >
-                                        <EditIcon />
-                                    </IconButton>
-                                    <IconButton
-                                        onClick={() => handleDelete(booking.bookingId)}
-                                        color="secondary"
-                                    >
-                                        <DeleteIcon />
-                                    </IconButton>
-                                </TableCell>
-                            </TableRow>
-
-                            <TableRow>
-                                <TableCell colSpan={7} style={{ paddingBottom: 0, paddingTop: 0 }}>
-                                    <Accordion>
-                                        <AccordionSummary expandIcon={<ExpandMore />}>
-                                            <Typography>
-                                                Additional information for{" "}
-                                                <span style={{ color: "purple" }}>
-                                                    {booking.bookingId}
-                                                </span>
-                                            </Typography>
-                                        </AccordionSummary>
-                                        <AccordionDetails>
-                                            <Grid container spacing={2}>
-                                                <Grid item xs={6}>
-                                                    <Typography>
-                                                        <strong>Pickup Date:</strong> {booking.pickupDate}
-                                                    </Typography>
-                                                </Grid>
-                                                <Grid item xs={6}>
-                                                    <Typography>
-                                                        <strong>Free Time (days):</strong>{" "}
-                                                        {booking.freeTime}
-                                                    </Typography>
-                                                </Grid>
-                                                <Grid item xs={6}>
-                                                    <Typography>
-                                                        <strong>Port of Loading:</strong>{" "}
-                                                        {booking.portLoading}
-                                                    </Typography>
-                                                </Grid>
-                                                <Grid item xs={6}>
-                                                    <Typography>
-                                                        <strong>Port of Destination:</strong>{" "}
-                                                        {booking.portDestination}
-                                                    </Typography>
-                                                </Grid>
-                                                <Grid item xs={6}>
-                                                    <Typography>
-                                                        <strong>ETA:</strong> {booking.eta}
-                                                    </Typography>
-                                                </Grid>
-                                                <Grid item xs={6}>
-                                                    <Typography>
-                                                        <strong>ETD:</strong> {booking.etd}
-                                                    </Typography>
-                                                </Grid>
-                                                <Grid item xs={6}>
-                                                    <Typography>
-                                                        <strong>Cut-off Deadline:</strong>{" "}
-                                                        {booking.cutoffDeadline}
-                                                    </Typography>
-                                                </Grid>
-
-                                                <Grid item xs={12}>
-                                                    <Typography variant="h6" gutterBottom>
-                                                        Cargo Details
-                                                    </Typography>
-                                                    {booking.cargo &&
-                                                        Object.entries(booking.cargo).map(
-                                                            ([key, cargoItem]) => (
-                                                                <Paper key={key} sx={{ p: 2, mb: 2 }}>
-                                                                    <Typography>
-                                                                        <strong>Cargo Item {key}:</strong>
-                                                                    </Typography>
-                                                                    <Typography>
-                                                                        Name: {cargoItem.name}
-                                                                    </Typography>
-                                                                    <Typography>
-                                                                        Quantity: {cargoItem.quantity}{" "}
-                                                                        {cargoItem.unit}
-                                                                    </Typography>
-                                                                    <Typography>
-                                                                        Description: {cargoItem.description}
-                                                                    </Typography>
-                                                                    <Typography>
-                                                                        Weight per Unit: {cargoItem.weightPerUnit}{" "}
-                                                                        kg
-                                                                    </Typography>
-                                                                    <Typography>
-                                                                        Cargo Type: {cargoItem.cargoType}
-                                                                    </Typography>
-                                                                    <Typography>
-                                                                        <strong>HS Code:</strong>{" "}
-                                                                        {cargoItem.hsCode}
-                                                                    </Typography>
-                                                                    <BookingSteps
-                                                                        isContainerRented={
-                                                                            cargoItem.isContainerRented
-                                                                        }
-                                                                        isTruckBooked={cargoItem.isTruckBooked}
-                                                                        isCustomsCleared={
-                                                                            cargoItem.isCustomsCleared
-                                                                        }
-                                                                        isDocumentsChecked={
-                                                                            cargoItem.isDocumentsChecked
-                                                                        }
-                                                                    />
-                                                                </Paper>
-                                                            )
-                                                        )}
-                                                </Grid>
-                                            </Grid>
-                                        </AccordionDetails>
-                                    </Accordion>
-                                    <br />
-                                </TableCell>
-                            </TableRow>
-                        </React.Fragment>
-                    ))}
-                </TableBody>
-            </Table>
-        </TableContainer>
-
-        <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-            <DialogTitle>
-                {editingId ? `Edit Booking ID: ${editingId}` : "Create Booking"}
-            </DialogTitle>
-            <DialogContent>
-                <Grid container spacing={2}>
-                    <Grid item xs={6}>
-                        <FormControl fullWidth required>
-                            <InputLabel>Vessel Name</InputLabel>
-                            <Select
-                                value={selectedVessel}
-                                onChange={handleVesselChange}
-                                label="Vessel Name"
-                                disabled={!!editingId} 
-                            >
-                                {vesselVisits.map((visit) => (
-                                    <MenuItem key={visit.vesselName} value={visit.vesselName}>
-                                        {visit.vesselName}
-                                    </MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-                    </Grid>
-                    <Grid item xs={6}>
-                        <FormControl fullWidth required disabled={!selectedVessel}>
-                            <InputLabel>Voyage Number</InputLabel>
-                            <Select
-                                value={formData.voyageNumber || ""}
-                                onChange={handleVoyageChange}
-                                label="Voyage Number"
-                                disabled={!!editingId} 
-                            >
-                                {availableVoyages.map((voyage) => (
-                                    <MenuItem
-                                        key={voyage.voyageNumber}
-                                        value={voyage.voyageNumber}
-                                    >
-                                        {voyage.voyageNumber} ({voyage.departurePort} →{" "}
-                                        {voyage.arrivalPort})
-                                    </MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-                    </Grid>
-
-                    <Grid item xs={6}>
-                        <TextField
-                            label="Port of Loading"
-                            name="portLoading"
-                            value={formData.portLoading}
-                            onChange={handleChange}
-                            fullWidth
-                            required
-                            disabled
+              Please Submit All Documents
+            </Alert>
+          )}
+          {formData.cargo[cargoId].isDocumentsChecked && (
+            <Alert
+              severity="success"
+              sx={{ mt: 2, mb: 2, borderRadius: "8px" }}
+              icon={<CheckCircleIcon fontSize="small" />}
+            >
+              All required documents have been uploaded and verified
+            </Alert>
+          )}
+          <Stack spacing={2}>
+            {documents.map(({ type, label }) => (
+              <Box key={type}>
+                <Grid container spacing={2} alignItems="center">
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" color="text.secondary">
+                      {label}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <input
+                        accept="application/pdf"
+                        style={{ display: "none" }}
+                        id={`${type}-upload-${cargoId}`}
+                        type="file"
+                        onChange={(e) =>
+                          handleDocumentUpload(cargoId, type, e.target.files[0])
+                        }
+                      />
+                      <label
+                        htmlFor={`${type}-upload-${cargoId}`}
+                        style={{ width: "100%" }}
+                      >
+                        <Button
+                          variant="outlined"
+                          component="span"
+                          startIcon={
+                            formData.cargo[cargoId]?.documents?.[type] ? (
+                              <CheckCircleIcon fontSize="small" />
+                            ) : (
+                              <UploadFileIcon fontSize="small" />
+                            )
+                          }
+                          fullWidth
+                          color={
+                            formData.cargo[cargoId]?.documents?.[type]
+                              ? "success"
+                              : "primary"
+                          }
+                          size="small"
+                          sx={{
+                            borderRadius: "8px",
+                            textTransform: "none",
+                            minHeight: "36px",
+                          }}
+                        >
+                          {formData.cargo[cargoId]?.documents?.[type]
+                            ? "Replace Document"
+                            : "Upload Document"}
+                        </Button>
+                      </label>
+                      {uploadStatus[cargoId]?.[type] && (
+                        <Chip
+                          size="small"
+                          label={uploadStatus[cargoId]?.[type]}
+                          color={getStatusColor(uploadStatus[cargoId][type])}
+                          icon={getStatusIcon(uploadStatus[cargoId][type])}
                         />
-                    </Grid>
-                    <Grid item xs={6}>
-                            <TextField
-                                label="Port of Destination"
-                                name="portDestination"
-                                value={formData.portDestination}
-                                onChange={handleChange}
-                                fullWidth
-                                required
-                                disabled
-                            />
-                        </Grid>
-                        <Grid item xs={6}>
-                            <TextField
-                                label="Pickup Date"
-                                name="pickupDate"
-                                type="date"
-                                value={formData.pickupDate}
-                                onChange={handleChange}
-                                fullWidth
-                                InputLabelProps={{ shrink: true }}
-                                required
-                            />
-                        </Grid>
-                        <Grid item xs={6}>
-                            <TextField
-                                label="Free Time (days)"
-                                name="freeTime"
-                                type="number"
-                                value={formData.freeTime}
-                                onChange={handleChange}
-                                fullWidth
-                                required
-                            />
-                        </Grid>
-
-                        <Grid item xs={6}>
-                            <TextField
-                                label="ETA"
-                                name="eta"
-                                type="datetime-local"
-                                value={formData.eta}
-                                onChange={handleChange}
-                                InputLabelProps={{ shrink: true }}
-                                fullWidth
-                                required
-                            />
-                        </Grid>
-                        <Grid item xs={6}>
-                            <TextField
-                                label="ETD"
-                                name="etd"
-                                type="datetime-local"
-                                value={formData.etd}
-                                onChange={handleChange}
-                                InputLabelProps={{ shrink: true }}
-                                fullWidth
-                                required
-                            />
-                        </Grid>
-                        <Grid item xs={6}>
-                            <TextField
-                                label="Cut-off Deadline"
-                                name="cutoffDeadline"
-                                type="datetime-local"
-                                value={formData.cutoffDeadline}
-                                onChange={handleChange}
-                                InputLabelProps={{ shrink: true }}
-                                fullWidth
-                                required
-                            />
-                        </Grid>
-
-                        <Grid item xs={12}>
-                            <Typography variant="h6" gutterBottom>
-                                Cargo Details
-                            </Typography>
-                        </Grid>
-                        {Object.entries(formData.cargo).map(([cargoId, cargoItem]) => (
-                            <Grid item xs={12} key={cargoId}>
-                                <Paper sx={{ p: 2, position: "relative" }}>
-                                    <Grid container spacing={2}>
-                                        <Grid item xs={12}>
-                                            <Box
-                                                display="flex"
-                                                justifyContent="space-between"
-                                                alignItems="center"
-                                            >
-                                                <Typography variant="subtitle1">
-                                                    Cargo ID: {cargoId}
-                                                </Typography>
-                                                {Object.keys(formData.cargo).length > 1 && (
-                                                    <IconButton
-                                                        onClick={() => handleRemoveCargo(cargoId)}
-                                                        size="small"
-                                                        color="error"
-                                                    >
-                                                        <DeleteIcon />
-                                                    </IconButton>
-                                                )}
-                                            </Box>
-                                        </Grid>
-                                        <Grid item xs={12} sm={6}>
-                                            <TextField
-                                                fullWidth
-                                                label="Name"
-                                                value={cargoItem.name}
-                                                onChange={(e) =>
-                                                    handleCargoChange(cargoId, "name", e.target.value)
-                                                }
-                                                required
-                                            />
-                                        </Grid>
-                                        <Grid item xs={12} sm={6}>
-                                            <HSCodeLookup
-                                                value={
-                                                    cargoItem.hsCode
-                                                        ? {
-                                                            code: cargoItem.hsCode,
-                                                            description: cargoItem.hsCodeDescription,
-                                                        }
-                                                        : null
-                                                }
-                                                onChange={(value) =>
-                                                    handleCargoChange(cargoId, "hsCode", value)
-                                                }
-                                                editMode={!!editingId}
-                                                helperText="Search by product description or code"
-                                            />
-                                        </Grid>
-                                        <Grid item xs={12}>
-                                            <TextField
-                                                fullWidth
-                                                label="Description"
-                                                value={cargoItem.description}
-                                                onChange={(e) =>
-                                                    handleCargoChange(cargoId, "description", e.target.value)
-                                                }
-                                                multiline
-                                                rows={4}
-                                                required
-                                            />
-                                        </Grid>
-                                        <Grid item xs={12} sm={4}>
-                                            <TextField
-                                                fullWidth
-                                                label="Quantity"
-                                                type="number"
-                                                value={cargoItem.quantity}
-                                                onChange={(e) =>
-                                                    handleCargoChange(cargoId, "quantity", e.target.value)
-                                                }
-                                                required
-                                            />
-                                        </Grid>
-                                        <Grid item xs={12} sm={4}>
-                                            <FormControl fullWidth>
-                                                <InputLabel>Unit</InputLabel>
-                                                <Select
-                                                    value={cargoItem.unit || "pieces"}
-                                                    onChange={(e) =>
-                                                        handleCargoChange(cargoId, "unit", e.target.value)
-                                                    }
-                                                    label="Unit"
-                                                    required
-                                                >
-                                                    <MenuItem value="pieces">Pieces</MenuItem>
-                                                    <MenuItem value="boxes">Boxes</MenuItem>
-                                                    <MenuItem value="bottles">Bottles</MenuItem>
-                                                    <MenuItem value="ampoules">Ampoules</MenuItem>
-                                                    <MenuItem value="kg">Kilograms (kg)</MenuItem>
-                                                    <MenuItem value="g">Grams (g)</MenuItem>
-                                                    <MenuItem value="liters">Liters</MenuItem>
-                                                    <MenuItem value="milliliters">Milliliters</MenuItem>
-                                                </Select>
-                                            </FormControl>
-                                        </Grid>
-                                        <Grid item xs={12} sm={4}>
-                                            <TextField
-                                                fullWidth
-                                                label="Weight per Unit (kg)"
-                                                type="number"
-                                                value={cargoItem.weightPerUnit}
-                                                onChange={(e) =>
-                                                    handleCargoChange(cargoId, "weightPerUnit", e.target.value)
-                                                }
-                                                required
-                                            />
-                                        </Grid>
-                                        <Grid item xs={12} sm={4}>
-                                            <FormControl fullWidth>
-                                                <InputLabel>Cargo Type</InputLabel>
-                                                <Select
-                                                    value={cargoItem.cargoType}
-                                                    onChange={(e) =>
-                                                        handleCargoChange(cargoId, "cargoType", e.target.value)
-                                                    }
-                                                    label="Cargo Type"
-                                                    required
-                                                >
-                                                    {cargoTypes.map((type) => (
-                                                        <MenuItem key={type} value={type}>
-                                                            {type}
-                                                        </MenuItem>
-                                                    ))}
-                                                </Select>
-                                            </FormControl>
-                                        </Grid>
-                                    </Grid>
-                                    {editingId && renderDocumentUpload(cargoId)}
-                                </Paper>
-                            </Grid>
-                        ))}
-
-                        <Grid item xs={12}>
-                            <Button
-                                startIcon={<AddCircleOutlineIcon />}
-                                onClick={handleAddCargo}
-                                variant="outlined"
-                                fullWidth
-                            >
-                                Add Cargo Item
-                            </Button>
-                        </Grid>
-                    </Grid>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleCloseDialog} color="secondary">
-                        Cancel
-                    </Button>
-                    <Button onClick={handleSubmit} color="primary" variant="contained">
-                        Submit
-                    </Button>
-                </DialogActions>
-            </Dialog>
-        </Container>
+                      )}
+                      {formData.cargo[cargoId]?.documents?.[type] && (
+                        <Button
+                          variant="outlined"
+                          onClick={() => handleViewDocument(cargoId, type)}
+                          startIcon={<VisibilityIcon />}
+                          size="small"
+                          sx={{ ml: 1 }}
+                        >
+                          View
+                        </Button>
+                      )}
+                    </Stack>
+                    {uploadStatus[cargoId]?.[type] === "uploading" && (
+                      <LinearProgress sx={{ mt: 1 }} />
+                    )}
+                  </Grid>
+                </Grid>
+              </Box>
+            ))}
+          </Stack>
+        </Paper>
+      </Grid>
     );
+  };
+
+  return (
+    <Container maxWidth="lg" sx={{ mt: 4 }}>
+      <Box
+        display="flex"
+        justifyContent="space-between"
+        alignItems="center"
+        mb={3}
+      >
+        <Typography variant="h4">Bookings</Typography>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={() => handleOpenDialog()}
+        >
+          Create Booking
+        </Button>
+      </Box>
+
+      <TableContainer component={Paper} sx={{ mt: 2 }}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>Booking ID</TableCell>
+              <TableCell>Port of Loading</TableCell>
+              <TableCell>Port of Destination</TableCell>
+              <TableCell>Cut-off Deadline</TableCell>
+              <TableCell>ETA</TableCell>
+              <TableCell>ETD</TableCell>
+              <TableCell>Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {bookingData.map((booking) => (
+              <React.Fragment key={booking.bookingId}>
+                <TableRow>
+                  <TableCell style={{ width: "100px", borderBottom: "none" }}>
+                    {booking.bookingId}
+                  </TableCell>
+                  <TableCell style={{ borderBottom: "none" }}>
+                    {booking.portLoading}
+                  </TableCell>
+                  <TableCell style={{ borderBottom: "none" }}>
+                    {booking.portDestination}
+                  </TableCell>
+                  <TableCell style={{ borderBottom: "none" }}>
+                    {booking.cutoffDeadline}
+                  </TableCell>
+                  <TableCell style={{ borderBottom: "none" }}>
+                    {booking.eta}
+                  </TableCell>
+                  <TableCell style={{ borderBottom: "none" }}>
+                    {booking.etd}
+                  </TableCell>
+                  <TableCell style={{ borderBottom: "none" }}>
+                    <IconButton
+                      onClick={() => handleOpenDialog(booking)}
+                      color="primary"
+                    >
+                      <EditIcon />
+                    </IconButton>
+                    <IconButton
+                      onClick={() => handleDelete(booking.bookingId)}
+                      color="secondary"
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+
+                <TableRow>
+                  <TableCell
+                    colSpan={7}
+                    style={{ paddingBottom: 0, paddingTop: 0 }}
+                  >
+                    <Accordion>
+                      <AccordionSummary expandIcon={<ExpandMore />}>
+                        <Typography>
+                          Additional information for{" "}
+                          <span style={{ color: "purple" }}>
+                            {booking.bookingId}
+                          </span>
+                        </Typography>
+                      </AccordionSummary>
+                      <AccordionDetails>
+                        <Grid container spacing={2}>
+                          <Grid item xs={6}>
+                            <Typography>
+                              <strong>Pickup Date:</strong> {booking.pickupDate}
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={6}>
+                            <Typography>
+                              <strong>Free Time (days):</strong>{" "}
+                              {booking.freeTime}
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={6}>
+                            <Typography>
+                              <strong>Port of Loading:</strong>{" "}
+                              {booking.portLoading}
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={6}>
+                            <Typography>
+                              <strong>Port of Destination:</strong>{" "}
+                              {booking.portDestination}
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={6}>
+                            <Typography>
+                              <strong>ETA:</strong> {booking.eta}
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={6}>
+                            <Typography>
+                              <strong>ETD:</strong> {booking.etd}
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={6}>
+                            <Typography>
+                              <strong>Cut-off Deadline:</strong>{" "}
+                              {booking.cutoffDeadline}
+                            </Typography>
+                          </Grid>
+
+                          <Grid item xs={12}>
+                            <Typography variant="h6" gutterBottom>
+                              Cargo Details
+                            </Typography>
+                            {booking.cargo &&
+                              Object.entries(booking.cargo).map(
+                                ([key, cargoItem]) => (
+                                  <Paper key={key} sx={{ p: 2, mb: 2 }}>
+                                    <Typography>
+                                      <strong>Cargo Item {key}:</strong>
+                                    </Typography>
+                                    <Typography>
+                                      Name: {cargoItem.name}
+                                    </Typography>
+                                    <Typography>
+                                      Quantity: {cargoItem.quantity}{" "}
+                                      {cargoItem.unit}
+                                    </Typography>
+                                    <Typography>
+                                      Description: {cargoItem.description}
+                                    </Typography>
+                                    <Typography>
+                                      Weight per Unit: {cargoItem.weightPerUnit}{" "}
+                                      kg
+                                    </Typography>
+                                    <Typography>
+                                      Cargo Type: {cargoItem.cargoType}
+                                    </Typography>
+                                    <Typography>
+                                      <strong>HS Code:</strong>{" "}
+                                      {cargoItem.hsCode}
+                                    </Typography>
+                                    <BookingSteps
+                                      isContainerRented={
+                                        cargoItem.isContainerRented
+                                      }
+                                      isTruckBooked={cargoItem.isTruckBooked}
+                                      isCustomsCleared={
+                                        cargoItem.isCustomsCleared
+                                      }
+                                      isDocumentsChecked={
+                                        cargoItem.isDocumentsChecked
+                                      }
+                                    />
+                                  </Paper>
+                                )
+                              )}
+                          </Grid>
+                        </Grid>
+                      </AccordionDetails>
+                    </Accordion>
+                    <br />
+                  </TableCell>
+                </TableRow>
+              </React.Fragment>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      <Dialog
+        open={openDialog}
+        onClose={handleCloseDialog}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          {editingId ? `Edit Booking ID: ${editingId}` : "Create Booking"}
+        </DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2}>
+            <Grid item xs={6}>
+              <FormControl fullWidth required>
+                <InputLabel>Vessel Name</InputLabel>
+                <Select
+                  value={selectedVessel}
+                  onChange={handleVesselChange}
+                  label="Vessel Name"
+                  disabled={!!editingId}
+                >
+                  {vesselVisits.map((visit) => (
+                    <MenuItem key={visit.vesselName} value={visit.vesselName}>
+                      {visit.vesselName}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={6}>
+              <FormControl fullWidth required disabled={!selectedVessel}>
+                <InputLabel>Voyage Number</InputLabel>
+                <Select
+                  value={formData.voyageNumber || ""}
+                  onChange={handleVoyageChange}
+                  label="Voyage Number"
+                  disabled={!!editingId}
+                >
+                  {availableVoyages.map((voyage) => (
+                    <MenuItem
+                      key={voyage.voyageNumber}
+                      value={voyage.voyageNumber}
+                    >
+                      {voyage.voyageNumber} ({voyage.departurePort} →{" "}
+                      {voyage.arrivalPort})
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={6}>
+              <TextField
+                label="Port of Loading"
+                name="portLoading"
+                value={formData.portLoading}
+                onChange={handleChange}
+                fullWidth
+                required
+                disabled
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                label="Port of Destination"
+                name="portDestination"
+                value={formData.portDestination}
+                onChange={handleChange}
+                fullWidth
+                required
+                disabled
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                label="Pickup Date"
+                name="pickupDate"
+                type="date"
+                value={formData.pickupDate}
+                onChange={handleChange}
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+                required
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                label="Free Time (days)"
+                name="freeTime"
+                type="number"
+                value={formData.freeTime}
+                onChange={handleChange}
+                fullWidth
+                required
+              />
+            </Grid>
+
+            <Grid item xs={6}>
+              <TextField
+                label="ETA"
+                name="eta"
+                type="datetime-local"
+                value={formData.eta}
+                onChange={handleChange}
+                InputLabelProps={{ shrink: true }}
+                fullWidth
+                required
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                label="ETD"
+                name="etd"
+                type="datetime-local"
+                value={formData.etd}
+                onChange={handleChange}
+                InputLabelProps={{ shrink: true }}
+                fullWidth
+                required
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                label="Cut-off Deadline"
+                name="cutoffDeadline"
+                type="datetime-local"
+                value={formData.cutoffDeadline}
+                onChange={handleChange}
+                InputLabelProps={{ shrink: true }}
+                fullWidth
+                required
+              />
+            </Grid>
+
+            <Grid item xs={12}>
+              <Typography variant="h6" gutterBottom>
+                Cargo Details
+              </Typography>
+            </Grid>
+            {Object.entries(formData.cargo).map(([cargoId, cargoItem]) => (
+              <Grid item xs={12} key={cargoId}>
+                <Paper sx={{ p: 2, position: "relative" }}>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12}>
+                      <Box
+                        display="flex"
+                        justifyContent="space-between"
+                        alignItems="center"
+                      >
+                        <Typography variant="subtitle1">
+                          Cargo ID: {cargoId}
+                        </Typography>
+                        {Object.keys(formData.cargo).length > 1 && (
+                          <IconButton
+                            onClick={() => handleRemoveCargo(cargoId)}
+                            size="small"
+                            color="error"
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        )}
+                      </Box>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Name"
+                        value={cargoItem.name}
+                        onChange={(e) =>
+                          handleCargoChange(cargoId, "name", e.target.value)
+                        }
+                        required
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <HSCodeLookup
+                        value={
+                          cargoItem.hsCode
+                            ? {
+                                code: cargoItem.hsCode,
+                                description: cargoItem.hsCodeDescription,
+                              }
+                            : null
+                        }
+                        onChange={(value) =>
+                          handleCargoChange(cargoId, "hsCode", value)
+                        }
+                        editMode={!!editingId}
+                        helperText="Search by product description or code"
+                      />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        label="Description"
+                        value={cargoItem.description}
+                        onChange={(e) =>
+                          handleCargoChange(
+                            cargoId,
+                            "description",
+                            e.target.value
+                          )
+                        }
+                        multiline
+                        rows={4}
+                        required
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <TextField
+                        fullWidth
+                        label="Quantity"
+                        type="number"
+                        value={cargoItem.quantity}
+                        onChange={(e) =>
+                          handleCargoChange(cargoId, "quantity", e.target.value)
+                        }
+                        required
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <FormControl fullWidth>
+                        <InputLabel>Unit</InputLabel>
+                        <Select
+                          value={cargoItem.unit || "pieces"}
+                          onChange={(e) =>
+                            handleCargoChange(cargoId, "unit", e.target.value)
+                          }
+                          label="Unit"
+                          required
+                        >
+                          <MenuItem value="pieces">Pieces</MenuItem>
+                          <MenuItem value="boxes">Boxes</MenuItem>
+                          <MenuItem value="bottles">Bottles</MenuItem>
+                          <MenuItem value="ampoules">Ampoules</MenuItem>
+                          <MenuItem value="kg">Kilograms (kg)</MenuItem>
+                          <MenuItem value="g">Grams (g)</MenuItem>
+                          <MenuItem value="liters">Liters</MenuItem>
+                          <MenuItem value="milliliters">Milliliters</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <TextField
+                        fullWidth
+                        label="Weight per Unit (kg)"
+                        type="number"
+                        value={cargoItem.weightPerUnit}
+                        onChange={(e) =>
+                          handleCargoChange(
+                            cargoId,
+                            "weightPerUnit",
+                            e.target.value
+                          )
+                        }
+                        required
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <FormControl fullWidth>
+                        <InputLabel>Cargo Type</InputLabel>
+                        <Select
+                          value={cargoItem.cargoType}
+                          onChange={(e) =>
+                            handleCargoChange(
+                              cargoId,
+                              "cargoType",
+                              e.target.value
+                            )
+                          }
+                          label="Cargo Type"
+                          required
+                        >
+                          {cargoTypes.map((type) => (
+                            <MenuItem key={type} value={type}>
+                              {type}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                  </Grid>
+                  {editingId && renderDocumentUpload(cargoId)}
+                </Paper>
+              </Grid>
+            ))}
+
+            <Grid item xs={12}>
+              <Button
+                startIcon={<AddCircleOutlineIcon />}
+                onClick={handleAddCargo}
+                variant="outlined"
+                fullWidth
+              >
+                Add Cargo Item
+              </Button>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog} color="secondary">
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} color="primary" variant="contained">
+            Submit
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Container>
+  );
 };
 
 export default BookingForm;

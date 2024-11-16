@@ -41,6 +41,7 @@ import {
   LocalShipping,
   UploadFile,
 } from "@mui/icons-material";
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import {
   getBookings,
   getBookingById,
@@ -104,6 +105,7 @@ const UploadDialog = ({ open, onClose, onUpload, documentType }) => (
 );
 
 
+ 
 
 const DocumentListItem = ({ doc, status, onUploadClick,  onViewDocument, category }) => {
   const isExporterDoc = category.documents.exporter.some(d => d.name === doc.name);
@@ -205,8 +207,9 @@ const DocumentListItem = ({ doc, status, onUploadClick,  onViewDocument, categor
         />
          {isViewable && (
             <Button 
-              size="small"
-              onClick={() => onViewDocument(doc.name)}
+            size="small"
+            onClick={() => onViewDocument(doc.name)}
+            startIcon={<VisibilityIcon />}
             >
               View
             </Button>
@@ -243,6 +246,27 @@ const CustomsPreview = () => {
     severity: "error",
   });
 
+//   const handleViewDocument = async (cargoId, documentType) => {
+//     try {
+//         const document = await retrieveBookingDocument(selectedBooking, cargoId, documentType);
+//         // document now has {url: "https://storage...", fileName: "filename.pdf"}
+        
+//         // Simply open in new tab
+//         window.open(document.url, '_blank');
+
+//         // Or if you want to force download:
+//         // const link = document.createElement('a');
+//         // link.href = document.url;
+//         // link.download = document.fileName;
+//         // document.body.appendChild(link);
+//         // link.click();
+//         // document.body.removeChild(link);
+//     } catch (error) {
+//         console.error('Error viewing document:', error);
+//         // Handle error - maybe show an alert or notification
+//     }
+// };
+
   // Handle Snackbar close
   const handleSnackbarClose = (event, reason) => {
     if (reason === "clickaway") {
@@ -252,32 +276,64 @@ const CustomsPreview = () => {
   };
 
   // Fetch bookings on component mount
-  useEffect(() => {
-    const fetchBookings = async () => {
-      try {
-        setLoading(true);
-        const bookingsData = await getBookings();
-        setBookings(bookingsData);
-      } catch (error) {
-        setSnackbar({
-          open: true,
-          message: "Error fetching bookings: " + error.message,
-          severity: "error", // or "success", "info", "warning"
-        });
-      } finally {
-        setLoading(false);
+ // In CustomsPreview.js
+ useEffect(() => {
+  const fetchBookings = async () => {
+    try {
+      setLoading(true);
+      console.log("Fetching bookings..."); // Debug log
+      
+      // Add timeout to prevent infinite loading
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timeout')), 10000)
+      );
+      
+      const bookingsPromise = getBookings();
+      const bookingsData = await Promise.race([bookingsPromise, timeoutPromise]);
+      
+      console.log("Bookings received:", bookingsData); // Debug log
+      
+      if (!Array.isArray(bookingsData)) {
+        throw new Error('Invalid data format received');
       }
-    };
+      
+      setBookings(bookingsData);
+    } catch (error) {
+      console.error("Detailed fetch error:", error);
+      setSnackbar({
+        open: true,
+        message: `Error fetching bookings: ${error.message || 'Unknown error'}`,
+        severity: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchBookings();
-  }, []);
+  fetchBookings();
+}, []);
+
+// Add a timeout effect to ensure loading state is cleared
+useEffect(() => {
+  const timer = setTimeout(() => {
+    if (loading) {
+      setLoading(false);
+      setSnackbar({
+        open: true,
+        message: "Loading timed out. Please refresh the page.",
+        severity: "error",
+      });
+    }
+  }, 1000); // 15 seconds timeout
+
+  return () => clearTimeout(timer);
+}, [loading]);
 
   const handleViewDocument = async (documentType) => {
-    console.log("sdfs" + documentType);
     try {
-      const doc = await retrieveBookingDocument(selectedBooking, selectedCargo, documentType);
+      const document = await retrieveBookingDocument(selectedBooking, selectedCargo, documentType);
       // Open document in new tab
-      window.open(doc.url);
+      window.open(document.url, '_blank');
     } catch (error) {
       setSnackbar({
         open: true,
@@ -286,8 +342,6 @@ const CustomsPreview = () => {
       });
     }
   };
-
-  
 
   // Handle booking selection
   const handleBookingChange = async (event) => {
@@ -545,7 +599,7 @@ const CustomsPreview = () => {
                         doc={doc}
                         status={cargoDetails.documentStatus[doc.name]}
                         onUploadClick={handleUploadClick}
-                        onViewDocument = {handleViewDocument}
+                      onViewDocument={handleViewDocument}
                         category={category}
                       />
                     ))}
@@ -566,7 +620,7 @@ const CustomsPreview = () => {
                         key={doc.name}
                         doc={doc}
                         status={cargoDetails.documentStatus[doc.name]}
-                        onViewDocument = {handleViewDocument}
+                        onViewDocument={handleViewDocument}
                         category={category}
                       />
                     ))}
