@@ -30,7 +30,6 @@ import {
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 import { db } from '../firebaseConfig';
-import { startOfMonth, endOfMonth } from 'date-fns';
 import { API_URL } from '../config/apiConfig';
 
 
@@ -1245,6 +1244,20 @@ export const getBillingRequestsByMonth1 = async (companyId, monthRange) => {
   }
 };
 
+export const getPricingRates = async () => {
+  try {
+    const ratesDoc = await getDoc(doc(db, 'pricing', 'rates'));
+    if (ratesDoc.exists()) {
+      return ratesDoc.data();
+    } else {
+      return null; 
+    }
+  } catch (error) {
+    console.error('Error fetching pricing rates:', error);
+    throw error;
+  }
+};
+
 const api = {
   loginUser,
   registerUser,
@@ -1321,6 +1334,7 @@ const api = {
   updateBooking,
   deleteBooking,
   getBillingRequestsByMonth1,
+  getPricingRates,
 };
 
 export default api;
