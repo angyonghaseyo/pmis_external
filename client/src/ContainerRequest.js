@@ -1030,7 +1030,7 @@ const ContainerRequest = ({ user }) => {
                                 <TableRow key={request.id} hover>
                                     <TableCell>{request.bookingId}</TableCell>
                                     <TableCell>{request.cargoDetails.name}</TableCell>
-                                    <TableCell>{request.containerDetails.carrierName}</TableCell>
+                                    <TableCell>{request.carrierName}</TableCell>
                                     <TableCell>{request.serviceType}</TableCell>
                                     <TableCell>
                                         {request.consolidationService ? (
