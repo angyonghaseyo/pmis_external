@@ -1081,6 +1081,15 @@ export const retrieveBookingDocument = async (bookingId, cargoId, documentType) 
       const data = await response.json();
       const documentUrl = data.cargo[cargoId].documents[documentType];
       console.log(documentUrl);
+      if (documentType === "Safety Data Sheet") {
+        await updateDoc(doc(db, "bookings", bookingId), {
+          [`cargo.${cargoId}.documentStatus['UN Classification Sheet']`]: {
+            status: "IN_PROGRESS",
+            lastUpdated: serverTimestamp(),
+            comments: "Prerequisites met, waiting for agency review"
+          }
+        });
+      }
       return {
           url: documentUrl,
           fileName: documentUrl.split('/').pop()

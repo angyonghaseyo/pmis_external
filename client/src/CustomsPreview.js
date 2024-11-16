@@ -30,6 +30,7 @@ import {
   Stack,
   LinearProgress,
 } from "@mui/material";
+import JSZip from "jszip";
 import {
   CheckCircle,
   Warning,
@@ -43,10 +44,10 @@ import {
   LocalShipping,
   UploadFile,
 } from "@mui/icons-material";
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import ErrorIcon from '@mui/icons-material/Error'; 
-import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
-
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import ErrorIcon from "@mui/icons-material/Error";
+import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
+import ArchiveIcon from '@mui/icons-material/Archive';
 import {
   getBookings,
   getBookingById,
@@ -55,7 +56,6 @@ import {
 } from "./services/api";
 import { validateDocumentWithOCR, DocumentKeywords } from "./OCRValidation.js";
 import { HSCodeCategories, ProcessStatus } from "./HSCodeCategories.js";
- 
 
 // const CategoryIcon = ({ category }) => {
 //   switch (category) {
@@ -88,14 +88,20 @@ import { HSCodeCategories, ProcessStatus } from "./HSCodeCategories.js";
 
 //   return <Chip label={displayStatus} color={getStatusColor()} size="small" />;
 // };
-const UploadDialog = ({ open, onClose, onUpload, documentType, uploadStatus }) => (
+const UploadDialog = ({
+  open,
+  onClose,
+  onUpload,
+  documentType,
+  uploadStatus,
+}) => (
   <Dialog open={open} onClose={onClose}>
     <DialogTitle>Upload {documentType}</DialogTitle>
     <DialogContent>
-      <Box sx={{ width: '100%', my: 2 }}>
+      <Box sx={{ width: "100%", my: 2 }}>
         <input
           accept="image/*"
-          style={{ display: 'none' }}
+          style={{ display: "none" }}
           id="upload-file-input"
           type="file"
           onChange={(e) => {
@@ -117,22 +123,22 @@ const UploadDialog = ({ open, onClose, onUpload, documentType, uploadStatus }) =
           </Button>
         </label>
       </Box>
-      
+
       {uploadStatus === "uploading" && (
-        <Box sx={{ width: '100%', mt: 2 }}>
+        <Box sx={{ width: "100%", mt: 2 }}>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
             Uploading...
           </Typography>
           <LinearProgress />
         </Box>
       )}
-      
+
       {uploadStatus === "success" && (
         <Alert severity="success" sx={{ mt: 2 }}>
           Upload completed successfully
         </Alert>
       )}
-      
+
       {uploadStatus === "error" && (
         <Alert severity="error" sx={{ mt: 2 }}>
           Upload failed. Please try again.
@@ -147,18 +153,28 @@ const UploadDialog = ({ open, onClose, onUpload, documentType, uploadStatus }) =
   </Dialog>
 );
 
-
- 
-
-const DocumentListItem = ({ doc, status, onUploadClick, onViewDocument, category, cargoDetails, uploadStatus}) => {
-  const isExporterDoc = category.documents.exporter.some(d => d.name === doc.name);
-  const isAgencyDoc = category.documents.agency.some(d => d.name === doc.name);
+const DocumentListItem = ({
+  doc,
+  status,
+  onUploadClick,
+  onViewDocument,
+  category,
+  cargoDetails,
+  uploadStatus,
+}) => {
+  const isExporterDoc = category.documents.exporter.some(
+    (d) => d.name === doc.name
+  );
+  const isAgencyDoc = category.documents.agency.some(
+    (d) => d.name === doc.name
+  );
   const docDetails = isExporterDoc
-    ? category.documents.exporter.find(d => d.name === doc.name)
-    : category.documents.agency.find(d => d.name === doc.name);
+    ? category.documents.exporter.find((d) => d.name === doc.name)
+    : category.documents.agency.find((d) => d.name === doc.name);
 
   const currentStatus = status?.status || "NOT_STARTED";
-  const hasDocument = cargoDetails?.documents?.[doc.name]; // Check documents map instead
+  const hasDocument = cargoDetails?.documents?.[doc.name];
+  console.log(hasDocument);
   const isClickable = isExporterDoc;
 
   const getStatusColor = (status) => {
@@ -214,7 +230,7 @@ const DocumentListItem = ({ doc, status, onUploadClick, onViewDocument, category
       }
     } else {
       if (hasDocument) {
-        return <CheckCircle />;
+        return <CheckCircle sx={{ color: 'green' }}/>;
       }
       return <UploadFile />;
     }
@@ -235,11 +251,11 @@ const DocumentListItem = ({ doc, status, onUploadClick, onViewDocument, category
   return (
     <ListItem
       sx={{
-        width: '100%',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        pr: 20
+        width: "100%",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        pr: 20,
       }}
       secondaryAction={
         <Stack direction="row" spacing={1}>
@@ -249,12 +265,14 @@ const DocumentListItem = ({ doc, status, onUploadClick, onViewDocument, category
                 size="small"
                 variant="outlined"
                 onClick={() => onUploadClick(doc.name)}
-                startIcon={hasDocument ? <UploadFile /> : <AddCircleOutlineIcon />}
+                startIcon={
+                  hasDocument ? <UploadFile /> : <AddCircleOutlineIcon />
+                }
               >
-                {hasDocument ? 'Replace' : 'Upload'}
+                {hasDocument ? "Replace" : "Upload"}
               </Button>
               {hasDocument && (
-                <Button 
+                <Button
                   size="small"
                   variant="outlined"
                   onClick={() => onViewDocument(doc.name)}
@@ -274,14 +292,14 @@ const DocumentListItem = ({ doc, status, onUploadClick, onViewDocument, category
               )}
             </>
           ) : (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <Chip
                 label={currentStatus.replace(/_/g, " ")}
                 color={getChipColor(currentStatus)}
-                sx={{ minWidth: '100px' }}
+                sx={{ minWidth: "100px" }}
               />
               {hasDocument && (
-                <Button 
+                <Button
                   size="small"
                   variant="outlined"
                   onClick={() => onViewDocument(doc.name)}
@@ -309,7 +327,6 @@ const DocumentListItem = ({ doc, status, onUploadClick, onViewDocument, category
   );
 };
 
-
 const CustomsPreview = () => {
   const [bookings, setBookings] = useState([]);
   const [selectedBooking, setSelectedBooking] = useState("");
@@ -323,8 +340,7 @@ const CustomsPreview = () => {
     message: "",
     severity: "error",
   });
-  const [uploadStatus, setUploadStatus] = useState({});  // Add this
-
+  const [uploadStatus, setUploadStatus] = useState({}); // Add this
 
   // Handle Snackbar close
   const handleSnackbarClose = (event, reason) => {
@@ -335,69 +351,78 @@ const CustomsPreview = () => {
   };
 
   // Fetch bookings on component mount
- // In CustomsPreview.js
- useEffect(() => {
-  const fetchBookings = async () => {
-    try {
-      setLoading(true);
-      console.log("Fetching bookings..."); // Debug log
-      
-      // Add timeout to prevent infinite loading
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Request timeout')), 10000)
-      );
-      
-      const bookingsPromise = getBookings();
-      const bookingsData = await Promise.race([bookingsPromise, timeoutPromise]);
-      
-      console.log("Bookings received:", bookingsData); // Debug log
-      
-      if (!Array.isArray(bookingsData)) {
-        throw new Error('Invalid data format received');
+  // In CustomsPreview.js
+  useEffect(() => {
+    const fetchBookings = async () => {
+      try {
+        setLoading(true);
+        console.log("Fetching bookings..."); // Debug log
+
+        // Add timeout to prevent infinite loading
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Request timeout")), 10000)
+        );
+
+        const bookingsPromise = getBookings();
+        const bookingsData = await Promise.race([
+          bookingsPromise,
+          timeoutPromise,
+        ]);
+
+        console.log("Bookings received:", bookingsData); // Debug log
+
+        if (!Array.isArray(bookingsData)) {
+          throw new Error("Invalid data format received");
+        }
+
+        setBookings(bookingsData);
+      } catch (error) {
+        console.error("Detailed fetch error:", error);
+        setSnackbar({
+          open: true,
+          message: `Error fetching bookings: ${
+            error.message || "Unknown error"
+          }`,
+          severity: "error",
+        });
+      } finally {
+        setLoading(false);
       }
-      
-      setBookings(bookingsData);
-    } catch (error) {
-      console.error("Detailed fetch error:", error);
-      setSnackbar({
-        open: true,
-        message: `Error fetching bookings: ${error.message || 'Unknown error'}`,
-        severity: "error",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
-  fetchBookings();
-}, []);
+    fetchBookings();
+  }, []);
 
-// Add a timeout effect to ensure loading state is cleared
-useEffect(() => {
-  const timer = setTimeout(() => {
-    if (loading) {
-      setLoading(false);
-      setSnackbar({
-        open: true,
-        message: "Loading timed out. Please refresh the page.",
-        severity: "error",
-      });
-    }
-  }, 1000); // 15 seconds timeout
+  // Add a timeout effect to ensure loading state is cleared
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (loading) {
+        setLoading(false);
+        setSnackbar({
+          open: true,
+          message: "Loading timed out. Please refresh the page.",
+          severity: "error",
+        });
+      }
+    }, 1000); // 15 seconds timeout
 
-  return () => clearTimeout(timer);
-}, [loading]);
+    return () => clearTimeout(timer);
+  }, [loading]);
 
   const handleViewDocument = async (documentType) => {
     try {
-      const document = await retrieveBookingDocument(selectedBooking, selectedCargo, documentType);
+      const document = await retrieveBookingDocument(
+        selectedBooking,
+        selectedCargo,
+        documentType
+      );
       // Open document in new tab
-      window.open(document.url, '_blank');
+      window.open(document.url, "_blank");
     } catch (error) {
       setSnackbar({
         open: true,
         message: `Failed to retrieve document: ${error.message}`,
-        severity: "error"
+        severity: "error",
       });
     }
   };
@@ -471,30 +496,32 @@ useEffect(() => {
       if (!selectedBooking || !selectedCargo || !selectedDocument) return;
 
       // Set uploading status
-    setUploadStatus((prev) => ({
-      ...prev,
-      [selectedDocument]: "uploading"
-    }));
-  
+      setUploadStatus((prev) => ({
+        ...prev,
+        [selectedDocument]: "uploading",
+      }));
+
       // Validate document using OCR
       const validationResult = await validateDocumentWithOCR(
         file,
         DocumentKeywords[selectedDocument]
       );
-  
+
       if (!validationResult.isValid) {
         setUploadStatus((prev) => ({
           ...prev,
-          [selectedDocument]: "error"
+          [selectedDocument]: "error",
         }));
         setSnackbar({
           open: true,
-          message: `Invalid document: Missing keywords: ${validationResult.missingKeywords.join(", ")}`,
-          severity: "error"
+          message: `Invalid document: Missing keywords: ${validationResult.missingKeywords.join(
+            ", "
+          )}`,
+          severity: "error",
         });
         return;
       }
-  
+
       // Upload the document
       const uploadResult = await uploadBookingDocument(
         selectedBooking,
@@ -502,58 +529,74 @@ useEffect(() => {
         selectedDocument,
         file
       );
-  
+
       // Update local state to reflect the upload
       const updatedCargoDetails = {
         ...cargoDetails,
         documents: {
           ...cargoDetails.documents,
-          [selectedDocument]: uploadResult.url  // Store the document URL
+          [selectedDocument]: uploadResult.url, // Store the document URL
         },
         documentStatus: {
           ...cargoDetails.documentStatus,
           [selectedDocument]: {
             ...cargoDetails.documentStatus[selectedDocument],
-            status: "IN_PROGRESS"
-          }
-        }
+            status: "IN_PROGRESS",
+          },
+        },
       };
-      
+
       setCargoDetails(updatedCargoDetails);
 
-       // Set success status after successful upload
-    setUploadStatus((prev) => ({
-      ...prev,
-      [selectedDocument]: "success"
-    }));
-  
+      if (selectedDocument === "Safety Data Sheet") {
+        const updatedStatus = {
+          ...cargoDetails.documentStatus,
+          "UN Classification Sheet": {
+            ...cargoDetails.documentStatus["UN Classification Sheet"],
+            status: "IN_PROGRESS",
+            lastUpdated: new Date(),
+            comments: "Prerequisites met, waiting for agency review"
+          }
+        };
+      
+        setCargoDetails(prev => ({
+          ...prev,
+          documentStatus: updatedStatus
+        }));
+      }
+
+      // Set success status after successful upload
+      setUploadStatus((prev) => ({
+        ...prev,
+        [selectedDocument]: "success",
+      }));
+
       setSnackbar({
         open: true,
         message: "Document uploaded successfully",
-        severity: "success"
+        severity: "success",
       });
-  
+
       setUploadDialogOpen(false);
 
       // Clear upload status after a delay
-    setTimeout(() => {
-      setUploadStatus((prev) => {
-        const newStatus = { ...prev };
-        delete newStatus[selectedDocument];
-        return newStatus;
-      });
-    }, 3000);
-
+      setTimeout(() => {
+        setUploadStatus((prev) => {
+          const newStatus = { ...prev };
+          delete newStatus[selectedDocument];
+          return newStatus;
+        });
+      }, 3000);
     } catch (error) {
       console.error("Upload error:", error);
       setUploadStatus((prev) => ({
         ...prev,
-        [selectedDocument]: "error"
+        [selectedDocument]: "error",
       }));
       setSnackbar({
         open: true,
         message: `Failed to upload document: ${error.message}`,
-        severity: "error"
+        severity: "error",
       });
     }
   };
@@ -592,7 +635,100 @@ useEffect(() => {
     }
   }, [selectedBooking, selectedCargo, cargoDetails]);
 
-  
+  const handleDownloadAllDocuments = async (cargoId) => {
+    try {
+      setSnackbar({
+        open: true,
+        message: "Preparing documents for download...",
+        severity: "info",
+      });
+
+      const cargo = cargoDetails;
+      if (!cargo?.documents || Object.keys(cargo.documents).length === 0) {
+        setSnackbar({
+          open: true,
+          message: "No documents available for download",
+          severity: "warning",
+        });
+        return;
+      }
+
+      // Create a new zip file
+      const zip = new JSZip();
+
+      // Download all documents
+      const documentPromises = Object.keys(cargo.documents).map(
+        async (documentType) => {
+          try {
+            const document = await retrieveBookingDocument(
+              selectedBooking,
+              cargoId,
+              documentType
+            );
+
+            // Fetch the actual file
+            const response = await fetch(document.url);
+            const blob = await response.blob();
+
+            // Add to zip with a meaningful filename
+            zip.file(`${documentType}.pdf`, blob);
+
+            return true;
+          } catch (error) {
+            console.error(`Error downloading ${documentType}:`, error);
+            return false;
+          }
+        }
+      );
+
+      // Wait for all downloads to complete
+      await Promise.all(documentPromises);
+
+      // Generate and download zip file
+      const zipContent = await zip.generateAsync({ type: "blob" });
+      const url = window.URL.createObjectURL(zipContent);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `cargo_${cargoId}_documents.zip`;
+
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      setSnackbar({
+        open: true,
+        message: "Documents downloaded successfully",
+        severity: "success",
+      });
+    } catch (error) {
+      console.error("Download error:", error);
+      setSnackbar({
+        open: true,
+        message: `Failed to download documents: ${error.message}`,
+        severity: "error",
+      });
+    }
+  };
+
+  // Add this button where you want to show the download option
+  const DownloadAllButton = ({ cargoId }) => {
+    const hasDocuments =
+      cargoDetails?.documents && Object.keys(cargoDetails.documents).length > 0;
+
+    return (
+      <Button
+        variant="outlined"
+        startIcon={<ArchiveIcon/>}
+        onClick={() => handleDownloadAllDocuments(cargoId)}
+        disabled={!hasDocuments}
+        sx={{ borderRadius: "8px" }}
+      >
+        Download All Documents
+      </Button>
+    );
+  };
 
   if (loading) {
     return (
@@ -671,52 +807,61 @@ useEffect(() => {
 
           {cargoDetails && category && (
             <>
-               <Grid item xs={12} md={12}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    Required Exporter Documents
-                  </Typography>
-                  <List>
-                    {category.documents.exporter.map((doc) => (
-                      <DocumentListItem
-                        key={doc.name}
-                        doc={doc}
-                        status={cargoDetails.documentStatus[doc.name]}
-                        onUploadClick={handleUploadClick}
-                      onViewDocument={handleViewDocument}
-                        category={category}
-                        cargoDetails={cargoDetails}  
-                        uploadStatus={uploadStatus[doc.name]} 
-                      />
-                    ))}
-                  </List>
-                </CardContent>
-              </Card>
-            </Grid>
+              <Grid item xs={12} md={12}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom>
+                      Required Exporter Documents
+                    </Typography>
+                    <List>
+                      {category.documents.exporter.map((doc) => (
+                        <DocumentListItem
+                          key={doc.name}
+                          doc={doc}
+                          status={cargoDetails.documentStatus[doc.name]}
+                          onUploadClick={handleUploadClick}
+                          onViewDocument={handleViewDocument}
+                          category={category}
+                          cargoDetails={cargoDetails}
+                          uploadStatus={uploadStatus[doc.name]}
+                        />
+                      ))}
+                    </List>
+                    <Stack
+                      direction="row"
+                      spacing={2}
+                      alignItems="center"
+                      justifyContent="space-between"
+                      sx={{ mb: 2 }}
+                    >
+                      <DownloadAllButton cargoId={selectedCargo} />
+                    </Stack>
+                  </CardContent>
+                </Card>
+              </Grid>
 
-            <Grid item xs={12} md={12}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    Agency Issued Documents
-                  </Typography>
-                  <List>
-                    {category.documents.agency.map((doc) => (
-                      <DocumentListItem
-                        key={doc.name}
-                        doc={doc}
-                        status={cargoDetails.documentStatus[doc.name]}
-                        onViewDocument={handleViewDocument}
-                        category={category}
-                        cargoDetails={cargoDetails}
-                        uploadStatus={uploadStatus[doc.name]} 
-                      />
-                    ))}
-                  </List>
-                </CardContent>
-              </Card>
-            </Grid>
+              <Grid item xs={12} md={12}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom>
+                      Agency Issued Documents
+                    </Typography>
+                    <List>
+                      {category.documents.agency.map((doc) => (
+                        <DocumentListItem
+                          key={doc.name}
+                          doc={doc}
+                          status={cargoDetails.documentStatus[doc.name]}
+                          onViewDocument={handleViewDocument}
+                          category={category}
+                          cargoDetails={cargoDetails}
+                          uploadStatus={uploadStatus[doc.name]}
+                        />
+                      ))}
+                    </List>
+                  </CardContent>
+                </Card>
+              </Grid>
             </>
           )}
         </Grid>

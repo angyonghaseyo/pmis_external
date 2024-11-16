@@ -64,7 +64,7 @@ export const DocumentKeywords = {
   "Commercial Invoice": ["commercial", "invoice"],
   "Packing List": ["packing", "list"],
   "UN Packaging Specification": ["un", "packaging", "specification"],
-
+  "Safety Data Sheet": ["safety", "data", "sheet"],
 };
 
 // Levenshtein distance for fuzzy matching
