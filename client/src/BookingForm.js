@@ -36,14 +36,13 @@ import {
 import { ExpandMore } from "@mui/icons-material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import DownloadIcon from "@mui/icons-material/Download";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import BookingSteps from "./BookingSteps";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorIcon from "@mui/icons-material/Error";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import CancelIcon from "@mui/icons-material/Cancel";
-import DownloadIcon from "@mui/icons-material/Download";
-import QRCode from 'qrcode';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import {
   getBookings,
@@ -55,6 +54,7 @@ import {
   getVesselVisits,
 } from "./services/api";
 import { HSCodeCategories, ProcessStatus } from "./HSCodeCategories.js";
+import QRCode from 'qrcode';
 
 const HSCodeLookup = ({ value, onChange, error, helperText }) => {
   const [open, setOpen] = useState(false);
@@ -101,8 +101,6 @@ const HSCodeLookup = ({ value, onChange, error, helperText }) => {
       setLoading(false);
     }
   };
-
-
 
   const debouncedFetch = useCallback(
     debounce((searchTerm) => fetchHSCodes(searchTerm), 300),
@@ -283,21 +281,6 @@ const BookingForm = ({ user }) => {
       portLoading: "",
       portDestination: "",
     }));
-  };
-
-  const handleDownloadQRCode = async (requestId) => {
-    try {
-      const qrCodeDataUrl = await QRCode.toDataURL(requestId);
-      const link = document.createElement('a');
-      link.href = qrCodeDataUrl;
-      link.download = `qr-code-${requestId}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch (error) {
-      console.error('Error generating QR code:', error);
-
-    }
   };
 
   const handleVoyageChange = (event) => {
@@ -549,19 +532,6 @@ const BookingForm = ({ user }) => {
       userEmail: user.email,
     };
 
-    Object.keys(newBooking.cargo).forEach(cargoId => {
-      if (!newBooking.cargo[cargoId].actions) {
-        newBooking.cargo[cargoId].actions = [];
-      }
-      newBooking.cargo[cargoId].actions.push({
-        action: "Booking Created",
-        location: newBooking.portLoading,
-        timestamp: new Date().toISOString(),
-        status: "completed"
-      });
-    });
-
-
     try {
       if (editingId) {
         // Update existing booking
@@ -734,6 +704,21 @@ const BookingForm = ({ user }) => {
         ...prev,
         [cargoId]: { ...prev[cargoId], [documentType]: "error" },
       }));
+    }
+  };
+
+  const handleDownloadQRCode = async (requestId) => {
+    try {
+      const qrCodeDataUrl = await QRCode.toDataURL(requestId);
+      const link = document.createElement('a');
+      link.href = qrCodeDataUrl;
+      link.download = `qr-code-${requestId}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error generating QR code:', error);
+
     }
   };
 
@@ -1004,56 +989,25 @@ const BookingForm = ({ user }) => {
                             <Typography variant="h6" gutterBottom>
                               Cargo Details
                             </Typography>
-
-                            {booking.cargo &&
-                              Object.entries(booking.cargo).map(([key, cargoItem]) => (
-                                <Paper key={key} sx={{ p: 2, mb: 2 }}>
-                                  <Box
-                                    display="flex"
-                                    alignItems="center"
-                                    justifyContent="space-between"
-                                    mb={1}
-                                  >
-                                    <Typography variant="h6">
-                                      <strong>Cargo Item {key}:</strong>
-                                    </Typography>
-                                    <Button
-                                      variant="contained"
-                                      color="primary"
-                                      size="medium"
-                                      startIcon={<DownloadIcon />}
-                                      onClick={() => handleDownloadQRCode(key)}
-                                      sx={{ textTransform: 'none' }} // keeps the text casing as is
-                                    >
-                                      QR Code
-                                    </Button>
-                                  </Box>
-                                  <Typography>Name: {cargoItem.name}</Typography>
-                                  <Typography>
-                                    Quantity: {cargoItem.quantity} {cargoItem.unit || "pieces"}
-                                  </Typography>
-                                  <Typography>Description: {cargoItem.description}</Typography>
-                                  <Typography>Weight per Unit: {cargoItem.weightPerUnit} kg</Typography>
-                                  <Typography>Cargo Type: {cargoItem.cargoType}</Typography>
-                                  <Typography>
-                                    <strong>HS Code:</strong> {cargoItem.hsCode}
-                                  </Typography>
-                                  <BookingSteps
-                                    isContainerRented={cargoItem.isContainerRented}
-                                    isTruckBooked={cargoItem.isTruckBooked}
-                                    isCustomsCleared={cargoItem.isCustomsCleared}
-                                    isDocumentsChecked={cargoItem.isDocumentsChecked}
-                                  />
-                                </Paper>
-                              ))}
-
                             {booking.cargo &&
                               Object.entries(booking.cargo).map(
                                 ([key, cargoItem]) => (
                                   <Paper key={key} sx={{ p: 2, mb: 2 }}>
-                                    <Typography>
-                                      <strong>Cargo Item {key}:</strong>
-                                    </Typography>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <Typography>
+                                        <strong>Cargo Item {key}:</strong>
+                                      </Typography>
+                                      <Button
+                                        variant="contained"
+                                        color="primary"
+                                        size="medium"
+                                        startIcon={<DownloadIcon />}
+                                        onClick={() => handleDownloadQRCode(key)}
+                                        sx={{ textTransform: 'none' }} // keeps the text casing as is
+                                      >
+                                        QR Code
+                                      </Button>
+                                    </Box>
                                     <Typography>
                                       Name: {cargoItem.name}
                                     </Typography>
@@ -1254,6 +1208,7 @@ const BookingForm = ({ user }) => {
                         <Typography variant="subtitle1">
                           Cargo ID: {cargoId}
                         </Typography>
+
                         {Object.keys(formData.cargo).length > 1 && (
                           <IconButton
                             onClick={() => handleRemoveCargo(cargoId)}
