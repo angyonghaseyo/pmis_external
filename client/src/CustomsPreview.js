@@ -27,6 +27,8 @@ import {
   DialogActions,
   Button,
   Snackbar,
+  Stack,
+  LinearProgress,
 } from "@mui/material";
 import {
   CheckCircle,
@@ -42,6 +44,9 @@ import {
   UploadFile,
 } from "@mui/icons-material";
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import ErrorIcon from '@mui/icons-material/Error'; 
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+
 import {
   getBookings,
   getBookingById,
@@ -83,23 +88,61 @@ import { HSCodeCategories, ProcessStatus } from "./HSCodeCategories.js";
 
 //   return <Chip label={displayStatus} color={getStatusColor()} size="small" />;
 // };
-const UploadDialog = ({ open, onClose, onUpload, documentType }) => (
+const UploadDialog = ({ open, onClose, onUpload, documentType, uploadStatus }) => (
   <Dialog open={open} onClose={onClose}>
     <DialogTitle>Upload {documentType}</DialogTitle>
     <DialogContent>
-      <Input
-        type="file"
-        accept="image/*"
-        onChange={(e) => {
-          const file = e.target.files[0];
-          if (file) {
-            onUpload(file);
-          }
-        }}
-      />
+      <Box sx={{ width: '100%', my: 2 }}>
+        <input
+          accept="image/*"
+          style={{ display: 'none' }}
+          id="upload-file-input"
+          type="file"
+          onChange={(e) => {
+            const file = e.target.files[0];
+            if (file) {
+              onUpload(file);
+            }
+          }}
+        />
+        <label htmlFor="upload-file-input">
+          <Button
+            variant="contained"
+            component="span"
+            fullWidth
+            disabled={uploadStatus === "uploading"}
+            startIcon={<UploadFile />}
+          >
+            Select File
+          </Button>
+        </label>
+      </Box>
+      
+      {uploadStatus === "uploading" && (
+        <Box sx={{ width: '100%', mt: 2 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            Uploading...
+          </Typography>
+          <LinearProgress />
+        </Box>
+      )}
+      
+      {uploadStatus === "success" && (
+        <Alert severity="success" sx={{ mt: 2 }}>
+          Upload completed successfully
+        </Alert>
+      )}
+      
+      {uploadStatus === "error" && (
+        <Alert severity="error" sx={{ mt: 2 }}>
+          Upload failed. Please try again.
+        </Alert>
+      )}
     </DialogContent>
     <DialogActions>
-      <Button onClick={onClose}>Cancel</Button>
+      <Button onClick={onClose} disabled={uploadStatus === "uploading"}>
+        {uploadStatus === "success" ? "Close" : "Cancel"}
+      </Button>
     </DialogActions>
   </Dialog>
 );
@@ -107,7 +150,7 @@ const UploadDialog = ({ open, onClose, onUpload, documentType }) => (
 
  
 
-const DocumentListItem = ({ doc, status, onUploadClick,  onViewDocument, category }) => {
+const DocumentListItem = ({ doc, status, onUploadClick, onViewDocument, category, cargoDetails, uploadStatus}) => {
   const isExporterDoc = category.documents.exporter.some(d => d.name === doc.name);
   const isAgencyDoc = category.documents.agency.some(d => d.name === doc.name);
   const docDetails = isExporterDoc
@@ -115,10 +158,32 @@ const DocumentListItem = ({ doc, status, onUploadClick,  onViewDocument, categor
     : category.documents.agency.find(d => d.name === doc.name);
 
   const currentStatus = status?.status || "NOT_STARTED";
-  const isClickable = isExporterDoc && currentStatus === "PENDING";
-  const isViewable = status?.status === "COMPLETED" || status?.status === "IN_PROGRESS";
+  const hasDocument = cargoDetails?.documents?.[doc.name]; // Check documents map instead
+  const isClickable = isExporterDoc;
 
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "success":
+        return "success";
+      case "uploading":
+        return "primary";
+      case "error":
+        return "error";
+      default:
+        return "default";
+    }
+  };
 
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case "success":
+        return <CheckCircle fontSize="small" />;
+      case "error":
+        return <ErrorIcon fontSize="small" />;
+      default:
+        return <UploadFile fontSize="small" />;
+    }
+  };
 
   const getChipColor = (status) => {
     switch (status) {
@@ -148,18 +213,10 @@ const DocumentListItem = ({ doc, status, onUploadClick,  onViewDocument, categor
           return <PendingActions />;
       }
     } else {
-      switch (currentStatus) {
-        case "COMPLETED":
-          return <CheckCircle />;
-        case "REJECTED":
-          return <Warning />;
-        case "IN_PROGRESS":
-          return <Assessment />;
-        case "PENDING":
-          return <PendingActions />;
-        default:
-          return <UploadFile />;
+      if (hasDocument) {
+        return <CheckCircle />;
       }
+      return <UploadFile />;
     }
   };
 
@@ -175,46 +232,67 @@ const DocumentListItem = ({ doc, status, onUploadClick,  onViewDocument, categor
     }
   };
 
-  const handleClick = () => {
-    if (isClickable) {
-      onUploadClick(doc.name);
-    }
-  };
-
-  
-
   return (
     <ListItem
-    sx={{
-      width: '100%',
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      pr: 20 // Add right padding to make room for the chip
-    }}
+      sx={{
+        width: '100%',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        pr: 20
+      }}
       secondaryAction={
-        <>
-        <Chip
-          label={currentStatus.replace(/_/g, " ")}
-          color={getChipColor(currentStatus)}
-          onClick={handleClick}
-          sx={{
-            cursor: isClickable ? "pointer" : "default",
-            "&:hover": {
-              backgroundColor: isClickable ? "rgba(0, 0, 0, 0.08)" : undefined,
-            },
-          }}
-        />
-         {isViewable && (
-            <Button 
-            size="small"
-            onClick={() => onViewDocument(doc.name)}
-            startIcon={<VisibilityIcon />}
-            >
-              View
-            </Button>
+        <Stack direction="row" spacing={1}>
+          {isExporterDoc ? (
+            <>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => onUploadClick(doc.name)}
+                startIcon={hasDocument ? <UploadFile /> : <AddCircleOutlineIcon />}
+              >
+                {hasDocument ? 'Replace' : 'Upload'}
+              </Button>
+              {hasDocument && (
+                <Button 
+                  size="small"
+                  variant="outlined"
+                  onClick={() => onViewDocument(doc.name)}
+                  startIcon={<VisibilityIcon />}
+                >
+                  View
+                </Button>
+              )}
+              {/* Add upload status chip */}
+              {uploadStatus && (
+                <Chip
+                  size="small"
+                  label={uploadStatus}
+                  color={getStatusColor(uploadStatus)}
+                  icon={getStatusIcon(uploadStatus)}
+                />
+              )}
+            </>
+          ) : (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Chip
+                label={currentStatus.replace(/_/g, " ")}
+                color={getChipColor(currentStatus)}
+                sx={{ minWidth: '100px' }}
+              />
+              {hasDocument && (
+                <Button 
+                  size="small"
+                  variant="outlined"
+                  onClick={() => onViewDocument(doc.name)}
+                  startIcon={<VisibilityIcon />}
+                >
+                  View
+                </Button>
+              )}
+            </Box>
           )}
-          </>
+        </Stack>
       }
     >
       <ListItemIcon>{getIcon()}</ListItemIcon>
@@ -245,27 +323,8 @@ const CustomsPreview = () => {
     message: "",
     severity: "error",
   });
+  const [uploadStatus, setUploadStatus] = useState({});  // Add this
 
-//   const handleViewDocument = async (cargoId, documentType) => {
-//     try {
-//         const document = await retrieveBookingDocument(selectedBooking, cargoId, documentType);
-//         // document now has {url: "https://storage...", fileName: "filename.pdf"}
-        
-//         // Simply open in new tab
-//         window.open(document.url, '_blank');
-
-//         // Or if you want to force download:
-//         // const link = document.createElement('a');
-//         // link.href = document.url;
-//         // link.download = document.fileName;
-//         // document.body.appendChild(link);
-//         // link.click();
-//         // document.body.removeChild(link);
-//     } catch (error) {
-//         console.error('Error viewing document:', error);
-//         // Handle error - maybe show an alert or notification
-//     }
-// };
 
   // Handle Snackbar close
   const handleSnackbarClose = (event, reason) => {
@@ -409,66 +468,92 @@ useEffect(() => {
 
   const handleUpload = async (file) => {
     try {
-      console.log(selectedDocument);
-      if (!selectedBooking || !selectedCargo) return;
+      if (!selectedBooking || !selectedCargo || !selectedDocument) return;
 
+      // Set uploading status
+    setUploadStatus((prev) => ({
+      ...prev,
+      [selectedDocument]: "uploading"
+    }));
+  
       // Validate document using OCR
       const validationResult = await validateDocumentWithOCR(
         file,
         DocumentKeywords[selectedDocument]
       );
-
+  
       if (!validationResult.isValid) {
-        // Show error in Snackbar instead of setting error state
+        setUploadStatus((prev) => ({
+          ...prev,
+          [selectedDocument]: "error"
+        }));
         setSnackbar({
           open: true,
-          message: (
-            <Box sx={{ textAlign: "center" }}>
-              <Typography>
-                Invalid document: Expected {selectedDocument}
-              </Typography>
-              <Typography sx={{ mt: 1 }}>
-                Your document is missing the following keywords:
-                {validationResult.missingKeywords.join(", ")}
-              </Typography>
-            </Box>
-          ),
-          severity: "error",
+          message: `Invalid document: Missing keywords: ${validationResult.missingKeywords.join(", ")}`,
+          severity: "error"
         });
         return;
       }
-
-      await uploadBookingDocument(
+  
+      // Upload the document
+      const uploadResult = await uploadBookingDocument(
         selectedBooking,
         selectedCargo,
         selectedDocument,
         file
       );
-
-      // Update local state to show pending status
+  
+      // Update local state to reflect the upload
       const updatedCargoDetails = {
         ...cargoDetails,
+        documents: {
+          ...cargoDetails.documents,
+          [selectedDocument]: uploadResult.url  // Store the document URL
+        },
         documentStatus: {
           ...cargoDetails.documentStatus,
-          [selectedDocument]: { status: ProcessStatus.IN_PROGRESS },
-        },
+          [selectedDocument]: {
+            ...cargoDetails.documentStatus[selectedDocument],
+            status: "IN_PROGRESS"
+          }
+        }
       };
+      
       setCargoDetails(updatedCargoDetails);
 
-      // Show success message
+       // Set success status after successful upload
+    setUploadStatus((prev) => ({
+      ...prev,
+      [selectedDocument]: "success"
+    }));
+  
       setSnackbar({
         open: true,
         message: "Document uploaded successfully",
-        severity: "success",
+        severity: "success"
       });
-
+  
       setUploadDialogOpen(false);
+
+      // Clear upload status after a delay
+    setTimeout(() => {
+      setUploadStatus((prev) => {
+        const newStatus = { ...prev };
+        delete newStatus[selectedDocument];
+        return newStatus;
+      });
+    }, 3000);
+
     } catch (error) {
       console.error("Upload error:", error);
+      setUploadStatus((prev) => ({
+        ...prev,
+        [selectedDocument]: "error"
+      }));
       setSnackbar({
         open: true,
         message: `Failed to upload document: ${error.message}`,
-        severity: "error",
+        severity: "error"
       });
     }
   };
@@ -586,7 +671,7 @@ useEffect(() => {
 
           {cargoDetails && category && (
             <>
-               <Grid item xs={12} md={6}>
+               <Grid item xs={12} md={12}>
               <Card>
                 <CardContent>
                   <Typography variant="h6" gutterBottom>
@@ -601,6 +686,8 @@ useEffect(() => {
                         onUploadClick={handleUploadClick}
                       onViewDocument={handleViewDocument}
                         category={category}
+                        cargoDetails={cargoDetails}  
+                        uploadStatus={uploadStatus[doc.name]} 
                       />
                     ))}
                   </List>
@@ -608,7 +695,7 @@ useEffect(() => {
               </Card>
             </Grid>
 
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} md={12}>
               <Card>
                 <CardContent>
                   <Typography variant="h6" gutterBottom>
@@ -622,6 +709,8 @@ useEffect(() => {
                         status={cargoDetails.documentStatus[doc.name]}
                         onViewDocument={handleViewDocument}
                         category={category}
+                        cargoDetails={cargoDetails}
+                        uploadStatus={uploadStatus[doc.name]} 
                       />
                     ))}
                   </List>
@@ -637,6 +726,7 @@ useEffect(() => {
         onClose={() => setUploadDialogOpen(false)}
         onUpload={handleUpload}
         documentType={selectedDocument}
+        uploadStatus={uploadStatus[selectedDocument]} // Pass the existing uploadStatus
       />
       <Snackbar
         open={snackbar.open}
