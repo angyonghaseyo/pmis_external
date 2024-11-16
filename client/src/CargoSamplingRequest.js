@@ -23,6 +23,7 @@ import {
     FormHelperText,
     Alert,
     IconButton,
+    Snackbar
 } from '@mui/material';
 import { Close as CloseIcon, CloudUpload as CloudUploadIcon } from '@mui/icons-material';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -31,6 +32,11 @@ import { styled } from '@mui/material/styles';
 import { doc, getDoc, setDoc, addDoc, collection, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from './firebaseConfig';
+import {
+    createSamplingRequest,
+    updateSamplingRequest,
+    uploadSamplingDocument
+} from './services/api';
 
 const VisuallyHiddenInput = styled('input')`
   clip: rect(0 0 0 0);
@@ -71,6 +77,7 @@ const StyledPaper = styled(Paper)(({ theme }) => ({
 
 const steps = ['Overview', 'Cargo Details', 'Sampling Requirements', 'Schedule & Documents'];
 
+
 const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuccess }) => {
     const [formData, setFormData] = useState({
         cargoDetails: {
@@ -103,6 +110,14 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
     const [submitError, setSubmitError] = useState(null);
     const [cargoNumbers, setCargoNumbers] = useState([]);
     const [selectedCargo, setSelectedCargo] = useState('');
+    const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+
+    const handleCloseSnackbar = (event, reason) => {
+        if (reason === 'clickaway') {
+            return;
+        }
+        setSnackbar({ ...snackbar, open: false });
+    };
 
     useEffect(() => {
         const fetchBookings = async () => {
@@ -485,7 +500,7 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
                 <StyledPaper>
                     <LocalizationProvider dateAdapter={AdapterDateFns}>
                         <Grid container spacing={3}>
-                            <Grid item xs={12}>
+                            <Grid item xs={6}>
                                 <DateTimePicker
                                     label="Start Date & Time"
                                     value={formData.schedule.startDate}
@@ -502,7 +517,7 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
                                     minDate={new Date()}
                                 />
                             </Grid>
-                            <Grid item xs={12}>
+                            <Grid item xs={6}>
                                 <DateTimePicker
                                     label="End Date & Time"
                                     value={formData.schedule.endDate}
@@ -607,9 +622,10 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
 
     const handleSubmit = async () => {
         if (!validateForm()) {
-            setSubmitError('Please fill in all required fields');
+            setSubmitError('Please fill in all required fields correctly');
             return;
         }
+
         try {
             setLoading(true);
             setSubmitError(null);
@@ -625,17 +641,25 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
             };
 
             if (editingId) {
-                await setDoc(doc(db, 'samplingRequests', editingId), requestData);
+                await updateSamplingRequest(editingId, requestData);
             } else {
-                const docRef = await addDoc(collection(db, 'samplingRequests'), requestData);
-                await setDoc(docRef, { id: docRef.id }, { merge: true });
+                await createSamplingRequest(requestData);
             }
 
             onSubmitSuccess?.();
             handleClose();
+            setSnackbar({
+                open: true,
+                message: 'Sampling Request created successfully',
+                severity: 'success'
+            });
         } catch (error) {
             console.error('Error submitting request:', error);
-            setSubmitError('Failed to submit request. Please try again.');
+            setSnackbar({
+                open: true,
+                message: 'Failed to submit request. Please try again.',
+                severity: 'error'
+            });
         } finally {
             setLoading(false);
         }
@@ -644,19 +668,10 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
     const uploadFiles = async () => {
         const uploads = {};
 
-        if (formData.documents.safetyDataSheet) {
-            uploads.safetyDataSheet = await uploadFile(
-                formData.documents.safetyDataSheet,
-                'safety-sheets'
-            );
-        }
-
-        if (formData.documents.additionalDocs?.length > 0) {
-            uploads.additionalDocs = await Promise.all(
-                formData.documents.additionalDocs.map(
-                    file => uploadFile(file, 'additional')
-                )
-            );
+        for (const [type, file] of Object.entries(formData.documents)) {
+            if (file instanceof File) {
+                uploads[type] = await uploadSamplingDocument(editingId, type, file);
+            }
         }
 
         return uploads;
@@ -672,72 +687,85 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
     // Rest of your component remains the same...
 
     return (
-        <Dialog
-            open={open}
-            onClose={handleClose}
-            maxWidth="md"
-            fullWidth
-            PaperProps={{
-                sx: { minHeight: '80vh' }
-            }}
-        >
-            <DialogTitle>
-                <Box display="flex" alignItems="center" justifyContent="space-between">
-                    <Typography variant="h6">
-                        {editingId ? 'Edit Sampling Request' : 'New Sampling Request'}
-                    </Typography>
-                    <IconButton onClick={handleClose} size="small">
-                        <CloseIcon />
-                    </IconButton>
-                </Box>
-            </DialogTitle>
+        <>
+            <Dialog
+                open={open}
+                onClose={handleClose}
+                maxWidth="md"
+                fullWidth
+                PaperProps={{
+                    sx: { minHeight: '80vh' }
+                }}
+            >
+                <DialogTitle>
+                    <Box display="flex" alignItems="center" justifyContent="space-between">
+                        <Typography variant="h6">
+                            {editingId ? 'Edit Sampling Request' : 'New Sampling Request'}
+                        </Typography>
+                        <IconButton onClick={handleClose} size="small">
+                            <CloseIcon />
+                        </IconButton>
+                    </Box>
+                </DialogTitle>
 
-            <DialogContent dividers>
-                {submitError && (
-                    <Alert severity="error" sx={{ mb: 2 }}>
-                        {submitError}
-                    </Alert>
-                )}
+                <DialogContent dividers>
+                    {submitError && (
+                        <Alert severity="error" sx={{ mb: 2 }}>
+                            {submitError}
+                        </Alert>
+                    )}
 
-                <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 4 }}>
-                    {steps.map((label) => (
-                        <Step key={label}>
-                            <StepLabel>{label}</StepLabel>
-                        </Step>
-                    ))}
-                </Stepper>
+                    <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 4 }}>
+                        {steps.map((label) => (
+                            <Step key={label}>
+                                <StepLabel>{label}</StepLabel>
+                            </Step>
+                        ))}
+                    </Stepper>
 
-                {renderStepContent(activeStep)}
-            </DialogContent>
+                    {renderStepContent(activeStep)}
+                </DialogContent>
 
-            <DialogActions>
-                <Button onClick={handleClose}>Cancel</Button>
-                <Box sx={{ flex: '1 1 auto' }} />
-                <Button
-                    disabled={activeStep === 0}
-                    onClick={() => setActiveStep((prev) => prev - 1)}
-                    sx={{ mr: 1 }}
-                >
-                    Back
-                </Button>
-                {activeStep === steps.length - 1 ? (
+                <DialogActions>
+                    <Button onClick={handleClose}>Cancel</Button>
+                    <Box sx={{ flex: '1 1 auto' }} />
                     <Button
-                        variant="contained"
-                        onClick={handleSubmit}
-                        disabled={loading}
+                        disabled={activeStep === 0}
+                        onClick={() => setActiveStep((prev) => prev - 1)}
+                        sx={{ mr: 1 }}
                     >
-                        {loading ? 'Submitting...' : 'Submit Request'}
+                        Back
                     </Button>
-                ) : (
-                    <Button
-                        variant="contained"
-                        onClick={() => setActiveStep((prev) => prev + 1)}
-                    >
-                        {activeStep === 0 ? 'Start Request' : 'Next'}
-                    </Button>
-                )}
-            </DialogActions>
-        </Dialog>
+                    {activeStep === steps.length - 1 ? (
+                        <Button
+                            variant="contained"
+                            onClick={handleSubmit}
+                            disabled={loading}
+                        >
+                            {loading ? 'Submitting...' : 'Submit Request'}
+                        </Button>
+                    ) : (
+                        <Button
+                            variant="contained"
+                            onClick={() => setActiveStep((prev) => prev + 1)}
+                        >
+                            {activeStep === 0 ? 'Start Request' : 'Next'}
+                        </Button>
+                    )}
+                </DialogActions>
+            </Dialog>
+
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={6000}
+                onClose={handleCloseSnackbar}
+                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            >
+                <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
+        </>
     );
 };
 

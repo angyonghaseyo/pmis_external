@@ -36,6 +36,7 @@ import {
 import { ExpandMore } from "@mui/icons-material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import DownloadIcon from "@mui/icons-material/Download";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import BookingSteps from "./BookingSteps";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
@@ -53,6 +54,7 @@ import {
   getVesselVisits,
 } from "./services/api";
 import { HSCodeCategories, ProcessStatus } from "./HSCodeCategories.js";
+import QRCode from 'qrcode';
 
 const HSCodeLookup = ({ value, onChange, error, helperText }) => {
   const [open, setOpen] = useState(false);
@@ -705,6 +707,21 @@ const BookingForm = ({ user }) => {
     }
   };
 
+  const handleDownloadQRCode = async (requestId) => {
+    try {
+      const qrCodeDataUrl = await QRCode.toDataURL(requestId);
+      const link = document.createElement('a');
+      link.href = qrCodeDataUrl;
+      link.download = `qr-code-${requestId}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error generating QR code:', error);
+
+    }
+  };
+
   const renderDocumentUpload = (cargoId) => {
     const documents = [
       { type: "vgm", label: "Verified Gross Mass (VGM)" },
@@ -714,25 +731,25 @@ const BookingForm = ({ user }) => {
 
     const handleViewDocument = async (cargoId, documentType) => {
       try {
-          const document = await retrieveBookingDocument(editingId, cargoId, documentType);
-          // document now has {url: "https://storage...", fileName: "filename.pdf"}
-          
-          // Simply open in new tab
-          window.open(document.url, '_blank');
-  
-          // Or if you want to force download:
-          // const link = document.createElement('a');
-          // link.href = document.url;
-          // link.download = document.fileName;
-          // document.body.appendChild(link);
-          // link.click();
-          // document.body.removeChild(link);
+        const document = await retrieveBookingDocument(editingId, cargoId, documentType);
+        // document now has {url: "https://storage...", fileName: "filename.pdf"}
+
+        // Simply open in new tab
+        window.open(document.url, '_blank');
+
+        // Or if you want to force download:
+        // const link = document.createElement('a');
+        // link.href = document.url;
+        // link.download = document.fileName;
+        // document.body.appendChild(link);
+        // link.click();
+        // document.body.removeChild(link);
       } catch (error) {
-          console.error('Error viewing document:', error);
-          // Handle error - maybe show an alert or notification
+        console.error('Error viewing document:', error);
+        // Handle error - maybe show an alert or notification
       }
-  };
-  
+    };
+
 
     return (
       <Grid item xs={12}>
@@ -976,9 +993,21 @@ const BookingForm = ({ user }) => {
                               Object.entries(booking.cargo).map(
                                 ([key, cargoItem]) => (
                                   <Paper key={key} sx={{ p: 2, mb: 2 }}>
-                                    <Typography>
-                                      <strong>Cargo Item {key}:</strong>
-                                    </Typography>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <Typography>
+                                        <strong>Cargo Item {key}:</strong>
+                                      </Typography>
+                                      <Button
+                                        variant="contained"
+                                        color="primary"
+                                        size="medium"
+                                        startIcon={<DownloadIcon />}
+                                        onClick={() => handleDownloadQRCode(key)}
+                                        sx={{ textTransform: 'none' }} // keeps the text casing as is
+                                      >
+                                        QR Code
+                                      </Button>
+                                    </Box>
                                     <Typography>
                                       Name: {cargoItem.name}
                                     </Typography>
@@ -1179,6 +1208,7 @@ const BookingForm = ({ user }) => {
                         <Typography variant="subtitle1">
                           Cargo ID: {cargoId}
                         </Typography>
+
                         {Object.keys(formData.cargo).length > 1 && (
                           <IconButton
                             onClick={() => handleRemoveCargo(cargoId)}
@@ -1206,9 +1236,9 @@ const BookingForm = ({ user }) => {
                         value={
                           cargoItem.hsCode
                             ? {
-                                code: cargoItem.hsCode,
-                                description: cargoItem.hsCodeDescription,
-                              }
+                              code: cargoItem.hsCode,
+                              description: cargoItem.hsCodeDescription,
+                            }
                             : null
                         }
                         onChange={(value) =>

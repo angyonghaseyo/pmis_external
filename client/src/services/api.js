@@ -801,25 +801,26 @@ export const getContainerTypesForCompany = async (company) => {
 export const addContainerType = async (company, containerData) => {
   try {
     const formData = new FormData();
-    formData.append("company", company);
-    formData.append("size", containerData.size);
-    formData.append("price", containerData.price);
-    formData.append("name", containerData.name);
+    formData.append('company', company);
+    formData.append('size', containerData.size);
+    formData.append('price', containerData.price);
+    formData.append('name', containerData.name);
+    formData.append('consolidationPrice', containerData.consolidationPrice);
     if (containerData.imageFile) {
-      formData.append("image", containerData.imageFile);
+      formData.append('image', containerData.imageFile);
     }
 
     const response = await fetch(`${API_URL}/container-types`, {
-      method: "POST",
-      body: formData,
+      method: 'POST',
+      body: formData
     });
 
     if (!response.ok) {
-      throw new Error("Error adding container type");
+      throw new Error('Error adding container type');
     }
     return await response.json();
   } catch (error) {
-    console.error("Error in addContainerType:", error);
+    console.error('Error in addContainerType:', error);
     throw error;
   }
 };
@@ -857,6 +858,7 @@ export const assignContainerPrice = async (company, containerData) => {
     if (!response.ok) {
       throw new Error("Error assigning container price");
     }
+
     return await response.json();
   } catch (error) {
     console.error("Error in assignContainerPrice:", error);
@@ -1070,33 +1072,33 @@ export const uploadBookingDocument = async (
 
 export const retrieveBookingDocument = async (bookingId, cargoId, documentType) => {
   try {
-      const response = await fetch(
-          `${API_URL}/bookings/${bookingId}`
-      );
+    const response = await fetch(
+      `${API_URL}/bookings/${bookingId}`
+    );
 
-      if (!response.ok) {
-          throw new Error('Failed to retrieve document');
-      }
+    if (!response.ok) {
+      throw new Error('Failed to retrieve document');
+    }
 
-      const data = await response.json();
-      const documentUrl = data.cargo[cargoId].documents[documentType];
-      console.log(documentUrl);
-      if (documentType === "Safety Data Sheet") {
-        await updateDoc(doc(db, "bookings", bookingId), {
-          [`cargo.${cargoId}.documentStatus['UN Classification Sheet']`]: {
-            status: "IN_PROGRESS",
-            lastUpdated: serverTimestamp(),
-            comments: "Prerequisites met, waiting for agency review"
-          }
-        });
-      }
-      return {
-          url: documentUrl,
-          fileName: documentUrl.split('/').pop()
-      };
+    const data = await response.json();
+    const documentUrl = data.cargo[cargoId].documents[documentType];
+    console.log(documentUrl);
+    if (documentType === "Safety Data Sheet") {
+      await updateDoc(doc(db, "bookings", bookingId), {
+        [`cargo.${cargoId}.documentStatus['UN Classification Sheet']`]: {
+          status: "IN_PROGRESS",
+          lastUpdated: serverTimestamp(),
+          comments: "Prerequisites met, waiting for agency review"
+        }
+      });
+    }
+    return {
+      url: documentUrl,
+      fileName: documentUrl.split('/').pop()
+    };
   } catch (error) {
-      console.error('Error retrieving document:', error);
-      throw error;
+    console.error('Error retrieving document:', error);
+    throw error;
   }
 };
 
@@ -1368,13 +1370,14 @@ export const getBillingRequestsByMonth1 = async (companyId, monthRange) => {
   }
 };
 
+
 export const getPricingRates = async () => {
   try {
     const ratesDoc = await getDoc(doc(db, 'pricing', 'rates'));
     if (ratesDoc.exists()) {
       return ratesDoc.data();
     } else {
-      return null; 
+      return null;
     }
   } catch (error) {
     console.error('Error fetching pricing rates:', error);
@@ -1382,7 +1385,94 @@ export const getPricingRates = async () => {
   }
 };
 
+export const getSamplingRequests = async () => {
+  try {
+    const response = await fetch('http://localhost:5001/sampling-requests');
+    if (!response.ok) {
+      throw new Error('Failed to fetch sampling requests');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching sampling requests:', error);
+    throw error;
+  }
+};
 
+export const createSamplingRequest = async (requestData) => {
+  try {
+    const response = await fetch('http://localhost:5001/sampling-requests', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestData),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to create sampling request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error creating sampling request:', error);
+    throw error;
+  }
+};
+
+export const updateSamplingRequest = async (id, requestData) => {
+  try {
+    const response = await fetch(`http://localhost:5001/sampling-requests/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestData),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to update sampling request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating sampling request:', error);
+    throw error;
+  }
+};
+
+export const deleteSamplingRequest = async (id) => {
+  try {
+    const response = await fetch(`http://localhost:5001/sampling-requests/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      throw new Error('Failed to delete sampling request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error deleting sampling request:', error);
+    throw error;
+  }
+};
+
+export const uploadSamplingDocument = async (requestId, documentType, file) => {
+  try {
+    const formData = new FormData();
+    formData.append('document', file);
+    formData.append('documentType', documentType);
+
+    const response = await fetch(
+      `http://localhost:5001/sampling-requests/${requestId}/documents`,
+      {
+        method: 'POST',
+        body: formData,
+      }
+    );
+    if (!response.ok) {
+      throw new Error('Failed to upload document');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error uploading document:', error);
+    throw error;
+  }
+};
 
 const api = {
   loginUser,
