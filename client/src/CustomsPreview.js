@@ -210,7 +210,30 @@ const DocumentListItem = ({
     if (isAgencyDoc) {
       const prerequisites = docDetails.requiresDocuments;
       if (prerequisites?.length > 0) {
-        return `Requires: ${prerequisites.join(", ")}`;
+        // Create a status list of required documents
+        return (
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              Required Documents:
+            </Typography>
+            {prerequisites.map((reqDoc) => (
+              <Chip
+                key={reqDoc}
+                size="small"
+                label={reqDoc}
+                icon={
+                  cargoDetails.documents[reqDoc] ? (
+                    <CheckCircle fontSize="small" />
+                  ) : (
+                    <ErrorIcon fontSize="small" />
+                  )
+                }
+                color={cargoDetails.documents[reqDoc] ? "success" : "default"}
+                sx={{ ml: 1, mb: 1 }}
+              />
+            ))}
+          </Box>
+        );
       }
       return `To be issued by: ${docDetails.issuedBy}`;
     } else {
@@ -534,8 +557,6 @@ const CustomsPreview = () => {
       //     },
       //   };
 
-        
-
       //   const updatedCargoDetails = {
       //     ...cargoDetails,
       //     documents: {
@@ -545,9 +566,7 @@ const CustomsPreview = () => {
       //     documentStatus: updatedStatus  // Include the updated status with UN_Classification_Sheet
       //   };
 
-       
       //   setCargoDetails(updatedCargoDetails);
-
 
       //   const bookingData = bookings.find(
       //     (b) => b.bookingId === selectedBooking
@@ -563,19 +582,20 @@ const CustomsPreview = () => {
 
       if (selectedDocument) {
         // Get all agency documents that require the uploaded document
-        const affectedAgencyDocs = category.documents.agency.filter(doc => 
+        const affectedAgencyDocs = category.documents.agency.filter((doc) =>
           doc.requiresDocuments.includes(selectedDocument)
         );
-      
+
         // Check each affected agency document
         const updatedStatus = { ...cargoDetails.documentStatus };
-        
-        affectedAgencyDocs.forEach(agencyDoc => {
+
+        affectedAgencyDocs.forEach((agencyDoc) => {
           // Check if all required documents are now uploaded
-          const allRequiredDocsUploaded = agencyDoc.requiresDocuments.every(reqDoc => 
-            cargoDetails.documents[reqDoc] || reqDoc === selectedDocument
+          const allRequiredDocsUploaded = agencyDoc.requiresDocuments.every(
+            (reqDoc) =>
+              cargoDetails.documents[reqDoc] || reqDoc === selectedDocument
           );
-      
+
           // If all required docs are now available, update the agency doc status
           if (allRequiredDocsUploaded) {
             updatedStatus[agencyDoc.name] = {
@@ -584,28 +604,31 @@ const CustomsPreview = () => {
               lastUpdated: new Date(),
               comments: "Prerequisites met, waiting for agency review",
               issuedBy: cargoDetails.documentStatus[agencyDoc.name].issuedBy,
-              requiresDocuments: cargoDetails.documentStatus[agencyDoc.name].requiresDocuments
+              requiresDocuments:
+                cargoDetails.documentStatus[agencyDoc.name].requiresDocuments,
             };
           }
         });
-      
+
         const updatedCargoDetails = {
           ...cargoDetails,
           documents: {
             ...cargoDetails.documents,
             [selectedDocument]: uploadResult.url,
           },
-          documentStatus: updatedStatus
+          documentStatus: updatedStatus,
         };
-      
+
         setCargoDetails(updatedCargoDetails);
-      
-        const bookingData = bookings.find(b => b.bookingId === selectedBooking);
+
+        const bookingData = bookings.find(
+          (b) => b.bookingId === selectedBooking
+        );
         await updateBooking(selectedBooking, {
           ...bookingData,
           cargo: {
             ...bookingData.cargo,
-            [selectedCargo]: updatedCargoDetails
+            [selectedCargo]: updatedCargoDetails,
           },
         });
       }
