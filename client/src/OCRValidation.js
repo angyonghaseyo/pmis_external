@@ -59,13 +59,25 @@ export async function validateDocumentWithOCR(file, requiredKeywords) {
 
 // Document type keyword mappings
 export const DocumentKeywords = {
-  "Export License": ["export", "license"],
-  "Certificate of Origin": ["certificate", "origin"],
-  "Commercial Invoice": ["commercial", "invoice"],
-  "Packing List": ["packing", "list"],
-  "UN Packaging Specification": ["un", "packaging", "specification"],
-  "Safety Data Sheet": ["safety", "data", "sheet"],
-};
+  "Export_License": ["export", "license"],
+  "Certificate_of_Origin": ["certificate", "origin"],
+  "Commercial_Invoice": ["commercial", "invoice"],
+  "Packing_List": ["packing", "list"],
+  "UN_Packaging_Specification": ["un", "packaging", "specification"],
+  "Safety_Data_Sheet": ["safety", "data", "sheet"],
+  "Explosives_Handling_License": ["explosives", "license"],
+  // For fresh fruits
+  "Phytosanitary Certificate": ["phytosanitary", "certificate"],
+  "Pesticide Residue Test Report": ["pesticide", "residue", "test", "report"],
+  "Cold Chain Compliance Certificate": ["cold", "chain", "compliance"],
+  "Packaging Declaration": ["packaging", "declaration"],
+  // For pharmaceuticals
+  "GMP Certificate": ["gmp", "certificate"],
+  "Drug Registration Certificate": ["drug", "registration"],
+  "Certificate of Pharmaceutical Product": ["pharmaceutical", "product", "certificate"],
+  "Stability Study Report": ["stability", "study", "report"],
+  "Batch Analysis Certificate": ["batch", "analysis", "certificate"]
+}
 
 // Levenshtein distance for fuzzy matching
 function levenshteinDistance(a, b) {

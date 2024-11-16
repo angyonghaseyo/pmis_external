@@ -47,47 +47,17 @@ import {
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import ErrorIcon from "@mui/icons-material/Error";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
-import ArchiveIcon from '@mui/icons-material/Archive';
+import ArchiveIcon from "@mui/icons-material/Archive";
 import {
   getBookings,
   getBookingById,
   uploadBookingDocument,
   retrieveBookingDocument,
+  updateBooking,
 } from "./services/api";
 import { validateDocumentWithOCR, DocumentKeywords } from "./OCRValidation.js";
 import { HSCodeCategories, ProcessStatus } from "./HSCodeCategories.js";
 
-// const CategoryIcon = ({ category }) => {
-//   switch (category) {
-//     case "EXPLOSIVES_AND_PYROTECHNICS":
-//       return <Warning />;
-//     case "FRESH_FRUITS":
-//       return <LocalFlorist />;
-//     case "PHARMACEUTICALS":
-//       return <Medication />;
-//     default:
-//       return null;
-//   }
-// };
-
-// const StatusChip = ({ status }) => {
-//   const getStatusColor = () => {
-//     switch (status) {
-//       case ProcessStatus.COMPLETED:
-//         return "success";
-//       case ProcessStatus.IN_PROGRESS:
-//         return "primary";
-//       case ProcessStatus.REJECTED:
-//         return "error";
-//       default:
-//         return "default";
-//     }
-//   };
-
-//   const displayStatus = status ? status.replace(/_/g, " ") : "NOT STARTED";
-
-//   return <Chip label={displayStatus} color={getStatusColor()} size="small" />;
-// };
 const UploadDialog = ({
   open,
   onClose,
@@ -230,7 +200,7 @@ const DocumentListItem = ({
       }
     } else {
       if (hasDocument) {
-        return <CheckCircle sx={{ color: 'green' }}/>;
+        return <CheckCircle sx={{ color: "green" }} />;
       }
       return <UploadFile />;
     }
@@ -548,21 +518,45 @@ const CustomsPreview = () => {
 
       setCargoDetails(updatedCargoDetails);
 
-      if (selectedDocument === "Safety Data Sheet") {
+      if (selectedDocument === "Safety_Data_Sheet") {
         const updatedStatus = {
           ...cargoDetails.documentStatus,
-          "UN Classification Sheet": {
-            ...cargoDetails.documentStatus["UN Classification Sheet"],
+          UN_Classification_Sheet: {
+            name: "UN_Classification_Sheet", // Keep existing fields
             status: "IN_PROGRESS",
             lastUpdated: new Date(),
-            comments: "Prerequisites met, waiting for agency review"
-          }
+            comments: "Prerequisites met, waiting for agency review",
+            issuedBy:
+              cargoDetails.documentStatus["UN_Classification_Sheet"].issuedBy, // Preserve existing issuedBy
+            requiresDocuments:
+              cargoDetails.documentStatus["UN_Classification_Sheet"]
+                .requiresDocuments, // Preserve existing requiresDocuments
+          },
         };
-      
-        setCargoDetails(prev => ({
-          ...prev,
-          documentStatus: updatedStatus
-        }));
+
+        const updatedCargoDetails = {
+          ...cargoDetails,
+          documents: {
+            ...cargoDetails.documents,
+            [selectedDocument]: uploadResult.url,
+          },
+          documentStatus: updatedStatus  // Include the updated status with UN_Classification_Sheet
+        };
+
+       
+        setCargoDetails(updatedCargoDetails);
+
+
+        const bookingData = bookings.find(
+          (b) => b.bookingId === selectedBooking
+        );
+        await updateBooking(selectedBooking, {
+          ...bookingData,
+          cargo: {
+            ...bookingData.cargo,
+            [selectedCargo]: updatedCargoDetails
+          },
+        });
       }
 
       // Set success status after successful upload
@@ -720,7 +714,7 @@ const CustomsPreview = () => {
     return (
       <Button
         variant="outlined"
-        startIcon={<ArchiveIcon/>}
+        startIcon={<ArchiveIcon />}
         onClick={() => handleDownloadAllDocuments(cargoId)}
         disabled={!hasDocuments}
         sx={{ borderRadius: "8px" }}
