@@ -29,6 +29,7 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import { Close } from '@mui/icons-material';
+import { useAuth } from "./AuthContext";
 import { 
   getOperatorRequisitions,
   createOperatorRequisition, 
@@ -37,7 +38,6 @@ import {
   getActiveVesselVisits,
   getCurrentUserCompany 
 } from './services/api';
-import { useAuth } from './AuthContext';
 
 const operatorSkills = ['Tugboat Operator', 'Pilot Operator'];
 const durations = ['1 Hour', '2 Hours', '3 Hours', '4 Hours'];
@@ -50,6 +50,7 @@ const OperatorRequisition = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [formData, setFormData] = useState({
+    company: user.company, 
     operatorSkill: '',
     date: '',
     time: '',

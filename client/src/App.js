@@ -36,6 +36,7 @@ import AgencySimulator from "./AgencySimulator"
 import BillingRequests from "./BillingRequests";
 import Invoice from './invoice';
 import DatabaseSetup from "./DatabaseSetup";
+import PricingRates from "./components/PricingRates";
 
 const drawerWidth = 240;
 
@@ -319,6 +320,14 @@ function App() {
                   <Route
                     path="/financial/invoice"
                     element={<Invoice companyId={user.company} />}
+                  />
+                )
+              }
+              {
+                hasAccessRights(['View Invoice']) && (
+                  <Route
+                    path="/financial/pricing-rates"
+                    element={<PricingRates />}
                   />
                 )
               }

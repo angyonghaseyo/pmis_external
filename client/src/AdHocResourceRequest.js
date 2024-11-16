@@ -31,6 +31,7 @@ import { Edit as EditIcon, Visibility as VisibilityIcon } from '@mui/icons-mater
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { useAuth } from "./AuthContext";
 import { getAdHocResourceRequests, submitAdHocResourceRequest, updateAdHocResourceRequest, getVesselVisitRequestsAdHocRequest, getCurrentUserCompany } from './services/api';
 
 const formatDate = (dateString) => {
@@ -40,10 +41,12 @@ const formatDate = (dateString) => {
 };
 
 const AdHocResourceRequest = () => {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [vesselVisits, setVesselVisits] = useState([]);
   const [company, setCompany] = useState('');
   const [formData, setFormData] = useState({
+    company: user.company,
     vesselVisit: '',
     resourceType: '',
     description: '',

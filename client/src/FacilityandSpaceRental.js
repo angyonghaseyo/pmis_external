@@ -46,6 +46,7 @@ import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { addHours, isBefore, isAfter, format } from 'date-fns';
+import { useAuth } from "./AuthContext";
 
 const steps = ['Select Warehouse', 'Specify Booking Hours', 'Review & Submit'];
 
@@ -76,12 +77,14 @@ const checkBookingConflict = (bookedPeriods, newStart, newEnd) => {
 
 const FacilityandSpaceRental = () => {
     // State management
+    const { user } = useAuth();
     const [activeStep, setActiveStep] = useState(0);
     const [openDialog, setOpenDialog] = useState(false);
     const [selectedFacility, setSelectedFacility] = useState(null);
     const [facilities, setFacilities] = useState([]);
     const [company, setCompany] = useState(''); 
     const [formData, setFormData] = useState({
+        company: user?.company,
         facilityId: '',
         startTime: null,
         endTime: null,
@@ -260,7 +263,7 @@ const FacilityandSpaceRental = () => {
             }
 
             const rentalData = {
-                company: company,
+                company: user.company,
                 facilityId: selectedFacility.id,
                 facilityName: selectedFacility.name,
                 warehouseId: selectedFacility.warehouseId,

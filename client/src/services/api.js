@@ -1363,10 +1363,26 @@ export const getBillingRequestsByMonth1 = async (companyId, monthRange) => {
 
     return billingRequests;
   } catch (error) {
-    console.error("Error fetching billing requests by month:", error);
+    console.error('Error fetching billing requests by month:', error);
     throw error;
   }
 };
+
+export const getPricingRates = async () => {
+  try {
+    const ratesDoc = await getDoc(doc(db, 'pricing', 'rates'));
+    if (ratesDoc.exists()) {
+      return ratesDoc.data();
+    } else {
+      return null; 
+    }
+  } catch (error) {
+    console.error('Error fetching pricing rates:', error);
+    throw error;
+  }
+};
+
+
 
 const api = {
   loginUser,
@@ -1446,6 +1462,7 @@ const api = {
   getBillingRequestsByMonth1,
   uploadBookingDocument,
   retrieveBookingDocument,
+  getPricingRates,
 };
 
 export default api;
