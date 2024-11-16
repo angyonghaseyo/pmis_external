@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios from "axios";
 import {
   auth,
   signInWithEmailAndPassword,
@@ -6,8 +6,8 @@ import {
   sendPasswordResetEmail,
   confirmPasswordReset,
   updateProfile,
-  deleteUser as firebaseDeleteUser
-} from '../firebaseConfig';
+  deleteUser as firebaseDeleteUser,
+} from "../firebaseConfig";
 import {
   collection,
   query,
@@ -25,14 +25,18 @@ import {
   Timestamp,
   arrayRemove,
   runTransaction,
-  orderBy
-} from 'firebase/firestore';
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+  orderBy,
+} from "firebase/firestore";
+import {
+  getStorage,
+  ref as storageRef,
+  uploadBytes,
+  getDownloadURL,
+} from "firebase/storage";
 
-import { db } from '../firebaseConfig';
-import { startOfMonth, endOfMonth } from 'date-fns';
-import { API_URL } from '../config/apiConfig';
-
+import { db } from "../firebaseConfig";
+import { startOfMonth, endOfMonth } from "date-fns";
+import { API_URL } from "../config/apiConfig";
 
 const storage = getStorage();
 
@@ -50,7 +54,10 @@ authAxios.interceptors.request.use(async (config) => {
 
 // Error handling helper
 const handleApiError = (error) => {
-  console.error('API Error:', error.response ? error.response.data : error.message);
+  console.error(
+    "API Error:",
+    error.response ? error.response.data : error.message
+  );
   throw error;
 };
 
@@ -60,12 +67,16 @@ export const loginUser = (email, password) =>
 
 export const registerUser = async (email, password, userData) => {
   try {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const userCredential = await createUserWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
     const user = userCredential.user;
-    await setDoc(doc(db, 'users', user.uid), { ...userData, uid: user.uid });
+    await setDoc(doc(db, "users", user.uid), { ...userData, uid: user.uid });
 
     // Update or create company document
-    const companyRef = doc(db, 'companies', userData.company);
+    const companyRef = doc(db, "companies", userData.company);
     const companyDoc = await getDoc(companyRef);
     if (companyDoc.exists()) {
       await updateDoc(companyRef, { userCount: increment(1) });
@@ -88,7 +99,7 @@ export const updateUserProfile = async (userData) => {
   try {
     const user = auth.currentUser;
     await updateProfile(user, userData);
-    await updateDoc(doc(db, 'users', user.uid), userData);
+    await updateDoc(doc(db, "users", user.uid), userData);
   } catch (error) {
     handleApiError(error);
   }
@@ -98,12 +109,12 @@ export const updateUserProfile = async (userData) => {
 export const getCurrentUserCompany = async () => {
   const user = await auth.currentUser;
   if (user) {
-    const userDoc = await getDoc(doc(db, 'users', user.uid));
+    const userDoc = await getDoc(doc(db, "users", user.uid));
     if (userDoc.exists()) {
       return userDoc.data().company;
     }
   }
-  throw new Error('User company not found');
+  throw new Error("User company not found");
 };
 
 export const updateUserPassword = (newPassword) =>
@@ -118,37 +129,40 @@ export const confirmUserPasswordReset = (oobCode, newPassword) =>
 
 export const getUsers = async (userId) => {
   try {
-
     const response = await fetch(`${API_URL}/users?email=${userId}`);
     if (!response.ok) {
-      throw new Error('Error fetching users');
+      throw new Error("Error fetching users");
     }
     const users = await response.json();
     return users;
   } catch (error) {
-    console.error('Error fetching users:', error);
+    console.error("Error fetching users:", error);
     throw error;
   }
 };
 
-
 export const getAllUsersInCompany = async (userId) => {
   try {
-    const response = await fetch(`${API_URL}/all-users-in-company?email=${userId}`);
+    const response = await fetch(
+      `${API_URL}/all-users-in-company?email=${userId}`
+    );
     if (!response.ok) {
-      throw new Error('Error fetching users in company');
+      throw new Error("Error fetching users in company");
     }
     const users = await response.json();
     return users;
   } catch (error) {
-    console.error('Error fetching users in company:', error);
+    console.error("Error fetching users in company:", error);
     throw error;
   }
 };
 
 export const createUser = async (userData) => {
   try {
-    const docRef = await addDoc(collection(db, 'users'), { ...userData, userType: 'Normal' });
+    const docRef = await addDoc(collection(db, "users"), {
+      ...userData,
+      userType: "Normal",
+    });
     return docRef.id;
   } catch (error) {
     handleApiError(error);
@@ -159,13 +173,13 @@ export const updateUser = async (userId, userData, isPending = false) => {
   try {
     const dataToUpdate = {
       ...userData,
-      userType: 'Normal'
+      userType: "Normal",
     };
 
     if (isPending) {
-      await updateDoc(doc(db, 'invitations', userId), dataToUpdate);
+      await updateDoc(doc(db, "invitations", userId), dataToUpdate);
     } else {
-      await updateDoc(doc(db, 'users', userId), dataToUpdate);
+      await updateDoc(doc(db, "users", userId), dataToUpdate);
     }
   } catch (error) {
     handleApiError(error);
@@ -174,11 +188,14 @@ export const updateUser = async (userId, userData, isPending = false) => {
 
 export const deleteUser = async (email) => {
   try {
-    const response = await fetch(`${API_URL}/users?email=${encodeURIComponent(email)}`, {
-      method: 'DELETE',
-    });
+    const response = await fetch(
+      `${API_URL}/users?email=${encodeURIComponent(email)}`,
+      {
+        method: "DELETE",
+      }
+    );
     if (!response.ok) {
-      throw new Error('Error deleting user');
+      throw new Error("Error deleting user");
     }
   } catch (error) {
     handleApiError(error);
@@ -188,14 +205,14 @@ export const deleteUser = async (email) => {
 export const deleteUserAccount = async (email) => {
   try {
     const response = await fetch(`${API_URL}/user-account`, {
-      method: 'DELETE',
+      method: "DELETE",
       headers: {
-        'Content-Type': 'application/json',
-        'X-User-Email': email,
+        "Content-Type": "application/json",
+        "X-User-Email": email,
       },
     });
     if (!response.ok) {
-      throw new Error('Error deleting user account');
+      throw new Error("Error deleting user account");
     }
   } catch (error) {
     handleApiError(error);
@@ -205,14 +222,14 @@ export const deleteUserAccount = async (email) => {
 export const inviteUser = async (userData) => {
   try {
     const response = await fetch(`${API_URL}/invitations`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(userData),
     });
     if (!response.ok) {
-      throw new Error('Error inviting user');
+      throw new Error("Error inviting user");
     }
     const result = await response.json();
     return result.id;
@@ -224,10 +241,10 @@ export const inviteUser = async (userData) => {
 export const cancelInvitation = async (invitationId) => {
   try {
     const response = await fetch(`${API_URL}/invitations/${invitationId}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
     if (!response.ok) {
-      throw new Error('Error canceling invitation');
+      throw new Error("Error canceling invitation");
     }
   } catch (error) {
     handleApiError(error);
@@ -239,13 +256,13 @@ export const getUserInquiriesFeedback = async (userId) => {
   try {
     const response = await fetch(`${API_URL}/inquiries-feedback/${userId}`);
     if (!response.ok) {
-      throw new Error('Error fetching inquiries and feedback');
+      throw new Error("Error fetching inquiries and feedback");
     }
     const results = await response.json();
-    console.log(results)
+    console.log(results);
     return results;
   } catch (error) {
-    console.error('Error fetching inquiries and feedback:', error);
+    console.error("Error fetching inquiries and feedback:", error);
     throw error;
   }
 };
@@ -258,18 +275,18 @@ export const createInquiryFeedback = async (data) => {
     }
 
     const response = await fetch(`${API_URL}/inquiries-feedback`, {
-      method: 'POST',
+      method: "POST",
       body: formData,
     });
 
     if (!response.ok) {
-      throw new Error('Error creating inquiry/feedback');
+      throw new Error("Error creating inquiry/feedback");
     }
 
     const result = await response.json();
     return result.id;
   } catch (error) {
-    console.error('Error in createInquiryFeedback:', error);
+    console.error("Error in createInquiryFeedback:", error);
     throw error;
   }
 };
@@ -281,26 +298,29 @@ export const updateInquiryFeedback = async (incrementalId, data) => {
       formData.append(key, data[key]);
     }
 
-    const response = await fetch(`${API_URL}/inquiries-feedback/${incrementalId}`, {
-      method: 'PUT',
-      body: formData,
-    });
+    const response = await fetch(
+      `${API_URL}/inquiries-feedback/${incrementalId}`,
+      {
+        method: "PUT",
+        body: formData,
+      }
+    );
 
     if (!response.ok) {
-      throw new Error('Error updating inquiry/feedback');
+      throw new Error("Error updating inquiry/feedback");
     }
   } catch (error) {
-    console.error('Error updating inquiry/feedback:', error);
+    console.error("Error updating inquiry/feedback:", error);
     throw error;
   }
 };
 // Delete inquiry or feedback
 export const deleteInquiryFeedback = async (id) => {
   try {
-    const docRef = doc(db, 'inquiries_feedback', id);
+    const docRef = doc(db, "inquiries_feedback", id);
     await deleteDoc(docRef);
   } catch (error) {
-    console.error('Error deleting inquiry/feedback:', error);
+    console.error("Error deleting inquiry/feedback:", error);
     throw error;
   }
 };
@@ -308,15 +328,17 @@ export const deleteInquiryFeedback = async (id) => {
 // Company operations
 export const getCompanyInfo = async (companyName) => {
   try {
-    console.log("Company Name", companyName)
-    const response = await fetch(`${API_URL}/company-data?companyName=${encodeURIComponent(companyName)}`);
+    console.log("Company Name", companyName);
+    const response = await fetch(
+      `${API_URL}/company-data?companyName=${encodeURIComponent(companyName)}`
+    );
     if (!response.ok) {
-      throw new Error('Error fetching company data');
+      throw new Error("Error fetching company data");
     }
     const companyData = await response.json();
     return companyData;
   } catch (error) {
-    console.error('Error fetching company data:', error);
+    console.error("Error fetching company data:", error);
     throw error;
   }
 };
@@ -324,17 +346,17 @@ export const getCompanyInfo = async (companyName) => {
 export const updateCompanyInfo = async (companyName, data) => {
   try {
     const response = await fetch(`${API_URL}/company-data/${companyName}`, {
-      method: 'PUT',
+      method: "PUT",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(data),
     });
     if (!response.ok) {
-      throw new Error('Error updating company info');
+      throw new Error("Error updating company info");
     }
   } catch (error) {
-    console.error('Error updating company info:', error);
+    console.error("Error updating company info:", error);
     throw new Error(`Failed to update company information: ${error.message}`);
   }
 };
@@ -342,12 +364,12 @@ export const getOperatorRequisitions = async (userId) => {
   try {
     const response = await fetch(`${API_URL}/operator-requisitions/${userId}`);
     if (!response.ok) {
-      throw new Error('Error fetching operator requisitions');
+      throw new Error("Error fetching operator requisitions");
     }
     const results = await response.json();
     return results;
   } catch (error) {
-    console.error('Error fetching operator requisitions:', error);
+    console.error("Error fetching operator requisitions:", error);
     throw error;
   }
 };
@@ -355,51 +377,57 @@ export const getOperatorRequisitions = async (userId) => {
 export const createOperatorRequisition = async (requisitionData) => {
   try {
     const response = await fetch(`${API_URL}/operator-requisitions`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(requisitionData),
     });
     if (!response.ok) {
-      throw new Error('Error creating operator requisition');
+      throw new Error("Error creating operator requisition");
     }
     const data = await response.json();
     return data.id;
   } catch (error) {
-    console.error('Error creating operator requisition:', error);
+    console.error("Error creating operator requisition:", error);
     throw error;
   }
 };
 
 export const updateOperatorRequisition = async (requisitionId, updateData) => {
   try {
-    const response = await fetch(`${API_URL}/operator-requisitions/${requisitionId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(updateData),
-    });
+    const response = await fetch(
+      `${API_URL}/operator-requisitions/${requisitionId}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updateData),
+      }
+    );
     if (!response.ok) {
-      throw new Error('Error updating operator requisition');
+      throw new Error("Error updating operator requisition");
     }
   } catch (error) {
-    console.error('Error updating operator requisition:', error);
+    console.error("Error updating operator requisition:", error);
     throw error;
   }
 };
 
 export const deleteOperatorRequisition = async (requisitionId) => {
   try {
-    const response = await fetch(`${API_URL}/operator-requisitions/${requisitionId}`, {
-      method: 'DELETE',
-    });
+    const response = await fetch(
+      `${API_URL}/operator-requisitions/${requisitionId}`,
+      {
+        method: "DELETE",
+      }
+    );
     if (!response.ok) {
-      throw new Error('Error deleting operator requisition');
+      throw new Error("Error deleting operator requisition");
     }
   } catch (error) {
-    console.error('Error deleting operator requisition:', error);
+    console.error("Error deleting operator requisition:", error);
     throw error;
   }
 };
@@ -408,12 +436,12 @@ export const getTrainingPrograms = async () => {
   try {
     const response = await fetch(`${API_URL}/training-programs`);
     if (!response.ok) {
-      throw new Error('Error fetching training programs');
+      throw new Error("Error fetching training programs");
     }
     const programs = await response.json();
     return programs;
   } catch (error) {
-    console.error('Error fetching training programs:', error);
+    console.error("Error fetching training programs:", error);
     throw error;
   }
 };
@@ -421,73 +449,80 @@ export const getTrainingPrograms = async () => {
 // Get user data including enrolled programs
 export const getUserData = async (userId) => {
   try {
-    const userRef = doc(db, 'users', userId);
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    const userRef = doc(db, "users", userId);
+    await new Promise((resolve) => setTimeout(resolve, 1500));
     const userDoc = await getDoc(userRef);
     if (userDoc.exists()) {
       return userDoc.data();
     } else {
-      throw new Error('User not found');
+      throw new Error("User not found");
     }
   } catch (error) {
-    console.error('Error fetching user data:', error);
+    console.error("Error fetching user data:", error);
     throw error;
   }
 };
 
 export const getUserUpdatedData = async (userEmail) => {
   try {
-    const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('email', '==', userEmail));
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, where("email", "==", userEmail));
     const querySnapshot = await getDocs(q);
 
     if (querySnapshot.empty) {
-      throw new Error('User not found');
+      throw new Error("User not found");
     }
 
     return querySnapshot.docs[0].data();
   } catch (error) {
-    console.error('Error fetching updated user data:', error);
+    console.error("Error fetching updated user data:", error);
     throw error;
   }
 };
 
 export const registerForProgram = async (programId, userEmail) => {
   try {
-    const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('email', '==', userEmail));
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, where("email", "==", userEmail));
     const querySnapshot = await getDocs(q);
 
     if (querySnapshot.empty) {
-      throw new Error('User not found');
+      throw new Error("User not found");
     }
 
     const userDoc = querySnapshot.docs[0];
     const userData = userDoc.data();
-    const programRef = doc(db, 'training_programs', programId);
+    const programRef = doc(db, "training_programs", programId);
     const programDoc = await getDoc(programRef);
 
     if (!programDoc.exists()) {
-      throw new Error('Program not found');
+      throw new Error("Program not found");
     }
 
     const programData = programDoc.data();
 
     // Check capacity
-    if (programData.numberOfCurrentRegistrations >= programData.participantCapacity) {
-      throw new Error('Program is full');
+    if (
+      programData.numberOfCurrentRegistrations >=
+      programData.participantCapacity
+    ) {
+      throw new Error("Program is full");
     }
 
     // Check if already enrolled
-    if (userData.enrolledPrograms?.some(program => program.programId === programId)) {
-      throw new Error('Already enrolled in this program');
+    if (
+      userData.enrolledPrograms?.some(
+        (program) => program.programId === programId
+      )
+    ) {
+      throw new Error("Already enrolled in this program");
     }
 
     // Use transaction to ensure atomicity
     await runTransaction(db, async (transaction) => {
       // Update program registrations
       transaction.update(programRef, {
-        numberOfCurrentRegistrations: increment(1)
+        numberOfCurrentRegistrations: increment(1),
       });
 
       // Update user enrollments
@@ -495,50 +530,52 @@ export const registerForProgram = async (programId, userEmail) => {
         enrolledPrograms: arrayUnion({
           programId: programId,
           enrollmentDate: Timestamp.now(),
-          status: 'Enrolled'
-        })
+          status: "Enrolled",
+        }),
       });
     });
   } catch (error) {
-    console.error('Error in registerForProgram:', error);
+    console.error("Error in registerForProgram:", error);
     throw error;
   }
 };
 
 export const withdrawFromProgram = async (programId, userEmail) => {
   try {
-    const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('email', '==', userEmail));
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, where("email", "==", userEmail));
     const querySnapshot = await getDocs(q);
 
     if (querySnapshot.empty) {
-      throw new Error('User not found');
+      throw new Error("User not found");
     }
 
     const userDoc = querySnapshot.docs[0];
     const userData = userDoc.data();
-    const programRef = doc(db, 'training_programs', programId);
+    const programRef = doc(db, "training_programs", programId);
 
-    const enrollmentToRemove = userData.enrolledPrograms?.find(ep => ep.programId === programId);
+    const enrollmentToRemove = userData.enrolledPrograms?.find(
+      (ep) => ep.programId === programId
+    );
 
     if (!enrollmentToRemove) {
-      throw new Error('Not enrolled in this program');
+      throw new Error("Not enrolled in this program");
     }
 
     // Use transaction to ensure atomicity
     await runTransaction(db, async (transaction) => {
       // Update program registrations
       transaction.update(programRef, {
-        numberOfCurrentRegistrations: increment(-1)
+        numberOfCurrentRegistrations: increment(-1),
       });
 
       // Update user enrollments
       transaction.update(userDoc.ref, {
-        enrolledPrograms: arrayRemove(enrollmentToRemove)
+        enrolledPrograms: arrayRemove(enrollmentToRemove),
       });
     });
   } catch (error) {
-    console.error('Error in withdrawFromProgram:', error);
+    console.error("Error in withdrawFromProgram:", error);
     throw error;
   }
 };
@@ -547,43 +584,49 @@ export const withdrawFromProgram = async (programId, userEmail) => {
 export const updateProgramCompletionStatus = async () => {
   try {
     const now = Timestamp.now();
-    const usersRef = collection(db, 'users');
+    const usersRef = collection(db, "users");
     const usersSnapshot = await getDocs(usersRef);
 
     for (const userDoc of usersSnapshot.docs) {
       const userData = userDoc.data();
       if (userData.enrolledPrograms) {
-        const updatedEnrollments = userData.enrolledPrograms.map(enrollment => {
-          if (enrollment.status === 'Enrolled') {
-            const programRef = doc(db, 'training_programs', enrollment.programId);
-            return getDoc(programRef).then(programDoc => {
-              const programData = programDoc.data();
-              if (programData.endDate.toDate() <= now.toDate()) {
-                return { ...enrollment, status: 'Completed' };
-              }
-              return enrollment;
-            });
+        const updatedEnrollments = userData.enrolledPrograms.map(
+          (enrollment) => {
+            if (enrollment.status === "Enrolled") {
+              const programRef = doc(
+                db,
+                "training_programs",
+                enrollment.programId
+              );
+              return getDoc(programRef).then((programDoc) => {
+                const programData = programDoc.data();
+                if (programData.endDate.toDate() <= now.toDate()) {
+                  return { ...enrollment, status: "Completed" };
+                }
+                return enrollment;
+              });
+            }
+            return enrollment;
           }
-          return enrollment;
-        });
+        );
 
         const resolvedEnrollments = await Promise.all(updatedEnrollments);
         await updateDoc(userDoc.ref, { enrolledPrograms: resolvedEnrollments });
       }
     }
   } catch (error) {
-    console.error('Error updating program completion status:', error);
+    console.error("Error updating program completion status:", error);
     throw error;
   }
 };
 
 export const getCargoManifests = async () => {
   try {
-    const manifestsRef = collection(db, 'cargo_manifests');
+    const manifestsRef = collection(db, "cargo_manifests");
     const snapshot = await getDocs(manifestsRef);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   } catch (error) {
-    console.error('Error fetching cargo manifests:', error);
+    console.error("Error fetching cargo manifests:", error);
     throw error;
   }
 };
@@ -591,19 +634,19 @@ export const getCargoManifests = async () => {
 export const submitCargoManifest = async (manifestData) => {
   try {
     const response = await fetch(`${API_URL}/cargo-manifests`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(manifestData),
     });
     if (!response.ok) {
-      throw new Error('Error submitting cargo manifest');
+      throw new Error("Error submitting cargo manifest");
     }
     const data = await response.json();
     return data.id;
   } catch (error) {
-    console.error('Error submitting cargo manifest:', error);
+    console.error("Error submitting cargo manifest:", error);
     throw error;
   }
 };
@@ -611,32 +654,31 @@ export const submitCargoManifest = async (manifestData) => {
 export const updateCargoManifest = async (id, manifestData) => {
   try {
     const response = await fetch(`${API_URL}/cargo-manifests/${id}`, {
-      method: 'PUT',
+      method: "PUT",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(manifestData),
     });
     if (!response.ok) {
-      throw new Error('Error updating cargo manifest');
+      throw new Error("Error updating cargo manifest");
     }
   } catch (error) {
-    console.error('Error updating cargo manifest:', error);
+    console.error("Error updating cargo manifest:", error);
     throw error;
   }
 };
 
-
 export const deleteCargoManifest = async (id) => {
   try {
     const response = await fetch(`${API_URL}/cargo-manifests/${id}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
     if (!response.ok) {
-      throw new Error('Error deleting cargo manifest');
+      throw new Error("Error deleting cargo manifest");
     }
   } catch (error) {
-    console.error('Error deleting cargo manifest:', error);
+    console.error("Error deleting cargo manifest:", error);
     throw error;
   }
 };
@@ -645,12 +687,12 @@ export const getVesselVisitRequestsAdHocRequest = async () => {
   try {
     const response = await fetch(`${API_URL}/vessel-visits-adhoc-requests`);
     if (!response.ok) {
-      throw new Error('Failed to fetch vessel visits');
+      throw new Error("Failed to fetch vessel visits");
     }
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error('Error fetching vessel visits:', error);
+    console.error("Error fetching vessel visits:", error);
     throw error;
   }
 };
@@ -659,12 +701,12 @@ export const getActiveVesselVisits = async () => {
   try {
     const response = await fetch(`${API_URL}/active-vessel-visits`);
     if (!response.ok) {
-      throw new Error('Failed to fetch active vessel visits');
+      throw new Error("Failed to fetch active vessel visits");
     }
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error('Error fetching active vessel visits:', error);
+    console.error("Error fetching active vessel visits:", error);
     throw error;
   }
 };
@@ -674,11 +716,11 @@ export const getAdHocResourceRequests = async () => {
   try {
     const response = await fetch(`${API_URL}/ad-hoc-resource-requests`);
     if (!response.ok) {
-      throw new Error('Failed to fetch ad hoc requests');
+      throw new Error("Failed to fetch ad hoc requests");
     }
     return await response.json();
   } catch (error) {
-    console.error('Error fetching ad hoc requests:', error);
+    console.error("Error fetching ad hoc requests:", error);
     throw error;
   }
 };
@@ -686,37 +728,40 @@ export const getAdHocResourceRequests = async () => {
 export const submitAdHocResourceRequest = async (requestData) => {
   try {
     const response = await fetch(`${API_URL}/ad-hoc-resource-requests`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(requestData),
     });
     if (!response.ok) {
-      throw new Error('Failed to submit ad hoc request');
+      throw new Error("Failed to submit ad hoc request");
     }
     return await response.json();
   } catch (error) {
-    console.error('Error submitting ad hoc request:', error);
+    console.error("Error submitting ad hoc request:", error);
     throw error;
   }
 };
 
 export const updateAdHocResourceRequest = async (requestId, requestData) => {
   try {
-    const response = await fetch(`${API_URL}/ad-hoc-resource-requests/${requestId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestData),
-    });
+    const response = await fetch(
+      `${API_URL}/ad-hoc-resource-requests/${requestId}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestData),
+      }
+    );
     if (!response.ok) {
-      throw new Error('Failed to update ad hoc request');
+      throw new Error("Failed to update ad hoc request");
     }
     return await response.json();
   } catch (error) {
-    console.error('Error updating ad hoc request:', error);
+    console.error("Error updating ad hoc request:", error);
     throw error;
   }
 };
@@ -726,66 +771,72 @@ export const getContainerTypes = async () => {
     const response = await fetch(`${API_URL}/container-types`);
 
     if (!response.ok) {
-      throw new Error('Error fetching container types');
+      throw new Error("Error fetching container types");
     }
 
     return await response.json();
   } catch (error) {
-    console.error('Error in getContainerTypes:', error);
+    console.error("Error in getContainerTypes:", error);
     throw error;
   }
 };
-
 
 export const getContainerTypesForCompany = async (company) => {
   try {
-    const response = await fetch(`${API_URL}/container-types/company?company=${encodeURIComponent(company)}`);
+    const response = await fetch(
+      `${API_URL}/container-types/company?company=${encodeURIComponent(
+        company
+      )}`
+    );
     if (!response.ok) {
-      throw new Error('Error fetching container types');
+      throw new Error("Error fetching container types");
     }
     return await response.json();
   } catch (error) {
-    console.error('Error in getContainerTypesForCompany:', error);
+    console.error("Error in getContainerTypesForCompany:", error);
     throw error;
   }
 };
-
 
 export const addContainerType = async (company, containerData) => {
   try {
     const formData = new FormData();
-    formData.append('company', company);
-    formData.append('size', containerData.size);
-    formData.append('price', containerData.price);
-    formData.append('name', containerData.name);
+    formData.append("company", company);
+    formData.append("size", containerData.size);
+    formData.append("price", containerData.price);
+    formData.append("name", containerData.name);
     if (containerData.imageFile) {
-      formData.append('image', containerData.imageFile);
+      formData.append("image", containerData.imageFile);
     }
 
     const response = await fetch(`${API_URL}/container-types`, {
-      method: 'POST',
-      body: formData
+      method: "POST",
+      body: formData,
     });
 
     if (!response.ok) {
-      throw new Error('Error adding container type');
+      throw new Error("Error adding container type");
     }
     return await response.json();
   } catch (error) {
-    console.error('Error in addContainerType:', error);
+    console.error("Error in addContainerType:", error);
     throw error;
   }
 };
 
 export const getCarrierContainerPrices = async (company) => {
   try {
-    const response = await fetch(`${API_URL}/carrier-container-prices?company=${encodeURIComponent(company)}`);
+    const response = await fetch(
+      `${API_URL}/carrier-container-prices?company=${encodeURIComponent(
+        company
+      )}`
+    );
     if (!response.ok) {
-      throw new Error('Error fetching carrier container prices');
+      throw new Error("Error fetching carrier container prices");
     }
     return await response.json();
   } catch (error) {
-    console.error('Error in getCarrierContainerPrices:', error);
+    console.error("Error in getCarrierContainerPrices:", error);
     throw error;
   }
 };
@@ -793,9 +844,9 @@ export const getCarrierContainerPrices = async (company) => {
 export const assignContainerPrice = async (company, containerData) => {
   try {
     const response = await fetch(`${API_URL}/carrier-container-prices`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         company,
@@ -804,48 +855,57 @@ export const assignContainerPrice = async (company, containerData) => {
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Server error' }));
-      throw new Error(errorData.error || 'Error assigning container price');
+      throw new Error("Error assigning container price");
     }
 
     return await response.json();
   } catch (error) {
-    console.error('Error in assignContainerPrice:', error);
+    console.error("Error in assignContainerPrice:", error);
     throw error;
   }
 };
 
-export const updateContainerPrice = async (company, equipmentId, updateData) => {
+export const updateContainerPrice = async (
+  company,
+  equipmentId,
+  updateData
+) => {
   try {
-    const response = await fetch(`${API_URL}/carrier-container-prices/${company}/${equipmentId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(updateData),
-    });
+    const response = await fetch(
+      `${API_URL}/carrier-container-prices/${company}/${equipmentId}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updateData),
+      }
+    );
 
     if (!response.ok) {
-      throw new Error('Error updating container price');
+      throw new Error("Error updating container price");
     }
     return await response.json();
   } catch (error) {
-    console.error('Error in updateContainerPrice:', error);
+    console.error("Error in updateContainerPrice:", error);
     throw error;
   }
 };
 
 export const deleteContainerPrice = async (company, equipmentId) => {
   try {
-    const response = await fetch(`${API_URL}/carrier-container-prices/${company}/${equipmentId}`, {
-      method: 'DELETE',
-    });
+    const response = await fetch(
+      `${API_URL}/carrier-container-prices/${company}/${equipmentId}`,
+      {
+        method: "DELETE",
+      }
+    );
 
     if (!response.ok) {
-      throw new Error('Error deleting container price');
+      throw new Error("Error deleting container price");
     }
   } catch (error) {
-    console.error('Error in deleteContainerPrice:', error);
+    console.error("Error in deleteContainerPrice:", error);
     throw error;
   }
 };
@@ -853,11 +913,13 @@ export const deleteContainerPrice = async (company, equipmentId) => {
 export const getBillingRequests = async (companyId, requestType) => {
   try {
     const response = await fetch(
-      `${API_URL}/billing-requests?companyId=${encodeURIComponent(companyId)}&requestType=${encodeURIComponent(requestType)}`,
+      `${API_URL}/billing-requests?companyId=${encodeURIComponent(
+        companyId
+      )}&requestType=${encodeURIComponent(requestType)}`,
       {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
       }
     );
@@ -869,7 +931,7 @@ export const getBillingRequests = async (companyId, requestType) => {
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error('Error fetching billing requests:', error);
+    console.error("Error fetching billing requests:", error);
     throw error;
   }
 };
@@ -877,11 +939,13 @@ export const getBillingRequests = async (companyId, requestType) => {
 export const getBillingRequestsByMonth = async (companyId, month) => {
   try {
     const response = await fetch(
-      `${API_URL}/billing-requests-by-month?companyId=${encodeURIComponent(companyId)}&month=${encodeURIComponent(month)}`,
+      `${API_URL}/billing-requests-by-month?companyId=${encodeURIComponent(
+        companyId
+      )}&month=${encodeURIComponent(month)}`,
       {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
       }
     );
@@ -893,7 +957,7 @@ export const getBillingRequestsByMonth = async (companyId, month) => {
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error('Error fetching billing requests by month:', error);
+    console.error("Error fetching billing requests by month:", error);
     throw error;
   }
 };
@@ -902,11 +966,11 @@ export const getBookingById = async (bookingId) => {
   try {
     const response = await fetch(`${API_URL}/bookings/${bookingId}`);
     if (!response.ok) {
-      throw new Error('Failed to fetch booking');
+      throw new Error("Failed to fetch booking");
     }
     return await response.json();
   } catch (error) {
-    console.error('Error fetching booking:', error);
+    console.error("Error fetching booking:", error);
     throw error;
   }
 };
@@ -915,11 +979,11 @@ export const getBookings = async () => {
   try {
     const response = await fetch(`${API_URL}/bookings`);
     if (!response.ok) {
-      throw new Error('Failed to fetch bookings');
+      throw new Error("Failed to fetch bookings");
     }
     return await response.json();
   } catch (error) {
-    console.error('Error fetching bookings:', error);
+    console.error("Error fetching bookings:", error);
     throw error;
   }
 };
@@ -927,18 +991,18 @@ export const getBookings = async () => {
 export const createBooking = async (bookingData) => {
   try {
     const response = await fetch(`${API_URL}/bookings`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(bookingData),
     });
     if (!response.ok) {
-      throw new Error('Failed to create booking');
+      throw new Error("Failed to create booking");
     }
     return await response.json();
   } catch (error) {
-    console.error('Error creating booking:', error);
+    console.error("Error creating booking:", error);
     throw error;
   }
 };
@@ -946,18 +1010,18 @@ export const createBooking = async (bookingData) => {
 export const updateBooking = async (id, bookingData) => {
   try {
     const response = await fetch(`${API_URL}/bookings/${id}`, {
-      method: 'PUT',
+      method: "PUT",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(bookingData),
     });
     if (!response.ok) {
-      throw new Error('Failed to update booking');
+      throw new Error("Failed to update booking");
     }
     return await response.json();
   } catch (error) {
-    console.error('Error updating booking:', error);
+    console.error("Error updating booking:", error);
     throw error;
   }
 };
@@ -965,37 +1029,74 @@ export const updateBooking = async (id, bookingData) => {
 export const deleteBooking = async (id) => {
   try {
     const response = await fetch(`${API_URL}/bookings/${id}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
     if (!response.ok) {
-      throw new Error('Failed to delete booking');
+      throw new Error("Failed to delete booking");
     }
     return await response.json();
   } catch (error) {
-    console.error('Error deleting booking:', error);
+    console.error("Error deleting booking:", error);
     throw error;
   }
 };
 
-export const uploadBookingDocument = async (bookingId, cargoId, documentType, file) => {
+export const uploadBookingDocument = async (
+  bookingId,
+  cargoId,
+  documentType,
+  file
+) => {
   try {
     const formData = new FormData();
-    formData.append('document', file);
-    formData.append('documentType', documentType);
+    formData.append("document", file);
+    formData.append("documentType", documentType);
 
     const response = await fetch(
       `${API_URL}/bookings/${bookingId}/cargo/${cargoId}/documents`,
       {
-        method: 'POST',
+        method: "POST",
         body: formData,
       }
     );
     if (!response.ok) {
-      throw new Error('Failed to upload document');
+      throw new Error("Failed to upload document");
     }
     return await response.json();
   } catch (error) {
-    console.error('Error uploading document:', error);
+    console.error("Error uploading document:", error);
+    throw error;
+  }
+};
+
+export const retrieveBookingDocument = async (bookingId, cargoId, documentType) => {
+  try {
+    const response = await fetch(
+      `${API_URL}/bookings/${bookingId}`
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to retrieve document');
+    }
+
+    const data = await response.json();
+    const documentUrl = data.cargo[cargoId].documents[documentType];
+    console.log(documentUrl);
+    if (documentType === "Safety Data Sheet") {
+      await updateDoc(doc(db, "bookings", bookingId), {
+        [`cargo.${cargoId}.documentStatus['UN Classification Sheet']`]: {
+          status: "IN_PROGRESS",
+          lastUpdated: serverTimestamp(),
+          comments: "Prerequisites met, waiting for agency review"
+        }
+      });
+    }
+    return {
+      url: documentUrl,
+      fileName: documentUrl.split('/').pop()
+    };
+  } catch (error) {
+    console.error('Error retrieving document:', error);
     throw error;
   }
 };
@@ -1003,21 +1104,21 @@ export const uploadBookingDocument = async (bookingId, cargoId, documentType, fi
 export const registerTruckForCargo = async (cargoId, truckLicense) => {
   try {
     const response = await fetch(`${API_URL}/bookings/register-truck`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({ cargoId, truckLicense }),
     });
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to register truck');
+      throw new Error(errorData.error || "Failed to register truck");
     }
 
     return await response.json();
   } catch (error) {
-    console.error('Error registering truck:', error);
+    console.error("Error registering truck:", error);
     throw error;
   }
 };
@@ -1026,11 +1127,11 @@ export const getContainerRequests = async () => {
   try {
     const response = await fetch(`${API_URL}/container-requests`);
     if (!response.ok) {
-      throw new Error('Failed to fetch container requests');
+      throw new Error("Failed to fetch container requests");
     }
     return await response.json();
   } catch (error) {
-    console.error('Error fetching container requests:', error);
+    console.error("Error fetching container requests:", error);
     throw error;
   }
 };
@@ -1038,18 +1139,18 @@ export const getContainerRequests = async () => {
 export const createContainerRequest = async (requestData) => {
   try {
     const response = await fetch(`${API_URL}/container-requests`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(requestData),
     });
     if (!response.ok) {
-      throw new Error('Failed to create container request');
+      throw new Error("Failed to create container request");
     }
     return await response.json();
   } catch (error) {
-    console.error('Error creating container request:', error);
+    console.error("Error creating container request:", error);
     throw error;
   }
 };
@@ -1057,18 +1158,18 @@ export const createContainerRequest = async (requestData) => {
 export const updateContainerRequest = async (id, requestData) => {
   try {
     const response = await fetch(`${API_URL}/container-requests/${id}`, {
-      method: 'PUT',
+      method: "PUT",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(requestData),
     });
     if (!response.ok) {
-      throw new Error('Failed to update container request');
+      throw new Error("Failed to update container request");
     }
     return await response.json();
   } catch (error) {
-    console.error('Error updating container request:', error);
+    console.error("Error updating container request:", error);
     throw error;
   }
 };
@@ -1076,14 +1177,14 @@ export const updateContainerRequest = async (id, requestData) => {
 export const deleteContainerRequest = async (id) => {
   try {
     const response = await fetch(`${API_URL}/container-requests/${id}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
     if (!response.ok) {
-      throw new Error('Failed to delete container request');
+      throw new Error("Failed to delete container request");
     }
     return await response.json();
   } catch (error) {
-    console.error('Error deleting container request:', error);
+    console.error("Error deleting container request:", error);
     throw error;
   }
 };
@@ -1092,11 +1193,11 @@ export const getAgencies = async () => {
   try {
     const response = await fetch(`${API_URL}/agencies`);
     if (!response.ok) {
-      throw new Error('Error fetching agencies');
+      throw new Error("Error fetching agencies");
     }
     return await response.json();
   } catch (error) {
-    console.error('Error in getAgencies:', error);
+    console.error("Error in getAgencies:", error);
     throw error;
   }
 };
@@ -1104,28 +1205,35 @@ export const getAgencies = async () => {
 export const verifyAgencyAccess = async (agencyKey, documentType) => {
   try {
     const response = await fetch(`${API_URL}/agencies/verify`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({ agencyKey, documentType }),
     });
     if (!response.ok) {
-      throw new Error('Error verifying agency access');
+      throw new Error("Error verifying agency access");
     }
     return await response.json();
   } catch (error) {
-    console.error('Error in verifyAgencyAccess:', error);
+    console.error("Error in verifyAgencyAccess:", error);
     throw error;
   }
 };
 
-export const updateDocumentStatus = async (agencyKey, bookingId, cargoId, documentType, status, comments) => {
+export const updateDocumentStatus = async (
+  agencyKey,
+  bookingId,
+  cargoId,
+  documentType,
+  status,
+  comments
+) => {
   try {
     const response = await fetch(`${API_URL}/agencies/document-status`, {
-      method: 'PUT',
+      method: "PUT",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         agencyKey,
@@ -1133,34 +1241,38 @@ export const updateDocumentStatus = async (agencyKey, bookingId, cargoId, docume
         cargoId,
         documentType,
         status,
-        comments
+        comments,
       }),
     });
     if (!response.ok) {
-      throw new Error('Error updating document status');
+      throw new Error("Error updating document status");
     }
     return await response.json();
   } catch (error) {
-    console.error('Error in updateDocumentStatus:', error);
+    console.error("Error in updateDocumentStatus:", error);
     throw error;
   }
 };
 
-
 // Dashboard data
-export const getLeaveStatistics = () => authAxios.get('/leave-statistics').catch(handleApiError);
+export const getLeaveStatistics = () =>
+  authAxios.get("/leave-statistics").catch(handleApiError);
 
-export const getTimeLog = () => authAxios.get('/time-log').catch(handleApiError);
+export const getTimeLog = () =>
+  authAxios.get("/time-log").catch(handleApiError);
 
-export const getServiceOperations = () => authAxios.get('/service-operations').catch(handleApiError);
+export const getServiceOperations = () =>
+  authAxios.get("/service-operations").catch(handleApiError);
 
 // Assets and Facilities
-export const getAssets = () => authAxios.get('/assets').catch(handleApiError);
+export const getAssets = () => authAxios.get("/assets").catch(handleApiError);
 
-export const getFacilities = () => authAxios.get('/facilities').catch(handleApiError);
+export const getFacilities = () =>
+  authAxios.get("/facilities").catch(handleApiError);
 
 // Manpower
-export const getEmployees = () => authAxios.get('/employees').catch(handleApiError);
+export const getEmployees = () =>
+  authAxios.get("/employees").catch(handleApiError);
 
 export const updateEmployee = (employeeId, data) =>
   authAxios.put(`/employees/${employeeId}`, data).catch(handleApiError);
@@ -1170,79 +1282,89 @@ export const getVesselVisits = async () => {
   try {
     const response = await fetch(`${API_URL}/vessel-visits-booking`);
     if (!response.ok) {
-      throw new Error('Failed to fetch vessel visits');
+      throw new Error("Failed to fetch vessel visits");
     }
     return await response.json();
   } catch (error) {
-    console.error('Error fetching vessel visits:', error);
+    console.error("Error fetching vessel visits:", error);
     throw error;
   }
 };
 
 export const getVesselVisitsConfirmedWithoutManifests = () => {
-  return axios.get('/vessel-visits-confirmed-without-manifests').catch(handleApiError);
-}
+  return axios
+    .get("/vessel-visits-confirmed-without-manifests")
+    .catch(handleApiError);
+};
 
 export const createVesselVisit = (visitData) =>
-  authAxios.post('/vessel-visits', visitData).catch(handleApiError);
+  authAxios.post("/vessel-visits", visitData).catch(handleApiError);
 
 export const updateVesselVisit = (visitId, visitData) =>
   authAxios.put(`/vessel-visits/${visitId}`, visitData).catch(handleApiError);
 
 // Port Operations
-export const getPortOperations = () => authAxios.get('/port-operations').catch(handleApiError);
+export const getPortOperations = () =>
+  authAxios.get("/port-operations").catch(handleApiError);
 
 export const createPortOperation = (operationData) =>
-  authAxios.post('/port-operations', operationData).catch(handleApiError);
+  authAxios.post("/port-operations", operationData).catch(handleApiError);
 
 // Cargos
-export const getCargos = () => authAxios.get('/cargos').catch(handleApiError);
+export const getCargos = () => authAxios.get("/cargos").catch(handleApiError);
 
-export const createCargo = (cargoData) => authAxios.post('/cargos', cargoData).catch(handleApiError);
+export const createCargo = (cargoData) =>
+  authAxios.post("/cargos", cargoData).catch(handleApiError);
 
 export const updateCargo = (cargoId, cargoData) =>
   authAxios.put(`/cargos/${cargoId}`, cargoData).catch(handleApiError);
 
 // Financial
-export const getFinancialReports = () => authAxios.get('/financial-reports').catch(handleApiError);
+export const getFinancialReports = () =>
+  authAxios.get("/financial-reports").catch(handleApiError);
 
 export const createInvoice = (invoiceData) =>
-  authAxios.post('/invoices', invoiceData).catch(handleApiError);
+  authAxios.post("/invoices", invoiceData).catch(handleApiError);
 
 // Customs and Trade Documents
-export const getCustomsDocuments = () => authAxios.get('/customs-documents').catch(handleApiError);
+export const getCustomsDocuments = () =>
+  authAxios.get("/customs-documents").catch(handleApiError);
 
 export const submitCustomsDocument = (documentData) =>
-  authAxios.post('/customs-documents', documentData).catch(handleApiError);
+  authAxios.post("/customs-documents", documentData).catch(handleApiError);
 
 // Settings
-export const getUserSettings = () => authAxios.get('/user-settings').catch(handleApiError);
+export const getUserSettings = () =>
+  authAxios.get("/user-settings").catch(handleApiError);
 
 export const updateUserSettings = (settingsData) =>
-  authAxios.put('/user-settings', settingsData).catch(handleApiError);
+  authAxios.put("/user-settings", settingsData).catch(handleApiError);
 
 export const getBillingRequestsByMonth1 = async (companyId, monthRange) => {
   try {
     const billingRequestsQuery = query(
-      collection(db, 'billing_requests'),
-      where('company', '==', companyId)
+      collection(db, "billing_requests"),
+      where("company", "==", companyId)
     );
 
     const querySnapshot = await getDocs(billingRequestsQuery);
 
     const billingRequests = querySnapshot.docs
-      .map(doc => ({
+      .map((doc) => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       }))
-      .filter(request => {
+      .filter((request) => {
         const dateCompleted = new Date(request.dateCompleted);
-        return dateCompleted >= new Date(monthRange.start) && dateCompleted <= new Date(monthRange.end);
+        return (
+          dateCompleted >= new Date(monthRange.start) &&
+          dateCompleted <= new Date(monthRange.end)
+        );
       });
 
     return billingRequests;
   } catch (error) {
-    console.error('Error fetching billing requests by month:', error);
+    console.error("Error fetching billing requests by month:", error);
     throw error;
   }
 };
@@ -1414,6 +1536,8 @@ const api = {
   updateBooking,
   deleteBooking,
   getBillingRequestsByMonth1,
+  uploadBookingDocument,
+  retrieveBookingDocument,
 };
 
 export default api;

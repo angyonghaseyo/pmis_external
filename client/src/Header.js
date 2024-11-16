@@ -1,22 +1,41 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Box, AppBar, Toolbar, IconButton, Menu, MenuItem, Typography, Avatar, Button, Select, FormControl, CircularProgress } from '@mui/material';
-import { Notifications, Logout, Person, DirectionsBoat } from '@mui/icons-material';
-import { useAuth } from './AuthContext';
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  Box,
+  AppBar,
+  Toolbar,
+  IconButton,
+  Menu,
+  MenuItem,
+  Typography,
+  Avatar,
+  Button,
+  Select,
+  FormControl,
+  CircularProgress,
+} from "@mui/material";
+import {
+  Notifications,
+  Logout,
+  Person,
+  DirectionsBoat,
+} from "@mui/icons-material";
+import { useAuth } from "./AuthContext";
+import logo from "./images/PortConnect-external.png";
 
 function Header() {
   const { user, logout } = useAuth();
   const [anchorEl, setAnchorEl] = useState(null);
   const [notificationAnchorEl, setNotificationAnchorEl] = useState(null);
-  const [language, setLanguage] = useState('EN');
+  const [language, setLanguage] = useState("EN");
   const navigate = useNavigate();
 
   const handleLogout = async () => {
     try {
       await logout();
-      navigate('/login');
+      navigate("/login");
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error("Error signing out:", error);
     }
   };
 
@@ -42,7 +61,14 @@ function Header() {
 
   if (!user) {
     return (
-      <AppBar position="fixed" sx={{ backgroundColor: '#ffffff', boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)', zIndex: 1300 }}>
+      <AppBar
+        position="fixed"
+        sx={{
+          backgroundColor: "#ffffff",
+          boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
+          zIndex: 1300,
+        }}
+      >
         <Toolbar>
           <CircularProgress />
         </Toolbar>
@@ -54,31 +80,44 @@ function Header() {
     <AppBar
       position="fixed"
       sx={{
-        backgroundColor: '#ffffff',
-        background: 'linear-gradient(135deg, #0061a8 0%, #003b6f 100%)',
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-        zIndex: 1300
+        backgroundColor: "#ffffff",
+        background: "linear-gradient(135deg, #0061a8 0%, #003b6f 100%)",
+        boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
+        zIndex: 1300,
       }}
     >
-      <Toolbar sx={{ justifyContent: 'space-between' }}>
+      <Toolbar
+        sx={{ justifyContent: "space-between", minHeight: "64px", px: 3 }}
+      >
         {/* Left Section */}
-        <Box display="flex" alignItems="center">
-          <DirectionsBoat sx={{
+        <Box display="flex" alignItems="center" gap={2}>
+          {/* <DirectionsBoat sx={{
             color: '#ffffff',
             fontSize: 30,
             marginRight: 1,
             filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))'
-          }} />
+          }} /> */}
+          <img
+            src={logo}
+            alt="PortConnect Logo (External)"
+            style={{
+              height: "40px",
+              width: "auto",
+            }}
+          />
           <Typography
             variant="h6"
             component={Link}
             to="/"
             sx={{
-              textDecoration: 'none',
-              color: '#ffffff',
-              fontWeight: 'bold',
-              letterSpacing: '0.5px',
-              textShadow: '0 2px 4px rgba(0,0,0,0.2)'
+              textDecoration: "none",
+              color: "#ffffff",
+              fontWeight: 600,
+              letterSpacing: "0.5px",
+              textShadow: "0 2px 4px rgba(0,0,0,0.2)",
+              "&:hover": {
+                color: "#60a5fa",
+              },
             }}
           >
             PortConnect Client System
@@ -92,18 +131,18 @@ function Header() {
               value={language}
               onChange={handleLanguageChange}
               sx={{
-                backgroundColor: 'rgba(255,255,255,0.1)',
-                color: '#ffffff',
-                '& .MuiSelect-icon': { color: '#ffffff' },
-                '& .MuiOutlinedInput-notchedOutline': {
-                  borderColor: 'rgba(255,255,255,0.2)'
+                backgroundColor: "rgba(255,255,255,0.1)",
+                color: "#ffffff",
+                "& .MuiSelect-icon": { color: "#ffffff" },
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "rgba(255,255,255,0.2)",
                 },
-                '&:hover .MuiOutlinedInput-notchedOutline': {
-                  borderColor: 'rgba(255,255,255,0.3)'
-                }
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "rgba(255,255,255,0.3)",
+                },
               }}
               displayEmpty
-              inputProps={{ 'aria-label': 'Language Select' }}
+              inputProps={{ "aria-label": "Language Select" }}
             >
               <MenuItem value="EN">EN</MenuItem>
               <MenuItem value="FR">FR</MenuItem>
@@ -117,10 +156,10 @@ function Header() {
               <IconButton
                 onClick={handleNotificationClick}
                 sx={{
-                  color: '#ffffff',
-                  '&:hover': {
-                    backgroundColor: 'rgba(255,255,255,0.1)'
-                  }
+                  color: "#ffffff",
+                  "&:hover": {
+                    backgroundColor: "rgba(255,255,255,0.1)",
+                  },
                 }}
               >
                 <Notifications />
@@ -132,44 +171,49 @@ function Header() {
                 open={Boolean(notificationAnchorEl)}
                 onClose={handleNotificationClose}
                 keepMounted
-                transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-                anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+                transformOrigin={{ horizontal: "right", vertical: "top" }}
+                anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
                 PaperProps={{
                   sx: {
                     mt: 1.5,
                     minWidth: 280,
                     maxHeight: 400,
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                    border: '1px solid rgba(0,97,168,0.1)',
-                    '& .MuiMenuItem-root': {
+                    borderRadius: "8px",
+                    boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
+                    border: "1px solid rgba(0,97,168,0.1)",
+                    "& .MuiMenuItem-root": {
                       px: 2,
                       py: 1.5,
-                      borderBottom: '1px solid rgba(0,0,0,0.06)',
-                      '&:last-child': {
-                        borderBottom: 'none',
+                      borderBottom: "1px solid rgba(0,0,0,0.06)",
+                      "&:last-child": {
+                        borderBottom: "none",
                       },
-                      '&:hover': {
-                        backgroundColor: 'rgba(0,97,168,0.08)',
+                      "&:hover": {
+                        backgroundColor: "rgba(0,97,168,0.08)",
                       },
                     },
                   },
                 }}
               >
-                <Box sx={{
-                  p: 2,
-                  borderBottom: '1px solid rgba(0,0,0,0.06)',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#2c3e50' }}>
+                <Box
+                  sx={{
+                    p: 2,
+                    borderBottom: "1px solid rgba(0,0,0,0.06)",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <Typography
+                    variant="subtitle1"
+                    sx={{ fontWeight: 600, color: "#2c3e50" }}
+                  >
                     Notifications
                   </Typography>
                 </Box>
                 <MenuItem onClick={handleNotificationClose}>
-                  <Box sx={{ width: '100%' }}>
-                    <Typography variant="body2" sx={{ color: '#2c3e50' }}>
+                  <Box sx={{ width: "100%" }}>
+                    <Typography variant="body2" sx={{ color: "#2c3e50" }}>
                       No new notifications
                     </Typography>
                   </Box>
@@ -181,10 +225,10 @@ function Header() {
                 onClick={handleProfileMenuClick}
                 sx={{
                   padding: 0.5,
-                  border: '2px solid rgba(255,255,255,0.2)',
-                  '&:hover': {
-                    backgroundColor: 'rgba(255,255,255,0.1)'
-                  }
+                  border: "2px solid rgba(255,255,255,0.2)",
+                  "&:hover": {
+                    backgroundColor: "rgba(255,255,255,0.1)",
+                  },
                 }}
               >
                 {user.photoURL ? (
@@ -193,16 +237,18 @@ function Header() {
                     sx={{
                       width: 36,
                       height: 36,
-                      backgroundColor: '#ffffff'
+                      backgroundColor: "#ffffff",
                     }}
                   />
                 ) : (
-                  <Avatar sx={{
-                    width: 36,
-                    height: 36,
-                    backgroundColor: '#ffffff',
-                    color: '#0061a8'
-                  }}>
+                  <Avatar
+                    sx={{
+                      width: 36,
+                      height: 36,
+                      backgroundColor: "#ffffff",
+                      color: "#0061a8",
+                    }}
+                  >
                     <Person />
                   </Avatar>
                 )}
@@ -214,34 +260,36 @@ function Header() {
                 open={Boolean(anchorEl)}
                 onClose={handleProfileMenuClose}
                 keepMounted
-                transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-                anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+                transformOrigin={{ horizontal: "right", vertical: "top" }}
+                anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
                 PaperProps={{
                   sx: {
                     mt: 1.5,
                     minWidth: 200,
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                    border: '1px solid rgba(0,97,168,0.1)',
-                    '& .MuiMenuItem-root': {
+                    borderRadius: "8px",
+                    boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
+                    border: "1px solid rgba(0,97,168,0.1)",
+                    "& .MuiMenuItem-root": {
                       px: 2,
                       py: 1.5,
-                      display: 'flex',
-                      alignItems: 'center',
+                      display: "flex",
+                      alignItems: "center",
                       gap: 2,
-                      color: '#2c3e50',
-                      '&:hover': {
-                        backgroundColor: 'rgba(0,97,168,0.08)',
+                      color: "#2c3e50",
+                      "&:hover": {
+                        backgroundColor: "rgba(0,97,168,0.08)",
                       },
                     },
                   },
                 }}
               >
-                <MenuItem onClick={() => {
-                  navigate('/settings/profile');
-                  handleProfileMenuClose();
-                }}>
-                  <Person sx={{ color: '#0061a8' }} />
+                <MenuItem
+                  onClick={() => {
+                    navigate("/settings/profile");
+                    handleProfileMenuClose();
+                  }}
+                >
+                  <Person sx={{ color: "#0061a8" }} />
                   <span>Edit Profile</span>
                 </MenuItem>
                 <MenuItem
@@ -250,13 +298,13 @@ function Header() {
                     handleProfileMenuClose();
                   }}
                   sx={{
-                    color: '#dc3545 !important',
-                    '&:hover': {
-                      backgroundColor: 'rgba(220,53,69,0.08) !important',
+                    color: "#dc3545 !important",
+                    "&:hover": {
+                      backgroundColor: "rgba(220,53,69,0.08) !important",
                     },
                   }}
                 >
-                  <Logout sx={{ color: '#dc3545' }} />
+                  <Logout sx={{ color: "#dc3545" }} />
                   <span>Logout</span>
                 </MenuItem>
               </Menu>
@@ -267,13 +315,13 @@ function Header() {
               component={Link}
               to="/login"
               sx={{
-                backgroundColor: '#ffffff',
-                color: '#0061a8',
-                textTransform: 'none',
+                backgroundColor: "#ffffff",
+                color: "#0061a8",
+                textTransform: "none",
                 fontWeight: 500,
-                '&:hover': {
-                  backgroundColor: 'rgba(255,255,255,0.9)'
-                }
+                "&:hover": {
+                  backgroundColor: "rgba(255,255,255,0.9)",
+                },
               }}
             >
               Login

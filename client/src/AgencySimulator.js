@@ -13,7 +13,8 @@ import {
   Grid,
   CircularProgress
 } from '@mui/material';
-import { getAgencies, getBookings, updateDocumentStatus } from './services/api';
+import { getAgencies, getBookings} from './services/api';
+import {updateDocumentStatus} from './CustomsTradeManager.js'
 
 const AgencySimulator = () => {
   const [agencies, setAgencies] = useState([]);

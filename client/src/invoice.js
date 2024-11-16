@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -16,10 +16,6 @@ import {
   TableHead,
   TableRow,
   IconButton,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
 } from '@mui/material';
 import { getBillingRequestsByMonth1 } from './services/api';
 import jsPDF from 'jspdf';
@@ -30,7 +26,6 @@ import { db } from './firebaseConfig';
 import { doc, setDoc, serverTimestamp, collection, getDocs } from 'firebase/firestore';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DownloadIcon from '@mui/icons-material/Download';
-import EditIcon from '@mui/icons-material/Edit';
 import logo from './logo.jpg';
 
 const storage = getStorage();
@@ -42,10 +37,6 @@ const Invoice = ({ companyId }) => {
   const [loading, setLoading] = useState(false);
   const [invoices, setInvoices] = useState([]);
   const [selectedPdfUrl, setSelectedPdfUrl] = useState('');
-  const [openSignDialog, setOpenSignDialog] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState(null);
-  const canvasRef = useRef(null);
-  const isDrawing = useRef(false);
 
   useEffect(() => {
     fetchInvoices();
@@ -76,7 +67,7 @@ const Invoice = ({ companyId }) => {
       const data = await getBillingRequestsByMonth1(companyId, monthRange);
       setBillingRequests(data);
     } catch (error) {
-      console.error("Error fetching billing requests by month:", error);
+      console.error("Error fetching billing requests:", error);
       setError("Failed to load billing requests. Please try again.");
     }
   };
@@ -107,19 +98,39 @@ const Invoice = ({ companyId }) => {
   const generateAndUploadInvoice = async (startOfSelectedMonth) => {
     setLoading(true);
     const pdfDoc = new jsPDF();
+  
+    // Group billing requests by vessel visit and separate facility rentals
+    const groupedRequests = billingRequests.reduce((acc, request) => {
+      const groupKey = request.requestType === 'facilityrental' ? 'facility_rental' : request.vesselVisit || 'no-vessel';
+      if (!acc[groupKey]) {
+        acc[groupKey] = [];
+      }
+      acc[groupKey].push(request);
+      return acc;
+    }, {});
+  
+    const sortedGroups = Object.entries(groupedRequests).sort((a, b) => {
+      if (a[0] === 'facility_rental') return 1;
+      if (b[0] === 'facility_rental') return -1;
+      const aHasVesselVisit = a[1].some(r => r.requestType === 'vesselvisit');
+      const bHasVesselVisit = b[1].some(r => r.requestType === 'vesselvisit');
+      if (aHasVesselVisit !== bHasVesselVisit) {
+        return bHasVesselVisit ? 1 : -1;
+      }
+      return new Date(a[1][0].dateCompleted) - new Date(b[1][0].dateCompleted);
+    });
+  
     const totalAmount = billingRequests.reduce((acc, request) => acc + (request.totalAmount || 0), 0);
-
-    // Add logo with a 1:1 aspect ratio
+  
+    // Add logo and company information
     pdfDoc.addImage(logo, 'JPEG', 160, 10, 30, 30);
-
-    // Company Information
     pdfDoc.setFontSize(10);
     pdfDoc.text("Oceania Port PMIS", 14, 20);
     pdfDoc.text("123 Ocean Drive", 14, 25);
     pdfDoc.text("Singapore 098765", 14, 30);
     pdfDoc.text("Phone: +65 1234 5678", 14, 35);
     pdfDoc.text("Email: contact@oceaniapmis.com", 14, 40);
-
+  
     // Invoice Header
     pdfDoc.setFontSize(18);
     pdfDoc.text("Invoice", pdfDoc.internal.pageSize.width / 2, 50, { align: "center" });
@@ -127,25 +138,145 @@ const Invoice = ({ companyId }) => {
     pdfDoc.text(`Company ID: ${companyId}`, 14, 60);
     pdfDoc.text(`Month: ${format(startOfSelectedMonth, 'MMMM yyyy')}`, 14, 65);
     pdfDoc.text(`Generated on: ${format(new Date(), 'dd/MM/yyyy')}`, 14, 70);
+  
+    // Vessel Visit Billing Details Title
+    pdfDoc.setFontSize(14);
+    pdfDoc.text("Vessel Visit Billing Details", 14, 85);
 
-    const tableColumn = ["Vessel Visit", "Type", "Date Completed", "Rate", "Quantity", "Total Amount"];
-    const tableRows = billingRequests.map((request) => [
-      request.vesselVisit || request.id,
-      request.resourceType || request.operatorSkill,
-      format(parseISO(request.dateCompleted), 'dd/MM/yyyy'),
-      `$${(request.rate || 0).toLocaleString()}`,
-      request.quantity || 0,
-      `$${(request.totalAmount || 0).toLocaleString()}`,
-    ]);
+    // Common table styles
+    const commonTableStyles = {
+      fontSize: 9,
+      cellPadding: 1.5,
+      lineWidth: 0.1,
+    };
 
-    pdfDoc.autoTable({
-      head: [tableColumn],
-      body: tableRows,
-      startY: 80,
-      styles: { fontSize: 10 },
+    const commonHeadStyles = {
+      fillColor: [41, 128, 185],
+      textColor: 255,
+      fontSize: 9
+    };
+
+    const commonAlternateRowStyles = {
+      fillColor: [245, 245, 245]
+    };
+
+    // Vessel Visits Table
+    const vesselTableColumn = [
+      "Vessel Visit",
+      "Service Type",
+      "Qty",
+      "Rate",
+      "Details",
+      "Amount",
+      "Date"
+    ];
+
+    const vesselTableRows = [];
+    sortedGroups.forEach(([groupKey, requests]) => {
+      if (groupKey !== 'facility_rental') {
+        requests.sort((a, b) => new Date(a.dateCompleted) - new Date(b.dateCompleted));
+        requests.forEach((request) => {
+          if (request.requestType === 'vesselvisit' && request.services) {
+            request.services.forEach((service) => {
+              vesselTableRows.push([
+                `${request.vesselVisit} ${request.visitType ? `[${request.visitType}]` : ''}`,
+                service.service,
+                service.quantity,
+                `$${parseFloat(service.rate).toFixed(2)}`,
+                service.details || '-',
+                `$${parseFloat(service.amount || service.quantity * service.rate).toFixed(2)}`,
+                format(parseISO(request.dateCompleted), 'dd/MM/yy')
+              ]);
+            });
+          } else {
+            vesselTableRows.push([
+              request.vesselVisit || request.id,
+              request.resourceType || request.operatorSkill,
+              request.quantity || '-',
+              `$${parseFloat(request.rate || 0).toFixed(2)}`,
+              '-',
+              `$${parseFloat(request.totalAmount || 0).toFixed(2)}`,
+              format(parseISO(request.dateCompleted), 'dd/MM/yy')
+            ]);
+          }
+        });
+      }
     });
 
-    pdfDoc.text(`Total Amount: $${totalAmount.toLocaleString()}`, 14, pdfDoc.lastAutoTable.finalY + 10);
+    const vesselColumnWidths = {
+      0: { cellWidth: 25 },  // Vessel Visit
+      1: { cellWidth: 30 },  // Service Type
+      2: { cellWidth: 15 },  // Qty
+      3: { cellWidth: 20 },  // Rate
+      4: { cellWidth: 35 },  // Details
+      5: { cellWidth: 20 },  // Amount
+      6: { cellWidth: 20 }   // Date
+    };
+
+    pdfDoc.autoTable({
+      head: [vesselTableColumn],
+      body: vesselTableRows,
+      startY: 90,
+      styles: commonTableStyles,
+      columnStyles: vesselColumnWidths,
+      margin: { left: 14, right: 14 },
+      didDrawPage: (data) => {
+        if (data.pageNumber > 1) {
+          pdfDoc.setFontSize(8);
+          pdfDoc.text(
+            `Page ${data.pageNumber}`,
+            data.settings.margin.left,
+            pdfDoc.internal.pageSize.height - 10
+          );
+        }
+      },
+      headStyles: commonHeadStyles,
+      alternateRowStyles: commonAlternateRowStyles
+    });
+
+    // Calculate total width of vessel visits table
+    const totalTableWidth = Object.values(vesselColumnWidths).reduce((sum, col) => sum + col.cellWidth, 0);
+
+    // Facility Rentals Table Title
+    pdfDoc.setFontSize(14);
+    pdfDoc.text("Facility Rental Billing Details", 14, pdfDoc.lastAutoTable.finalY + 8);
+
+    // Facility Rentals Table
+    const facilityRentalRequests = groupedRequests['facility_rental'];
+    if (facilityRentalRequests) {
+      const facilityRentalRows = facilityRentalRequests.map((request) => [
+        request.facilityName || '-',
+        request.quantity || '-',
+        `$${request.rate.toFixed(2)}`,
+        `$${request.totalAmount.toFixed(2)}`,
+        format(parseISO(request.dateCompleted), 'dd/MM/yy')
+      ]);
+
+      // Adjust facility rental table column widths to match total width of vessel visits table
+      const facilityColumnWidths = {
+        0: { cellWidth: 50 },     // Facility Name
+        1: { cellWidth: 25 },     // Qty
+        2: { cellWidth: 35 },     // Rate
+        3: { cellWidth: 35 },     // Total Amount
+        4: { cellWidth: 20 }      // Date Completed
+      };
+
+      pdfDoc.autoTable({
+        head: [["Facility Name", "Qty", "Rate", "Total Amount", "Date Completed"]],
+        body: facilityRentalRows,
+        startY: pdfDoc.lastAutoTable.finalY + 12,
+        styles: commonTableStyles,
+        columnStyles: facilityColumnWidths,
+        margin: { left: 14, right: 14 },
+        headStyles: commonHeadStyles,
+        alternateRowStyles: commonAlternateRowStyles
+      });
+    }
+
+    // Total Amount
+    pdfDoc.setFontSize(11);
+    pdfDoc.setFont(undefined, 'bold');
+    pdfDoc.text(`Total Amount: $${totalAmount.toFixed(2)}`, 14, pdfDoc.lastAutoTable.finalY + 10);
 
     const pdfBlob = pdfDoc.output('blob');
     const fileName = `invoice_${companyId}_${format(startOfSelectedMonth, 'MMMM_yyyy')}.pdf`;
@@ -173,7 +304,7 @@ const Invoice = ({ companyId }) => {
     } finally {
       setLoading(false);
     }
-  };
+};
 
   const handleDownload = async (url) => {
     const response = await fetch(url);
@@ -185,115 +316,6 @@ const Invoice = ({ companyId }) => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
-
-  const openSignDialogForInvoice = (invoice) => {
-    setSelectedInvoice(invoice);
-    setOpenSignDialog(true);
-  };
-
-  const handleClearCanvas = () => {
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-  };
-
-  const handleSaveSignature = async () => {
-    if (!canvasRef.current) return;
-  
-    // Convert the drawn signature to a data URL
-    const signatureDataUrl = canvasRef.current.toDataURL("image/png");
-  
-    // Retrieve the original invoice details to keep the table data
-    const pdfDoc = new jsPDF();
-    const totalAmount = billingRequests.reduce((acc, request) => acc + (request.totalAmount || 0), 0);
-  
-    // Add logo and company information
-    pdfDoc.addImage(logo, 'JPEG', 160, 10, 30, 30);
-    pdfDoc.setFontSize(10);
-    pdfDoc.text("Oceania Port PMIS", 14, 20);
-    pdfDoc.text("123 Ocean Drive", 14, 25);
-    pdfDoc.text("Singapore 098765", 14, 30);
-    pdfDoc.text("Phone: +65 1234 5678", 14, 35);
-    pdfDoc.text("Email: contact@oceaniapm.com", 14, 40);
-  
-    // Invoice details
-    pdfDoc.setFontSize(18);
-    pdfDoc.text("Invoice", pdfDoc.internal.pageSize.width / 2, 50, { align: "center" });
-    pdfDoc.setFontSize(12);
-    pdfDoc.text(`Company ID: ${companyId}`, 14, 60);
-    pdfDoc.text(`Month: ${selectedInvoice.month}`, 14, 65);
-    pdfDoc.text(`Generated on: ${format(new Date(selectedInvoice.generatedAt.seconds * 1000), 'dd/MM/yyyy')}`, 14, 70);
-  
-    const tableColumn = ["Vessel Visit", "Type", "Date Completed", "Rate", "Quantity", "Total Amount"];
-    const tableRows = billingRequests.map((request) => [
-      request.vesselVisit || request.id,
-      request.resourceType || request.operatorSkill,
-      format(parseISO(request.dateCompleted), 'dd/MM/yyyy'),
-      `$${(request.rate || 0).toLocaleString()}`,
-      request.quantity || 0,
-      `$${(request.totalAmount || 0).toLocaleString()}`,
-    ]);
-  
-    pdfDoc.autoTable({
-      head: [tableColumn],
-      body: tableRows,
-      startY: 80,
-      styles: { fontSize: 10 },
-    });
-  
-    pdfDoc.text(`Total Amount: $${totalAmount.toLocaleString()}`, 14, pdfDoc.lastAutoTable.finalY + 10);
-  
-    // Add signature image and signing details below the table
-    pdfDoc.addImage(signatureDataUrl, 'PNG', 14, pdfDoc.lastAutoTable.finalY + 20, 50, 20);
-    pdfDoc.text(`Signed by: ${companyId}`, 14, pdfDoc.lastAutoTable.finalY + 45);
-    pdfDoc.text(`Date: ${format(new Date(), 'dd/MM/yyyy')}`, 14, pdfDoc.lastAutoTable.finalY + 50);
-  
-    // Convert PDF to blob for Firebase upload
-    const pdfBlob = pdfDoc.output('blob');
-    const fileName = `invoice_${companyId}_${format(new Date(), 'MMMM_yyyy')}.pdf`;
-  
-    try {
-      // Upload the signed PDF to replace the original file in Firebase
-      const pdfRef = ref(storage, `invoices/${fileName}`);
-      await uploadBytes(pdfRef, pdfBlob);
-  
-      // Retrieve the download URL for the new signed PDF
-      const signedDownloadUrl = await getDownloadURL(pdfRef);
-  
-      // Update the Firestore document with the new signed PDF URL
-      await setDoc(doc(db, 'invoices', selectedInvoice.id), {
-        ...selectedInvoice, // Preserve existing document data
-        pdfUrl: signedDownloadUrl,
-        signedAt: serverTimestamp(), // Record the signature timestamp
-      });
-  
-      setSelectedPdfUrl(signedDownloadUrl); // Set this URL to display the signed PDF in the iframe or for download
-      setOpenSignDialog(false);
-      setSelectedInvoice(null);
-      fetchInvoices(); // Refresh the invoice list with the signed invoice
-  
-    } catch (error) {
-      console.error("Error uploading or retrieving signed invoice:", error);
-      setError("Failed to upload the signed invoice. Please try again.");
-    }
-  };
-
-  const startDrawing = (e) => {
-    isDrawing.current = true;
-    const ctx = canvasRef.current.getContext("2d");
-    ctx.moveTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
-  };
-
-  const draw = (e) => {
-    if (!isDrawing.current) return;
-    const ctx = canvasRef.current.getContext("2d");
-    ctx.lineTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
-    ctx.stroke();
-  };
-
-  const stopDrawing = () => {
-    isDrawing.current = false;
   };
 
   return (
@@ -344,9 +366,6 @@ const Invoice = ({ companyId }) => {
                   <IconButton onClick={() => handleDownload(invoice.pdfUrl)}>
                     <DownloadIcon />
                   </IconButton>
-                  <IconButton onClick={() => openSignDialogForInvoice(invoice)}>
-                    <EditIcon />
-                  </IconButton>
                 </TableCell>
               </TableRow>
             ))}
@@ -366,27 +385,6 @@ const Invoice = ({ companyId }) => {
           />
         </Box>
       )}
-
-      <Dialog open={openSignDialog} onClose={() => setOpenSignDialog(false)}>
-        <DialogTitle>Sign Invoice</DialogTitle>
-        <DialogContent>
-          <canvas
-            ref={canvasRef}
-            width={400}
-            height={200}
-            style={{ border: "1px solid black" }}
-            onMouseDown={startDrawing}
-            onMouseMove={draw}
-            onMouseUp={stopDrawing}
-            onMouseLeave={stopDrawing}
-          />
-          <Button onClick={handleClearCanvas}>Clear</Button>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenSignDialog(false)}>Cancel</Button>
-          <Button onClick={handleSaveSignature} color="primary">Save Signature</Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 };

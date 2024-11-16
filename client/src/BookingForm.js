@@ -38,21 +38,23 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import BookingSteps from "./BookingSteps";
-import AttachFileIcon from "@mui/icons-material/AttachFile";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorIcon from "@mui/icons-material/Error";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import CancelIcon from "@mui/icons-material/Cancel";
 import DownloadIcon from "@mui/icons-material/Download";
 import QRCode from 'qrcode';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import {
   getBookings,
   createBooking,
   updateBooking,
   deleteBooking,
   uploadBookingDocument,
-  getVesselVisits
-} from './services/api';
+  retrieveBookingDocument,
+  getVesselVisits,
+} from "./services/api";
+import { HSCodeCategories, ProcessStatus } from "./HSCodeCategories.js";
 
 const HSCodeLookup = ({ value, onChange, error, helperText }) => {
   const [open, setOpen] = useState(false);
@@ -247,7 +249,7 @@ const BookingForm = ({ user }) => {
         const bookings = await getBookings();
         setBookingData(bookings);
       } catch (error) {
-        console.error('Error fetching bookings:', error);
+        console.error("Error fetching bookings:", error);
       }
     };
     fetchBookings();
@@ -259,7 +261,7 @@ const BookingForm = ({ user }) => {
         const visits = await getVesselVisits();
         setVesselVisits(visits);
       } catch (error) {
-        console.error('Error fetching vessel visits:', error);
+        console.error("Error fetching vessel visits:", error);
       }
     };
     fetchVesselVisits();
@@ -329,7 +331,7 @@ const BookingForm = ({ user }) => {
       setFormData({
         ...booking,
         cargo: booking.cargo || {},
-        voyageNumber: booking.voyageNumber || ""
+        voyageNumber: booking.voyageNumber || "",
       });
 
       setEditingId(booking.bookingId);
@@ -348,13 +350,12 @@ const BookingForm = ({ user }) => {
         freeTime: 0,
         bookingId: "",
         vesselName: "",
-        voyageNumber: ""
+        voyageNumber: "",
       });
       setEditingId(null);
     }
     setOpenDialog(true);
   };
-
 
   const handleCloseDialog = () => {
     setOpenDialog(false);
@@ -365,9 +366,186 @@ const BookingForm = ({ user }) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  // const handleSubmit = async () => {
+  //   const newBooking = {
+  //     ...formData,
+  //     userEmail: user.email,
+  //   };
+
+  //   try {
+  //     if (editingId) {
+  //       const updatedBooking = await updateBooking(editingId, newBooking);
+  //       setBookingData(prevBookings =>
+  //         prevBookings.map(booking =>
+  //           booking.bookingId === editingId ? updatedBooking : booking
+  //         )
+  //       );
+  //     } else {
+  //       const createdBooking = await createBooking(newBooking);
+  //       setBookingData(prev => [...prev, createdBooking]);
+  //     }
+  //     handleCloseDialog();
+  //   } catch (error) {
+  //     console.error('Error saving booking:', error);
+  //   }
+  // };
+
   const handleSubmit = async () => {
-    const newBooking = {
+    // First validate all cargo items
+    const cargoValidationErrors = [];
+
+    Object.entries(formData.cargo).forEach(([cargoId, cargo]) => {
+      if (!cargo.hsCode) {
+        cargoValidationErrors.push(`Cargo ${cargoId}: HS Code is required`);
+        return;
+      }
+
+      const hsCodePrefix = cargo.hsCode.substring(0, 2);
+      if (!["36", "08", "30"].includes(hsCodePrefix)) {
+        cargoValidationErrors.push(
+          `Cargo ${cargoId}: HS Code must start with 36 (Explosives/Pyrotechnics), 08 (Fresh Fruits), or 30 (Pharmaceuticals)`
+        );
+      }
+    });
+
+    if (cargoValidationErrors.length > 0) {
+      alert(cargoValidationErrors.join("\n"));
+      return;
+    }
+
+    // Process cargo items and add document requirements
+    const processedCargo = {};
+    Object.entries(formData.cargo).forEach(([cargoId, cargo]) => {
+      const hsCodePrefix = cargo.hsCode.substring(0, 2);
+      let documentStatus = {};
+
+      switch (hsCodePrefix) {
+        case "36": // Explosives and Pyrotechnics
+          HSCodeCategories.EXPLOSIVES_AND_PYROTECHNICS.documents.exporter.forEach(
+            (doc) => {
+              documentStatus[doc.name] = {
+                name: doc.name,
+                status: "PENDING",
+                reviewedBy: doc.reviewedBy,
+                lastUpdated: new Date(),
+                comments: null,
+                documentUrl: null,
+              };
+            }
+          );
+
+          // Initialize agency document statuses
+          HSCodeCategories.EXPLOSIVES_AND_PYROTECHNICS.documents.agency.forEach(
+            (doc) => {
+              documentStatus[doc.name] = {
+                name: doc.name,
+                status: "NOT_STARTED",
+                issuedBy: doc.issuedBy,
+                requiresDocuments: doc.requiresDocuments,
+                lastUpdated: new Date(),
+                comments: null,
+                documentUrl: null,
+              };
+            }
+          );
+          break;
+
+        case "08": // Fresh Fruits
+          documentStatus = {
+            "Phytosanitary Certificate": {
+              name: "Phytosanitary Certificate",
+              status: "PENDING",
+              agencyType: "PHYTOSANITARY",
+              agencyName: "Phytosanitary Department",
+              lastUpdated: new Date(),
+              comments: null,
+              documentUrl: null,
+            },
+            "Pesticide Residue Test Report": {
+              name: "Pesticide Residue Test Report",
+              status: "PENDING",
+              agencyType: "PHYTOSANITARY",
+              agencyName: "Phytosanitary Department",
+              lastUpdated: new Date(),
+              comments: null,
+              documentUrl: null,
+            },
+            "Cold Chain Compliance Certificate": {
+              name: "Cold Chain Compliance Certificate",
+              status: "PENDING",
+              agencyType: "QUALITY",
+              agencyName: "Quality Control Department",
+              lastUpdated: new Date(),
+              comments: null,
+              documentUrl: null,
+            },
+            "Packaging Declaration": {
+              name: "Packaging Declaration",
+              status: "PENDING",
+              agencyType: "QUALITY",
+              agencyName: "Quality Control Department",
+              lastUpdated: new Date(),
+              comments: null,
+              documentUrl: null,
+            },
+          };
+          break;
+
+        case "30": // Pharmaceuticals
+          documentStatus = {
+            "GMP Certificate": {
+              name: "GMP Certificate",
+              status: "PENDING",
+              agencyType: "PHARMA",
+              agencyName: "Pharmaceutical Control Board",
+              lastUpdated: new Date(),
+              comments: null,
+              documentUrl: null,
+            },
+            "Drug Registration Certificate": {
+              name: "Drug Registration Certificate",
+              status: "PENDING",
+              agencyType: "PHARMA",
+              agencyName: "Pharmaceutical Control Board",
+              lastUpdated: new Date(),
+              comments: null,
+              documentUrl: null,
+            },
+            "Certificate of Pharmaceutical Product": {
+              name: "Certificate of Pharmaceutical Product",
+              status: "PENDING",
+              agencyType: "PHARMA",
+              agencyName: "Pharmaceutical Control Board",
+              lastUpdated: new Date(),
+              comments: null,
+              documentUrl: null,
+            },
+            "Stability Study Report": {
+              name: "Stability Study Report",
+              status: "PENDING",
+              agencyType: "PHARMA",
+              agencyName: "Pharmaceutical Control Board",
+              lastUpdated: new Date(),
+              comments: null,
+              documentUrl: null,
+            },
+          };
+          break;
+      }
+
+      // Add the processed cargo with document status
+      processedCargo[cargoId] = {
+        ...cargo,
+        documentStatus,
+        isCustomsCleared: false,
+        documents: cargo.documents || {},
+      };
+    });
+
+    // Prepare the booking data
+    const bookingData = {
       ...formData,
+      cargo: processedCargo,
       userEmail: user.email,
     };
 
@@ -386,28 +564,38 @@ const BookingForm = ({ user }) => {
 
     try {
       if (editingId) {
-        const updatedBooking = await updateBooking(editingId, newBooking);
-        setBookingData(prevBookings =>
-          prevBookings.map(booking =>
-            booking.bookingId === editingId ? updatedBooking : booking
+        // Update existing booking
+        const response = await updateBooking(editingId, bookingData);
+        setBookingData((prev) =>
+          prev.map((booking) =>
+            booking.bookingId === editingId
+              ? { ...bookingData, bookingId: editingId }
+              : booking
           )
         );
       } else {
-        const createdBooking = await createBooking(newBooking);
-        setBookingData(prev => [...prev, createdBooking]);
+        // Create new booking
+        const response = await createBooking(bookingData);
+        setBookingData((prev) => [
+          ...prev,
+          { ...bookingData, bookingId: response.id },
+        ]);
       }
       handleCloseDialog();
     } catch (error) {
-      console.error('Error saving booking:', error);
+      console.error("Error saving booking:", error);
+      alert("Error saving booking: " + error.message);
     }
   };
 
   const handleDelete = async (id) => {
     try {
       await deleteBooking(id);
-      setBookingData(prev => prev.filter(booking => booking.bookingId !== id));
+      setBookingData((prev) =>
+        prev.filter((booking) => booking.bookingId !== id)
+      );
     } catch (error) {
-      console.error('Error deleting booking:', error);
+      console.error("Error deleting booking:", error);
     }
   };
 
@@ -433,148 +621,6 @@ const BookingForm = ({ user }) => {
             advancedDeclaration: null,
             exportDocument: null,
           },
-          actions: [  // Add this actions array
-            {
-              action: "Cargo Created",
-              location: "Initial Registration",
-              timestamp: new Date().toISOString(),
-              status: "completed"
-            }
-          ],
-          documentStatus: {
-            // Fresh Fruits Documents
-            "Phytosanitary Certificate": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "PHYTOSANITARY",
-              agencyName: "Phytosanitary Department",
-              comments: null,
-              documentUrl: null,
-            },
-            "Pesticide Residue Test Report": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "PHYTOSANITARY",
-              agencyName: "Phytosanitary Department",
-              comments: null,
-              documentUrl: null,
-            },
-            "Cold Chain Compliance Certificate": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "QUALITY",
-              agencyName: "Quality Control Department",
-              comments: null,
-              documentUrl: null,
-            },
-            "Packaging Declaration": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "QUALITY",
-              agencyName: "Quality Control Department",
-              comments: null,
-              documentUrl: null,
-            },
-            // Live Animals Documents
-            "Veterinary Health Certificate": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "VETERINARY",
-              agencyName: "National Veterinary Authority",
-              comments: null,
-              documentUrl: null,
-            },
-            "Animal Welfare Certification": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "WELFARE",
-              agencyName: "Animal Welfare Board",
-              comments: null,
-              documentUrl: null,
-            },
-            "CITES Permit": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "SECURITY",
-              agencyName: "CITES Authority",
-              comments: null,
-              documentUrl: null,
-            },
-            "Quarantine Clearance Certificate": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "VETERINARY",
-              agencyName: "Quarantine Department",
-              comments: null,
-              documentUrl: null,
-            },
-            // Pharmaceutical Documents
-            "GMP Certificate": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "PHARMA",
-              agencyName: "Pharmaceutical Control Board",
-              comments: null,
-              documentUrl: null,
-            },
-            "Drug Registration Certificate": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "PHARMA",
-              agencyName: "Pharmaceutical Control Board",
-              comments: null,
-              documentUrl: null,
-            },
-            "Certificate of Pharmaceutical Product": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "PHARMA",
-              agencyName: "Pharmaceutical Control Board",
-              comments: null,
-              documentUrl: null,
-            },
-            "Stability Study Report": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "PHARMA",
-              agencyName: "Pharmaceutical Control Board",
-              comments: null,
-              documentUrl: null,
-            },
-            // Common Documents
-            "Export License": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "CUSTOMS",
-              agencyName: "Customs Department",
-              comments: null,
-              documentUrl: null,
-            },
-            "Commercial Invoice": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "CUSTOMS",
-              agencyName: "Customs Department",
-              comments: null,
-              documentUrl: null,
-            },
-            "Certificate of Origin": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "CUSTOMS",
-              agencyName: "Chamber of Commerce",
-              comments: null,
-              documentUrl: null,
-            },
-            "Packing List": {
-              status: "IN_PROGRESS",
-              lastUpdated: null,
-              agencyType: "CUSTOMS",
-              agencyName: "Customs Department",
-              comments: null,
-              documentUrl: null,
-            }
-          }
         },
       },
     }));
@@ -649,7 +695,12 @@ const BookingForm = ({ user }) => {
         [cargoId]: { ...prev[cargoId], [documentType]: "uploading" },
       }));
 
-      const result = await uploadBookingDocument(editingId, cargoId, documentType, file);
+      const result = await uploadBookingDocument(
+        editingId,
+        cargoId,
+        documentType,
+        file
+      );
 
       const updatedFormData = {
         ...formData,
@@ -659,10 +710,10 @@ const BookingForm = ({ user }) => {
             ...formData.cargo[cargoId],
             documents: {
               ...formData.cargo[cargoId].documents,
-              [documentType]: result.url
-            }
-          }
-        }
+              [documentType]: result.url,
+            },
+          },
+        },
       };
 
       const allDocsUploaded =
@@ -692,6 +743,28 @@ const BookingForm = ({ user }) => {
       { type: "advancedDeclaration", label: "Advanced Declaration" },
       { type: "exportDocument", label: "Export Document" },
     ];
+
+    const handleViewDocument = async (cargoId, documentType) => {
+      try {
+        const document = await retrieveBookingDocument(editingId, cargoId, documentType);
+        // document now has {url: "https://storage...", fileName: "filename.pdf"}
+
+        // Simply open in new tab
+        window.open(document.url, '_blank');
+
+        // Or if you want to force download:
+        // const link = document.createElement('a');
+        // link.href = document.url;
+        // link.download = document.fileName;
+        // document.body.appendChild(link);
+        // link.click();
+        // document.body.removeChild(link);
+      } catch (error) {
+        console.error('Error viewing document:', error);
+        // Handle error - maybe show an alert or notification
+      }
+    };
+
 
     return (
       <Grid item xs={12}>
@@ -777,6 +850,17 @@ const BookingForm = ({ user }) => {
                           icon={getStatusIcon(uploadStatus[cargoId][type])}
                         />
                       )}
+                      {formData.cargo[cargoId]?.documents?.[type] && (
+                        <Button
+                          variant="outlined"
+                          onClick={() => handleViewDocument(cargoId, type)}
+                          startIcon={<VisibilityIcon />}
+                          size="small"
+                          sx={{ ml: 1 }}
+                        >
+                          View
+                        </Button>
+                      )}
                     </Stack>
                     {uploadStatus[cargoId]?.[type] === "uploading" && (
                       <LinearProgress sx={{ mt: 1 }} />
@@ -861,7 +945,10 @@ const BookingForm = ({ user }) => {
                 </TableRow>
 
                 <TableRow>
-                  <TableCell colSpan={7} style={{ paddingBottom: 0, paddingTop: 0 }}>
+                  <TableCell
+                    colSpan={7}
+                    style={{ paddingBottom: 0, paddingTop: 0 }}
+                  >
                     <Accordion>
                       <AccordionSummary expandIcon={<ExpandMore />}>
                         <Typography>
@@ -960,6 +1047,49 @@ const BookingForm = ({ user }) => {
                                 </Paper>
                               ))}
 
+                            {booking.cargo &&
+                              Object.entries(booking.cargo).map(
+                                ([key, cargoItem]) => (
+                                  <Paper key={key} sx={{ p: 2, mb: 2 }}>
+                                    <Typography>
+                                      <strong>Cargo Item {key}:</strong>
+                                    </Typography>
+                                    <Typography>
+                                      Name: {cargoItem.name}
+                                    </Typography>
+                                    <Typography>
+                                      Quantity: {cargoItem.quantity}{" "}
+                                      {cargoItem.unit}
+                                    </Typography>
+                                    <Typography>
+                                      Description: {cargoItem.description}
+                                    </Typography>
+                                    <Typography>
+                                      Weight per Unit: {cargoItem.weightPerUnit}{" "}
+                                      kg
+                                    </Typography>
+                                    <Typography>
+                                      Cargo Type: {cargoItem.cargoType}
+                                    </Typography>
+                                    <Typography>
+                                      <strong>HS Code:</strong>{" "}
+                                      {cargoItem.hsCode}
+                                    </Typography>
+                                    <BookingSteps
+                                      isContainerRented={
+                                        cargoItem.isContainerRented
+                                      }
+                                      isTruckBooked={cargoItem.isTruckBooked}
+                                      isCustomsCleared={
+                                        cargoItem.isCustomsCleared
+                                      }
+                                      isDocumentsChecked={
+                                        cargoItem.isDocumentsChecked
+                                      }
+                                    />
+                                  </Paper>
+                                )
+                              )}
                           </Grid>
                         </Grid>
                       </AccordionDetails>
@@ -973,7 +1103,12 @@ const BookingForm = ({ user }) => {
         </Table>
       </TableContainer>
 
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
+      <Dialog
+        open={openDialog}
+        onClose={handleCloseDialog}
+        maxWidth="md"
+        fullWidth
+      >
         <DialogTitle>
           {editingId ? `Edit Booking ID: ${editingId}` : "Create Booking"}
         </DialogTitle>
@@ -1164,7 +1299,11 @@ const BookingForm = ({ user }) => {
                         label="Description"
                         value={cargoItem.description}
                         onChange={(e) =>
-                          handleCargoChange(cargoId, "description", e.target.value)
+                          handleCargoChange(
+                            cargoId,
+                            "description",
+                            e.target.value
+                          )
                         }
                         multiline
                         rows={4}
@@ -1212,7 +1351,11 @@ const BookingForm = ({ user }) => {
                         type="number"
                         value={cargoItem.weightPerUnit}
                         onChange={(e) =>
-                          handleCargoChange(cargoId, "weightPerUnit", e.target.value)
+                          handleCargoChange(
+                            cargoId,
+                            "weightPerUnit",
+                            e.target.value
+                          )
                         }
                         required
                       />
@@ -1223,7 +1366,11 @@ const BookingForm = ({ user }) => {
                         <Select
                           value={cargoItem.cargoType}
                           onChange={(e) =>
-                            handleCargoChange(cargoId, "cargoType", e.target.value)
+                            handleCargoChange(
+                              cargoId,
+                              "cargoType",
+                              e.target.value
+                            )
                           }
                           label="Cargo Type"
                           required
