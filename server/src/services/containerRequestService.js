@@ -19,12 +19,18 @@ class ContainerRequestService {
 
     async createContainerRequest(requestData) {
         try {
+            // Add estimated cost calculation for consolidation
+            if (requestData.consolidationService) {
+                requestData.estimatedCost =
+                    requestData.consolidationPrice * requestData.consolidationSpace;
+            }
+
             const docRef = await this.db.collection('container_requests').add({
                 ...requestData,
                 createdAt: new Date().toISOString(),
                 status: 'Pending'
             });
-            
+
             return {
                 id: docRef.id,
                 ...requestData
@@ -42,7 +48,7 @@ class ContainerRequestService {
                 ...requestData,
                 updatedAt: new Date().toISOString()
             });
-            
+
             const doc = await docRef.get();
             return {
                 id: doc.id,

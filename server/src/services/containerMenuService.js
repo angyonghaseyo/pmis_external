@@ -18,8 +18,13 @@ class ContainerMenuService {
       const containerData = {};
 
       snapshot.forEach(doc => {
-        const containerTypes = doc.data().container_types || [];
-        containerData[doc.id] = containerTypes;
+        const data = doc.data();
+        if (data.container_types && data.container_types.length > 0) {
+          containerData[doc.id] = data.container_types.map(ct => ({
+            ...ct,
+            carrierName: doc.id
+          }));
+        }
       });
 
       return containerData;
