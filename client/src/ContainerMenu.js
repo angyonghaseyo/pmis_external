@@ -21,7 +21,11 @@ import {
     Snackbar,
     Alert,
     IconButton,
-    CircularProgress
+    CircularProgress,
+    FormControl,
+    InputLabel,
+    OutlinedInput,
+    InputAdornment
 } from '@mui/material';
 import {
     Add,
@@ -50,6 +54,7 @@ const ContainerMenu = () => {
         severity: 'info'
     });
     const [loading, setLoading] = useState(true);
+    const [newConsolidationPrice, setNewConsolidationPrice] = useState('');
 
     useEffect(() => {
         const initializeData = async () => {
@@ -115,7 +120,7 @@ const ContainerMenu = () => {
     };
 
     const handleAddContainer = async () => {
-        if (!newName || !newSize || !newPrice) {
+        if (!newName || !newSize || !newPrice || !newConsolidationPrice) {
             setSnackbar({
                 open: true,
                 message: "Please fill in all required fields",
@@ -126,17 +131,18 @@ const ContainerMenu = () => {
 
         try {
             setUploading(true);
-            
+
             const containerData = {
                 company,
                 size: newSize,
                 price: newPrice,
                 name: newName,
-                imageFile: imageFile
+                consolidationPrice: newConsolidationPrice,
+                imageFile: imageFile,
             };
 
             await addContainerType(company, containerData);
-            
+
             setSnackbar({
                 open: true,
                 message: 'Container type added successfully.',
@@ -149,6 +155,7 @@ const ContainerMenu = () => {
             setNewName('');
             setImageFile(null);
             setImagePreview(null);
+            setNewConsolidationPrice('');
 
             // Refresh container list
             const updatedContainers = await getContainerTypesForCompany(company);
@@ -232,6 +239,16 @@ const ContainerMenu = () => {
                             size="small"
                             required
                         />
+                        <FormControl size="small" required>
+                            <InputLabel>Consolidation Price per ft³</InputLabel>
+                            <OutlinedInput
+                                type="number"
+                                value={newConsolidationPrice}
+                                onChange={(e) => setNewConsolidationPrice(e.target.value)}
+                                startAdornment={<InputAdornment position="start">$</InputAdornment>}
+                                label="Consolidation Price per ft³"
+                            />
+                        </FormControl>
                     </Box>
 
                     <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
@@ -278,7 +295,7 @@ const ContainerMenu = () => {
                             variant="contained"
                             startIcon={uploading ? <CircularProgress size={20} /> : <Add />}
                             onClick={handleAddContainer}
-                            disabled={!newSize || !newPrice || !newName || uploading}
+                            disabled={!newSize || !newPrice || !newName || uploading || !newConsolidationPrice}
                         >
                             Add Container Type
                         </Button>
@@ -333,6 +350,9 @@ const ContainerMenu = () => {
                                                 ${container.price.toLocaleString()}
                                             </Typography>
                                         </Box>
+                                        <Typography variant="subtitle1" color="text.secondary">
+                                            Consolidation: ${container.consolidationPrice}/ft³
+                                        </Typography>
                                     </CardContent>
                                 </Card>
                             </Grid>
@@ -347,6 +367,7 @@ const ContainerMenu = () => {
                                     <TableCell>Name</TableCell>
                                     <TableCell>Size (ft)</TableCell>
                                     <TableCell>Price (USD)</TableCell>
+                                    <TableCell>Consolidation Price (USD/ft³)</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -367,6 +388,7 @@ const ContainerMenu = () => {
                                         <TableCell>{container.name}</TableCell>
                                         <TableCell>{container.size}ft</TableCell>
                                         <TableCell>${container.price.toLocaleString()}</TableCell>
+                                        <TableCell>${container.consolidationPrice}/ft³</TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>

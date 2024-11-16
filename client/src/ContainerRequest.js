@@ -35,12 +35,12 @@ import {
     FormControlLabel
 } from "@mui/material";
 
-import { 
-    getContainerRequests, 
-    createContainerRequest, 
-    getBookings, 
+import {
+    getContainerRequests,
+    createContainerRequest,
+    getBookings,
     getContainerTypes,
-    getBookingById 
+    getBookingById
 } from './services/api';
 
 const ContainerRequest = ({ user }) => {
@@ -464,6 +464,7 @@ const ContainerRequest = ({ user }) => {
                                     fullWidth
                                     sx={{ mb: 2 }}
                                 />
+
                             </Box>
                         )}
                         {currentCargo.serviceType === 'fullContainer' && (

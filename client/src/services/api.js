@@ -801,25 +801,26 @@ export const getContainerTypesForCompany = async (company) => {
 export const addContainerType = async (company, containerData) => {
   try {
     const formData = new FormData();
-    formData.append("company", company);
-    formData.append("size", containerData.size);
-    formData.append("price", containerData.price);
-    formData.append("name", containerData.name);
+    formData.append('company', company);
+    formData.append('size', containerData.size);
+    formData.append('price', containerData.price);
+    formData.append('name', containerData.name);
+    formData.append('consolidationPrice', containerData.consolidationPrice);
     if (containerData.imageFile) {
-      formData.append("image", containerData.imageFile);
+      formData.append('image', containerData.imageFile);
     }
 
     const response = await fetch(`${API_URL}/container-types`, {
-      method: "POST",
-      body: formData,
+      method: 'POST',
+      body: formData
     });
 
     if (!response.ok) {
-      throw new Error("Error adding container type");
+      throw new Error('Error adding container type');
     }
     return await response.json();
   } catch (error) {
-    console.error("Error in addContainerType:", error);
+    console.error('Error in addContainerType:', error);
     throw error;
   }
 };

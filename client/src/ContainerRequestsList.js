@@ -34,6 +34,7 @@ import {
     Download as DownloadIcon,
     Close as CloseIcon
 } from '@mui/icons-material';
+import { useAuth } from './AuthContext';
 
 const db = getFirestore();
 
@@ -47,10 +48,48 @@ const ContainerRequestsList = () => {
     const [isRejecting, setIsRejecting] = useState(false);
     const [requests, setRequests] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [company, setCompany] = useState('');
+    const { user } = useAuth();
+    const [snackbar, setSnackbar] = useState({
+        open: false,
+        message: '',
+        severity: 'info'
+    });
 
     useEffect(() => {
         fetchData();
     }, []);
+
+    useEffect(() => {
+        const initializeData = async () => {
+            if (!user?.company) {
+                setSnackbar({
+                    open: true,
+                    message: "Company information not available",
+                    severity: 'error'
+                });
+                return;
+            }
+
+            setIsLoading(true);
+            try {
+                setCompany(user.company);
+            } catch (error) {
+                console.error("Error loading container types:", error);
+                setSnackbar({
+                    open: true,
+                    message: "Error loading container types",
+                    severity: 'error'
+                });
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        if (user) {
+            initializeData();
+        }
+    }, [user]);
 
     const fetchData = async () => {
         setIsLoading(true);

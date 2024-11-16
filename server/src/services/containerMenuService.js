@@ -45,7 +45,7 @@ class ContainerMenuService {
     }
   }
 
-  async addContainerType({ company, size, price, name, imageFile }) {
+  async addContainerType({ company, size, price, name, imageFile, consolidationPrice }) {
     try {
       const menuCollectionRef = this.db.collection('container_menu');
       const companyDocRef = menuCollectionRef.doc(company);
@@ -69,7 +69,9 @@ class ContainerMenuService {
         size,
         price,
         name,
-        imageUrl
+        imageUrl,
+        consolidationPrice
+
       };
 
       await companyDocRef.set({
@@ -82,6 +84,7 @@ class ContainerMenuService {
       throw error;
     }
   }
+
 
   async uploadImage(company, file) {
     try {
