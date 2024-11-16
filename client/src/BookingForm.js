@@ -1281,7 +1281,7 @@ const BookingForm = ({ user }) => {
                       <FormControl fullWidth>
                         <InputLabel>Unit</InputLabel>
                         <Select
-                          value={cargoItem.unit || "pieces"}
+                          value={cargoItem.unit}
                           onChange={(e) =>
                             handleCargoChange(cargoId, "unit", e.target.value)
                           }
