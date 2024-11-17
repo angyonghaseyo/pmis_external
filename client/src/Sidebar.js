@@ -89,11 +89,12 @@ const Sidebar = ({ user }) => {
         { name: 'Cargo Repacking', accessRights: ['Create Repacking Request'] },
         { name: 'Cargo Storage', accessRights: ['Create Storage Request'] },
         { name: 'Cargo Transloading', accessRights: ['Create Transloading Request'] },
+        { name: 'Cargo Tracking', accessRights: ['View Cargo Status'] },
 
       ],
       accessRights: ['Create Cargo Booking', 'Create Facility Rental', 'View Cargo Manifests', 'Submit Cargo Manifest', 'Update Cargo Manifest', 'Delete Cargo Manifest',
         'Create Container Request', 'View Container Request', 'Create Container Pricings', 'View Container Pricings',
-        'Create Container Menu', 'View Container Menu', 'Register Truck', 'View Truck Registrations', 'View Container Requests', 'Approve Container Requests', 'Create Sampling Request', 'Create Repacking Request', 'Create Storage Request', 'Create Transloading Request']
+        'Create Container Menu', 'View Container Menu', 'Register Truck', 'View Truck Registrations', 'View Container Requests', 'Approve Container Requests', 'Create Sampling Request', 'Create Repacking Request', 'Create Storage Request', 'Create Transloading Request', 'View Cargo Status']
     },
     {
       name: "Customs and Trade Documents",
