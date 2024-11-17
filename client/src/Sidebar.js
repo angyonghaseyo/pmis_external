@@ -111,6 +111,8 @@ const Sidebar = ({ user }) => {
       path: "/financial",
       children: [
         { name: 'Billing Requests', accessRights: ['View Billing Requests'] },
+        { name: 'Invoice', accessRights: ['View Invoice'] },
+        { name: 'Pricing Rates', accessRights: ['View Invoice'] },
       ],
       accessRights: ['View Billing Requests']
     },

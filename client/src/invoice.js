@@ -29,7 +29,7 @@ import { PDFDocument } from 'pdf-lib';
 import { format, parseISO, addMonths } from 'date-fns';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db } from './firebaseConfig';
-import { doc, setDoc, serverTimestamp, collection, getDocs } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection, getDocs, query, where } from 'firebase/firestore';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DownloadIcon from '@mui/icons-material/Download';
 import EditIcon from '@mui/icons-material/Edit';
@@ -59,11 +59,18 @@ const Invoice = ({ companyId }) => {
 
   const fetchInvoices = async () => {
     try {
-      const invoicesSnapshot = await getDocs(collection(db, 'invoices'));
+      console.log('Fetching invoices for company:', companyId); 
+  
+      const invoicesRef = collection(db, 'invoices');
+      const q = query(invoicesRef, where('companyId', '==', companyId));
+      const invoicesSnapshot = await getDocs(q);
+  
       const invoicesData = invoicesSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
+  
+      console.log('Company invoices:', invoicesData); 
       setInvoices(invoicesData);
     } catch (error) {
       console.error("Error fetching invoices:", error);
@@ -107,7 +114,7 @@ const Invoice = ({ companyId }) => {
       const signatureWidth = 150;  
       const signatureHeight = 60;  
   
-      const signatureY = 50;  
+      const signatureY = 100;  
       lastPage.drawImage(signatureImage, {
         x: 30,  
         y: signatureY,

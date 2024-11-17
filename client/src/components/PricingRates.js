@@ -9,7 +9,6 @@ import {
   TableHead,
   TableRow,
   Paper,
-  TextField,
   Accordion,
   AccordionSummary,
   AccordionDetails,
@@ -99,6 +98,18 @@ const PricingRates = () => {
     );
   }
 
+  const renderTableHead = () => (
+    <TableHead>
+      <TableRow>
+        <TableCell sx={{ width: '50%' }}>Service</TableCell>
+        <TableCell sx={{ width: '30%', textAlign: 'right' }} align="right">
+          Rate (SGD)
+        </TableCell>
+        <TableCell sx={{ width: '20%' }}>Unit</TableCell>
+      </TableRow>
+    </TableHead>
+  );
+
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
@@ -119,21 +130,17 @@ const PricingRates = () => {
         <AccordionDetails>
           <TableContainer component={Paper} variant="outlined">
             <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Service</TableCell>
-                  <TableCell align="right">Rate (SGD)</TableCell>
-                  <TableCell>Unit</TableCell>
-                </TableRow>
-              </TableHead>
+              {renderTableHead()}
               <TableBody>
-                {Object.entries(rates.vesselVisit.berths).map(([berth, rate]) => (
-                  <TableRow key={berth}>
-                    <TableCell>Berth {berth}</TableCell>
-                    <TableCell align="right">{parseFloat(rate).toFixed(2)}</TableCell>
-                    <TableCell>Per Hour</TableCell>
-                  </TableRow>
-                ))}
+                {Object.entries(rates.vesselVisit.berths)
+                  .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
+                  .map(([berth, rate]) => (
+                    <TableRow key={berth}>
+                      <TableCell>Berth {berth}</TableCell>
+                      <TableCell align="right">{parseFloat(rate).toFixed(2)}</TableCell>
+                      <TableCell>Per Hour</TableCell>
+                    </TableRow>
+                  ))}
                 <TableRow>
                   <TableCell>Container Handling</TableCell>
                   <TableCell align="right">{parseFloat(rates.vesselVisit.containerRate).toFixed(2)}</TableCell>
@@ -153,13 +160,7 @@ const PricingRates = () => {
         <AccordionDetails>
           <TableContainer component={Paper} variant="outlined">
             <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Service</TableCell>
-                  <TableCell align="right">Rate (SGD)</TableCell>
-                  <TableCell>Unit</TableCell>
-                </TableRow>
-              </TableHead>
+              {renderTableHead()}
               <TableBody>
                 <TableRow>
                   <TableCell>Sampling</TableCell>
@@ -195,13 +196,7 @@ const PricingRates = () => {
         <AccordionDetails>
           <TableContainer component={Paper} variant="outlined">
             <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Resource</TableCell>
-                  <TableCell align="right">Rate (SGD)</TableCell>
-                  <TableCell>Unit</TableCell>
-                </TableRow>
-              </TableHead>
+              {renderTableHead()}
               <TableBody>
                 <TableRow>
                   <TableCell>Water Supply</TableCell>
@@ -213,24 +208,16 @@ const PricingRates = () => {
                   <TableCell align="right">{parseFloat(rates.adHocResourceRequest.power).toFixed(2)}</TableCell>
                   <TableCell>Per kW/h</TableCell>
                 </TableRow>
-                {/* Fuel Types */}
                 {Object.entries(rates.adHocResourceRequest.fuel).map(([type, rate]) => (
                   <TableRow key={type}>
-                    <TableCell>
-                      {type === 'marineDiesel' ? 'Marine Diesel' :
-                       type === 'heavyFuelOil' ? 'Heavy Fuel Oil' :
-                       'LNG'}
-                    </TableCell>
+                    <TableCell>{type.replace(/([A-Z])/g, ' $1').trim()}</TableCell>
                     <TableCell align="right">{parseFloat(rate).toFixed(2)}</TableCell>
                     <TableCell>Per Liter</TableCell>
                   </TableRow>
                 ))}
-                {/* Waste Removal */}
                 {Object.entries(rates.adHocResourceRequest.wasteRemoval).map(([type, rate]) => (
                   <TableRow key={type}>
-                    <TableCell>
-                      Waste Removal - {type.charAt(0).toUpperCase() + type.slice(1)}
-                    </TableCell>
+                    <TableCell>Waste Removal - {type.charAt(0).toUpperCase() + type.slice(1)}</TableCell>
                     <TableCell align="right">{parseFloat(rate).toFixed(2)}</TableCell>
                     <TableCell>Per m³</TableCell>
                   </TableRow>
@@ -249,13 +236,7 @@ const PricingRates = () => {
         <AccordionDetails>
           <TableContainer component={Paper} variant="outlined">
             <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Service</TableCell>
-                  <TableCell align="right">Rate (SGD)</TableCell>
-                  <TableCell>Unit</TableCell>
-                </TableRow>
-              </TableHead>
+              {renderTableHead()}
               <TableBody>
                 <TableRow>
                   <TableCell>Pilot Operator</TableCell>
@@ -277,12 +258,9 @@ const PricingRates = () => {
         <Typography variant="body2" color="textSecondary">
           * All rates are subject to change. Please contact us for any inquiries about the rates.
         </Typography>
-        <Typography variant="body2" color="textSecondary">
-          * Additional charges may apply for special requirements or after-hour services.
-        </Typography>
       </Box>
     </Box>
   );
 };
 
-export default PricingRates;
+export default PricingRates

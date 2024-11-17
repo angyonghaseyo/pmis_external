@@ -53,6 +53,7 @@ import {
 } from "firebase/storage";
 
 const VesselVisits = () => {
+  const { user } = useAuth();
   const [openDialog, setOpenDialog] = useState(false);
   const [visitType, setVisitType] = useState("");
   const [tabValue, setTabValue] = useState(0);
@@ -60,6 +61,7 @@ const VesselVisits = () => {
   const [userProfile, setUserProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [formData, setFormData] = useState({
+    company: user.company,
     vesselName: "",
     imoNumber: "",
     vesselType: "",
@@ -109,8 +111,6 @@ const VesselVisits = () => {
   const fileInputRef = useRef(null); // Create a ref for the file input
   const [downloadURL, setDownloadURL] = useState("");
   const [deleteConfirmation, setDeleteConfirmation] = useState(null);
-
-  const { user } = useAuth();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -956,6 +956,7 @@ const VesselVisits = () => {
     // The dates are already stored in ISO format in formData
     if (resourceCheck.facilitiesDemandCheckBooleanAndBerth?.success) {
       const newVisit = {
+        company: user.company,
         vesselName: formData.vesselName,
         imoNumber: formData.imoNumber,
         vesselType: formData.vesselType,

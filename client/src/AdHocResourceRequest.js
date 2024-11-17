@@ -132,6 +132,7 @@ const AdHocResourceRequest = () => {
 
   const resetForm = () => {
     setFormData({
+      company: '',
       vesselVisit: '',
       resourceType: '',
       description: '',
@@ -165,9 +166,9 @@ const AdHocResourceRequest = () => {
 
     try {
       const requestData = {
-        ...formData,
-        company, // Include company in the request data
+        ...formData, 
       };
+
 
       if (editMode && editRequestId) {
         await updateAdHocResourceRequest(editRequestId, requestData);

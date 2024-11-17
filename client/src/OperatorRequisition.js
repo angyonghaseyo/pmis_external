@@ -210,7 +210,7 @@ const OperatorRequisition = () => {
 
       const requestData = {
         ...formData,
-        company, 
+        company: user.company,
         email: user.email,
         status: 'Pending',
       };
