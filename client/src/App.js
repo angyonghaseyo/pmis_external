@@ -31,12 +31,13 @@ import CargoStorage from './CargoStorage';
 import CargoTransloading from './CargoTransloading';
 import { jwtDecode } from "jwt-decode";
 import ElectronicTradeDocuments from "./ElectronicTradeDocument";
-import CustomsPreview from "./CustomsPreview";
+import DocumentManager from "./DocumentManager";
 import AgencySimulator from "./AgencySimulator"
 import BillingRequests from "./BillingRequests";
 import Invoice from './invoice';
 import DatabaseSetup from "./DatabaseSetup";
 import PricingRates from "./components/PricingRates";
+import CargoTracking from "./CargoTracking";
 
 const drawerWidth = 240;
 
@@ -98,8 +99,10 @@ function App() {
         <Routes>
           {user ? (
             <>
-            <Route path="/setup" element={<DatabaseSetup />} />
+              <Route path="/setup" element={<DatabaseSetup />} />
+              {user.email !== "agency@gmail.com" && (
               <Route path="/" element={<UserWorkspace user={user} />} />
+              )}
               {
                 hasAccessRights([
                   "View Inquiries and Feedbacks",
@@ -248,20 +251,20 @@ function App() {
                 "Register Truck",
                 "View Truck Registrations",
               ]) && (
-                <Route
-                  path="/cargos/truck-registration"
-                  element={<TruckRegistration user={user} />}
-                />
-              )}
+                  <Route
+                    path="/cargos/truck-registration"
+                    element={<TruckRegistration user={user} />}
+                  />
+                )}
               {hasAccessRights([
                 "View Container Requests",
                 "Approve Container Requests",
               ]) && (
-                <Route
-                  path="/cargos/container-requests-list"
-                  element={<ContainerRequestsList user={user} />}
-                />
-              )}
+                  <Route
+                    path="/cargos/container-requests-list"
+                    element={<ContainerRequestsList user={user} />}
+                  />
+                )}
               {hasAccessRights(["Create Facility Rental"]) && (
                 <Route
                   path="/cargos/facility-and-space-rental"
@@ -276,13 +279,13 @@ function App() {
               )}
               {hasAccessRights(['Manage Documents']) && (
                 <Route
-                  path="/customs-and-trade-documents/something"
-                  element={<CustomsPreview />}
+                  path="/customs-and-trade-documents/document-manager"
+                  element={<DocumentManager />}
                 />
               )}
-               {hasAccessRights(['Manage Documents']) && (
+              {hasAccessRights(['Agent']) && (
                 <Route
-                  path="/abcd"
+                  path="/"
                   element={<AgencySimulator />}
                 />
               )}
@@ -328,6 +331,15 @@ function App() {
                   <Route
                     path="/financial/pricing-rates"
                     element={<PricingRates />}
+                  />
+                )
+              }
+              {
+                hasAccessRights(['View Cargo Status']) && (
+
+                  <Route
+                    path="/cargos/cargo-tracking"
+                    element={<CargoTracking />}
                   />
                 )
               }

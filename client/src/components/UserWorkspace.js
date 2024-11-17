@@ -64,7 +64,7 @@ const UserWorkspace = ({ user }) => {
       </Box>
 
       {/* Welcome message */}
-      <Typography variant="h5" gutterBottom>Good to see you, {user.firstName} 👋</Typography>
+      <Typography variant="h5" gutterBottom>Good to see you, {user.company} </Typography>
 
       {/* Leave statistics */}
       <Grid container spacing={3} mb={3}>

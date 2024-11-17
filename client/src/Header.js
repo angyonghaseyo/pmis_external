@@ -13,6 +13,7 @@ import {
   Select,
   FormControl,
   CircularProgress,
+  useTheme,
 } from "@mui/material";
 import {
   Notifications,
@@ -29,6 +30,7 @@ function Header() {
   const [notificationAnchorEl, setNotificationAnchorEl] = useState(null);
   const [language, setLanguage] = useState("EN");
   const navigate = useNavigate();
+  const theme = useTheme();
 
   const handleLogout = async () => {
     try {
@@ -77,7 +79,9 @@ function Header() {
   }
 
   return (
-    <AppBar
+    <>
+    {user?.email !== "agency@gmail.com" && (
+      <AppBar
       position="fixed"
       sx={{
         backgroundColor: "#ffffff",
@@ -126,6 +130,41 @@ function Header() {
 
         {/* Right Section - Language Select, Notifications, and User Profile/Login */}
         <Box display="flex" alignItems="center" gap={2}>
+        {user && (
+            <Typography
+              variant="caption"
+              sx={{
+                color: "rgba(255,255,255,0.9)",
+                backgroundColor: theme.palette.primary.main,
+                padding: "4px 12px",
+                borderRadius: "16px",
+                fontWeight: "bold",
+                // Responsive font sizing
+                fontSize: {
+                  xs: "0.65rem", // Extra small screens
+                  sm: "0.7rem", // Small screens
+                  md: "0.75rem", // Medium screens
+                  lg: "0.8rem", // Large screens
+                },
+                // Make container responsive
+                maxWidth: {
+                  xs: "200px", // Extra small screens
+                  sm: "300px", // Small screens
+                  md: "400px", // Medium screens
+                  lg: "none", // Large screens
+                },
+                // Handle text overflow
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {user
+                ? `${user.email} - ${user.company || "Company X"}`
+                : ""}
+            </Typography>
+          )}
+
           <FormControl size="small">
             <Select
               value={language}
@@ -330,6 +369,8 @@ function Header() {
         </Box>
       </Toolbar>
     </AppBar>
+      )}
+  </>
   );
 }
 
