@@ -18,8 +18,13 @@ class ContainerMenuService {
       const containerData = {};
 
       snapshot.forEach(doc => {
-        const containerTypes = doc.data().container_types || [];
-        containerData[doc.id] = containerTypes;
+        const data = doc.data();
+        if (data.container_types && data.container_types.length > 0) {
+          containerData[doc.id] = data.container_types.map(ct => ({
+            ...ct,
+            carrierName: doc.id
+          }));
+        }
       });
 
       return containerData;
@@ -45,7 +50,7 @@ class ContainerMenuService {
     }
   }
 
-  async addContainerType({ company, size, price, name, imageFile }) {
+  async addContainerType({ company, size, price, name, imageFile, consolidationPrice }) {
     try {
       const menuCollectionRef = this.db.collection('container_menu');
       const companyDocRef = menuCollectionRef.doc(company);
@@ -69,7 +74,9 @@ class ContainerMenuService {
         size,
         price,
         name,
-        imageUrl
+        imageUrl,
+        consolidationPrice
+
       };
 
       await companyDocRef.set({
@@ -82,6 +89,7 @@ class ContainerMenuService {
       throw error;
     }
   }
+
 
   async uploadImage(company, file) {
     try {

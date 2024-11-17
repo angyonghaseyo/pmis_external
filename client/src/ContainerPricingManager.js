@@ -33,8 +33,8 @@ import {
     LinearProgress
 } from '@mui/material';
 import { Add, Close, ArrowBack, ArrowForward, List } from '@mui/icons-material';
-import { 
-    getContainerTypesForCompany, 
+import {
+    getContainerTypesForCompany,
     getCarrierContainerPrices,
     assignContainerPrice
 } from './services/api';
@@ -115,7 +115,13 @@ const ContainerPricingManager = () => {
         }
     };
 
+
     const handleAddContainers = async () => {
+        console.log('Starting handleAddContainers');
+        console.log('Company:', company);
+        console.log('Selected Container:', selectedContainer);
+        console.log('Equipment IDs:', equipmentIds);
+
         if (equipmentIds.length !== numberOfContainers) {
             setSnackbar({
                 open: true,
@@ -139,19 +145,45 @@ const ContainerPricingManager = () => {
         setIsLoading(true);
         try {
             // Create array of promises for each container
-            const containerPromises = equipmentIds.map(equipmentId => 
-                assignContainerPrice(company, {
-                    size: selectedContainer.size,
-                    price: selectedContainer.price,
+            const containerPromises = equipmentIds.map(equipmentId => {
+                const containerData = {
+                    size: parseInt(selectedContainer.size),
+                    price: parseFloat(selectedContainer.price),
                     name: selectedContainer.name,
                     EquipmentID: equipmentId,
                     bookingStatus: "available",
                     spaceUsed: 0,
                     containerConsolidationsID: [],
-                })
-            );
+                };
 
+                console.log('Creating container with data:', {
+                    company,
+                    containerData
+                });
+
+                // First verify we have all required data
+                if (!company) {
+                    throw new Error('Company is not defined');
+                }
+                if (!containerData.EquipmentID) {
+                    throw new Error('Equipment ID is not defined');
+                }
+                if (!containerData.size) {
+                    throw new Error('Container size is not defined');
+                }
+                if (!containerData.price) {
+                    throw new Error('Container price is not defined');
+                }
+                if (!containerData.name) {
+                    throw new Error('Container name is not defined');
+                }
+
+                return assignContainerPrice(company, containerData);
+            });
+
+            console.log('Awaiting all container promises...');
             await Promise.all(containerPromises);
+            console.log('All containers created successfully');
 
             setSnackbar({
                 open: true,
@@ -162,7 +194,11 @@ const ContainerPricingManager = () => {
             handleCloseDialog();
             await fetchContainers();
         } catch (error) {
-            console.error("Error adding containers: ", error);
+            console.error("Detailed error in handleAddContainers:", {
+                error,
+                message: error.message,
+                stack: error.stack
+            });
             setSnackbar({
                 open: true,
                 message: error.message || "Error adding containers. Please try again.",
@@ -172,6 +208,7 @@ const ContainerPricingManager = () => {
             setIsLoading(false);
         }
     };
+
 
     const handleCloseDialog = () => {
         setOpenDialog(false);
@@ -494,9 +531,9 @@ const ContainerPricingManager = () => {
                     onClose={handleCloseSnackbar}
                     anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
                 >
-                    <Alert 
-                        onClose={handleCloseSnackbar} 
-                        severity={snackbar.severity} 
+                    <Alert
+                        onClose={handleCloseSnackbar}
+                        severity={snackbar.severity}
                         sx={{ width: '100%' }}
                     >
                         {snackbar.message}

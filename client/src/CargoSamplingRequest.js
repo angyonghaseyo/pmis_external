@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
     Box,
@@ -23,14 +24,14 @@ import {
     FormHelperText,
     Alert,
     IconButton,
+    Snackbar
 } from '@mui/material';
 import { Close as CloseIcon, CloudUpload as CloudUploadIcon } from '@mui/icons-material';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DateTimePicker } from '@mui/x-date-pickers';
 import { styled } from '@mui/material/styles';
-import { doc, getDoc, setDoc, addDoc, collection, getDocs } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from './firebaseConfig';
+import { submitSamplingRequest, updateSamplingRequest, getSamplingRequestById } from './services/api';
+import { API_URL } from './config/apiConfig';
 import { useAuth } from "./AuthContext";
 
 
@@ -106,18 +107,26 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
     const [submitError, setSubmitError] = useState(null);
     const [cargoNumbers, setCargoNumbers] = useState([]);
     const [selectedCargo, setSelectedCargo] = useState('');
+    const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+
+    const handleCloseSnackbar = (event, reason) => {
+        if (reason === 'clickaway') {
+            return;
+        }
+        setSnackbar({ ...snackbar, open: false });
+    };
 
     useEffect(() => {
         const fetchBookings = async () => {
             try {
-                const querySnapshot = await getDocs(collection(db, "bookings"));
-                const bookingsArray = querySnapshot.docs.map((doc) => ({
-                    bookingId: doc.id,
-                    ...doc.data(),
-                }));
+                const response = await fetch(`${API_URL}/bookings`);
+                if (!response.ok) {
+                    throw new Error('Error fetching bookings');
+                }
+                const bookingsData = await response.json();
 
-                // Process cargo numbers from all bookings
-                const allCargoNumbers = bookingsArray.reduce((acc, booking) => {
+                // Process cargo numbers from bookings
+                const allCargoNumbers = bookingsData.reduce((acc, booking) => {
                     if (booking.cargo) {
                         Object.entries(booking.cargo).forEach(([cargoNumber, cargoDetails]) => {
                             acc.push({
@@ -136,7 +145,11 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
                 setCargoNumbers(allCargoNumbers);
             } catch (error) {
                 console.error('Error fetching bookings:', error);
-                // Handle error appropriately
+                setSnackbar({
+                    open: true,
+                    message: 'Error fetching bookings data',
+                    severity: 'error'
+                });
             }
         };
 
@@ -152,26 +165,26 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
     const fetchRequestData = async () => {
         try {
             setLoading(true);
-            const docRef = doc(db, 'samplingRequests', editingId);
-            const docSnap = await getDoc(docRef);
+            const data = await getSamplingRequestById(editingId);
 
-            if (docSnap.exists()) {
-                const data = docSnap.data();
+            // Format dates - assuming the API returns ISO date strings
+            const formattedData = {
+                ...data,
+                schedule: {
+                    startDate: data.schedule?.startDate ? new Date(data.schedule.startDate) : null,
+                    endDate: data.schedule?.endDate ? new Date(data.schedule.endDate) : null
+                }
+            };
 
-                // Convert Firestore Timestamps to JavaScript Date objects
-                const formattedData = {
-                    ...data,
-                    schedule: {
-                        startDate: data.schedule?.startDate?.toDate() || null,
-                        endDate: data.schedule?.endDate?.toDate() || null
-                    }
-                };
-
-                setFormData(formattedData);
-            }
+            setFormData(formattedData);
         } catch (error) {
             console.error('Error fetching request:', error);
             setSubmitError('Error loading request data');
+            setSnackbar({
+                open: true,
+                message: 'Error loading request data',
+                severity: 'error'
+            });
         } finally {
             setLoading(false);
         }
@@ -488,7 +501,7 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
                 <StyledPaper>
                     <LocalizationProvider dateAdapter={AdapterDateFns}>
                         <Grid container spacing={3}>
-                            <Grid item xs={12}>
+                            <Grid item xs={6}>
                                 <DateTimePicker
                                     label="Start Date & Time"
                                     value={formData.schedule.startDate}
@@ -505,7 +518,7 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
                                     minDate={new Date()}
                                 />
                             </Grid>
-                            <Grid item xs={12}>
+                            <Grid item xs={6}>
                                 <DateTimePicker
                                     label="End Date & Time"
                                     value={formData.schedule.endDate}
@@ -617,131 +630,119 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
             setLoading(true);
             setSubmitError(null);
 
-            const fileUrls = await uploadFiles();
-
             const requestData = {
                 ...formData,
                 company: user.company,
-                documents: fileUrls,
                 status: 'Pending',
                 updatedAt: new Date(),
                 createdAt: editingId ? formData.createdAt : new Date()
             };
 
             if (editingId) {
-                await setDoc(doc(db, 'samplingRequests', editingId), requestData);
+                await updateSamplingRequest(editingId, requestData);
             } else {
-                const docRef = await addDoc(collection(db, 'samplingRequests'), requestData);
-                await setDoc(docRef, { id: docRef.id }, { merge: true });
+                await submitSamplingRequest(requestData);
             }
 
             onSubmitSuccess?.();
             handleClose();
+            setSnackbar({
+                open: true,
+                message: 'Sampling Request submitted successfully',
+                severity: 'success'
+            });
         } catch (error) {
             console.error('Error submitting request:', error);
             setSubmitError('Failed to submit request. Please try again.');
+            setSnackbar({
+                open: true,
+                message: 'Failed to submit request. Please try again.',
+                severity: 'error'
+            });
         } finally {
             setLoading(false);
         }
     };
 
-    const uploadFiles = async () => {
-        const uploads = {};
-
-        if (formData.documents.safetyDataSheet) {
-            uploads.safetyDataSheet = await uploadFile(
-                formData.documents.safetyDataSheet,
-                'safety-sheets'
-            );
-        }
-
-        if (formData.documents.additionalDocs?.length > 0) {
-            uploads.additionalDocs = await Promise.all(
-                formData.documents.additionalDocs.map(
-                    file => uploadFile(file, 'additional')
-                )
-            );
-        }
-
-        return uploads;
-    };
-
-    const uploadFile = async (file, path) => {
-        if (!file) return null;
-        const storageRef = ref(storage, `sampling-requests/${path}/${Date.now()}_${file.name}`);
-        await uploadBytes(storageRef, file);
-        return await getDownloadURL(storageRef);
-    };
-
-    // Rest of your component remains the same...
-
     return (
-        <Dialog
-            open={open}
-            onClose={handleClose}
-            maxWidth="md"
-            fullWidth
-            PaperProps={{
-                sx: { minHeight: '80vh' }
-            }}
-        >
-            <DialogTitle>
-                <Box display="flex" alignItems="center" justifyContent="space-between">
-                    <Typography variant="h6">
-                        {editingId ? 'Edit Sampling Request' : 'New Sampling Request'}
-                    </Typography>
-                    <IconButton onClick={handleClose} size="small">
-                        <CloseIcon />
-                    </IconButton>
-                </Box>
-            </DialogTitle>
+        <>
+            <Dialog
+                open={open}
+                onClose={handleClose}
+                maxWidth="md"
+                fullWidth
+                PaperProps={{
+                    sx: { minHeight: '80vh' }
+                }}
+            >
+                <DialogTitle>
+                    <Box display="flex" alignItems="center" justifyContent="space-between">
+                        <Typography variant="h6">
+                            {editingId ? 'Edit Sampling Request' : 'New Sampling Request'}
+                        </Typography>
+                        <IconButton onClick={handleClose} size="small">
+                            <CloseIcon />
+                        </IconButton>
+                    </Box>
+                </DialogTitle>
 
-            <DialogContent dividers>
-                {submitError && (
-                    <Alert severity="error" sx={{ mb: 2 }}>
-                        {submitError}
-                    </Alert>
-                )}
+                <DialogContent dividers>
+                    {submitError && (
+                        <Alert severity="error" sx={{ mb: 2 }}>
+                            {submitError}
+                        </Alert>
+                    )}
 
-                <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 4 }}>
-                    {steps.map((label) => (
-                        <Step key={label}>
-                            <StepLabel>{label}</StepLabel>
-                        </Step>
-                    ))}
-                </Stepper>
+                    <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 4 }}>
+                        {steps.map((label) => (
+                            <Step key={label}>
+                                <StepLabel>{label}</StepLabel>
+                            </Step>
+                        ))}
+                    </Stepper>
 
-                {renderStepContent(activeStep)}
-            </DialogContent>
+                    {renderStepContent(activeStep)}
+                </DialogContent>
 
-            <DialogActions>
-                <Button onClick={handleClose}>Cancel</Button>
-                <Box sx={{ flex: '1 1 auto' }} />
-                <Button
-                    disabled={activeStep === 0}
-                    onClick={() => setActiveStep((prev) => prev - 1)}
-                    sx={{ mr: 1 }}
-                >
-                    Back
-                </Button>
-                {activeStep === steps.length - 1 ? (
+                <DialogActions>
+                    <Button onClick={handleClose}>Cancel</Button>
+                    <Box sx={{ flex: '1 1 auto' }} />
                     <Button
-                        variant="contained"
-                        onClick={handleSubmit}
-                        disabled={loading}
+                        disabled={activeStep === 0}
+                        onClick={() => setActiveStep((prev) => prev - 1)}
+                        sx={{ mr: 1 }}
                     >
-                        {loading ? 'Submitting...' : 'Submit Request'}
+                        Back
                     </Button>
-                ) : (
-                    <Button
-                        variant="contained"
-                        onClick={() => setActiveStep((prev) => prev + 1)}
-                    >
-                        {activeStep === 0 ? 'Start Request' : 'Next'}
-                    </Button>
-                )}
-            </DialogActions>
-        </Dialog>
+                    {activeStep === steps.length - 1 ? (
+                        <Button
+                            variant="contained"
+                            onClick={handleSubmit}
+                            disabled={loading}
+                        >
+                            {loading ? 'Submitting...' : 'Submit Request'}
+                        </Button>
+                    ) : (
+                        <Button
+                            variant="contained"
+                            onClick={() => setActiveStep((prev) => prev + 1)}
+                        >
+                            {activeStep === 0 ? 'Start Request' : 'Next'}
+                        </Button>
+                    )}
+                </DialogActions>
+            </Dialog>
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={6000}
+                onClose={handleCloseSnackbar}
+                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            >
+                <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
+        </>
     );
 };
 

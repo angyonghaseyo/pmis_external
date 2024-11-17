@@ -35,13 +35,19 @@ import {
     FormControlLabel
 } from "@mui/material";
 
-import { 
-    getContainerRequests, 
-    createContainerRequest, 
-    getBookings, 
+import {
+    getContainerRequests,
+    createContainerRequest,
+    getBookings,
     getContainerTypes,
-    getBookingById 
+    getBookingById
 } from './services/api';
+import {
+    Edit as EditIcon,
+    Visibility as ViewIcon,
+    Delete as DeleteIcon,
+    Search as SearchIcon
+} from '@mui/icons-material';
 
 const ContainerRequest = ({ user }) => {
     const [activeStep, setActiveStep] = useState(0);
@@ -59,6 +65,9 @@ const ContainerRequest = ({ user }) => {
     const [openDetailsDialog, setOpenDetailsDialog] = useState(false);
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [voyage, setVoyage] = useState("");
+    const [carriers, setCarriers] = useState([]);
+    const [cargoCarriers, setCargoCarriers] = useState({});
+    const [consolidationPrices, setConsolidationPrices] = useState({});
 
     const steps = [
         'Enter Booking Details',
@@ -77,6 +86,21 @@ const ContainerRequest = ({ user }) => {
         const fetchData = async () => {
             try {
                 // Fetch container requests
+                const containerTypes = await getContainerTypes();
+                const carriersList = [];
+                const pricesMap = {};
+                Object.entries(containerTypes).forEach(([carrierName, containers]) => {
+                    if (containers && containers.length > 0) {
+                        const carrierInfo = {
+                            name: carrierName,
+                            consolidationPrice: containers[0].consolidationPrice // Assuming same consolidation price for all container types
+                        };
+                        carriersList.push(carrierInfo);
+                        pricesMap[carrierName] = containers[0].consolidationPrice;
+                    }
+                });
+                setCarriers(carriersList);
+                setConsolidationPrices(pricesMap);
                 const requestsData = await getContainerRequests();
                 setContainerRequests(requestsData);
 
@@ -151,15 +175,16 @@ const ContainerRequest = ({ user }) => {
     };
 
     const handleContainerSelection = (cargoId, containerDetails, serviceType, carrierName) => {
-        if (serviceType === 'fullContainer') {
+        if (serviceType === 'Full Container') {
             setSelectedContainers(prev => ({
                 ...prev,
                 [cargoId]: {
                     ...containerDetails,
-                    carrierName
+                    carrierName,
+                    serviceType: 'Full Container'
                 }
             }));
-        } else if (serviceType === 'consolidation') {
+        } else if (serviceType === 'Consolidation') {
             setCargos(prevCargos =>
                 prevCargos.map(cargo =>
                     cargo.id === cargoId
@@ -167,7 +192,8 @@ const ContainerRequest = ({ user }) => {
                             ...cargo,
                             selectedContainer: {
                                 ...containerDetails,
-                                carrierName
+                                carrierName,
+                                serviceType: 'Consolidation'
                             }
                         }
                         : cargo
@@ -178,25 +204,35 @@ const ContainerRequest = ({ user }) => {
 
     const handleSubmit = async () => {
         try {
-            // Validate selections
             const invalidCargos = cargos.filter(cargo => {
-                if (cargo.serviceType === 'fullContainer' && !selectedContainers[cargo.id]) {
-                    return true;
-                }
+                if (!cargo.serviceType || !cargoCarriers[cargo.id]) return true;
+                if (cargo.serviceType === 'Consolidation' && !cargo.consolidationSpace) return true;
+                if (cargo.serviceType === 'Full Container' && !selectedContainers[cargo.id]) return true;
                 return false;
             });
 
             if (invalidCargos.length > 0) {
                 setOpenSnackbar({
                     open: true,
-                    message: "Please complete all cargo selections",
+                    message: "Please complete all selections",
                     severity: "error"
                 });
                 return;
             }
 
-            // Submit individual requests for each cargo
             for (const cargo of cargos) {
+                const carrierName = cargoCarriers[cargo.id];
+                let containerDetails;
+                if (cargo.serviceType === 'Consolidation') {
+                    containerDetails = cargo.selectedContainer || availableContainers[carrierName][0];
+                } else {
+                    containerDetails = selectedContainers[cargo.id];
+                }
+
+                if (!containerDetails) {
+                    throw new Error(`Container details not found for cargo ${cargo.id}`);
+                }
+
                 const dataToSubmit = {
                     bookingId: formData.bookingId,
                     voyageNumber: formData.voyageNumber,
@@ -207,20 +243,24 @@ const ContainerRequest = ({ user }) => {
                         quantity: cargo.quantity,
                         weightPerUnit: cargo.weightPerUnit
                     },
+                    containerDetails: {
+                        ...containerDetails,
+                        carrierName
+                    },
+                    serviceType: cargo.serviceType,
+                    carrierName,
                     eta: bookingData?.eta || null,
                     etd: bookingData?.etd || null,
                     createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString()
+                    updatedAt: new Date().toISOString(),
+                    consolidationService: cargo.serviceType === 'Consolidation'
                 };
 
-                if (cargo.serviceType === 'fullContainer') {
-                    const containerDetails = selectedContainers[cargo.id];
-                    dataToSubmit.containerDetails = containerDetails;
-                    dataToSubmit.carrierName = containerDetails.carrierName;
+                if (cargo.serviceType === 'Consolidation') {
+                    dataToSubmit.consolidationSpace = parseFloat(cargo.consolidationSpace);
+                    dataToSubmit.estimatedCost = containerDetails.consolidationPrice * dataToSubmit.consolidationSpace;
                 } else {
-                    dataToSubmit.consolidationSpace = cargo.consolidationSpace;
-                    dataToSubmit.consolidationService = true;
-                    dataToSubmit.containerDetails = cargo.selectedContainer;
+                    dataToSubmit.estimatedCost = parseFloat(containerDetails.price);
                 }
 
                 await createContainerRequest(dataToSubmit);
@@ -233,7 +273,6 @@ const ContainerRequest = ({ user }) => {
             });
             handleCloseDialog();
 
-            // Refresh the container requests list
             const updatedRequests = await getContainerRequests();
             setContainerRequests(updatedRequests);
 
@@ -297,7 +336,16 @@ const ContainerRequest = ({ user }) => {
         return baseSteps;
     };
 
-    const ContainerCard = ({ container, cargoId, onSelect, isSelected, serviceType, carrierName }) => (
+    const ContainerCard = ({
+        container,
+        cargoId,
+        onSelect,
+        isSelected,
+        serviceType,
+        carrierName,
+        showPrice,
+        showConsolidationPrice
+    }) => (
         <Card
             sx={{
                 maxWidth: 345,
@@ -344,9 +392,16 @@ const ContainerRequest = ({ user }) => {
                 <Typography variant="body2" color="text.secondary">
                     Carrier: {carrierName}
                 </Typography>
-                <Typography variant="h6" color="primary">
-                    ${container.price}
-                </Typography>
+                {showPrice && (
+                    <Typography variant="h6" color="primary">
+                        ${container.price}
+                    </Typography>
+                )}
+                {showConsolidationPrice && (
+                    <Typography variant="h6" color="primary">
+                        ${container.consolidationPrice}/ft³
+                    </Typography>
+                )}
             </CardContent>
         </Card>
     );
@@ -414,12 +469,12 @@ const ContainerRequest = ({ user }) => {
                                                     onChange={(e) => handleServiceTypeChange(cargo.id, e.target.value)}
                                                 >
                                                     <FormControlLabel
-                                                        value="fullContainer"
+                                                        value="Full Container"
                                                         control={<Radio />}
                                                         label="Full Container"
                                                     />
                                                     <FormControlLabel
-                                                        value="consolidation"
+                                                        value="Consolidation"
                                                         control={<Radio />}
                                                         label="Consolidation"
                                                     />
@@ -433,11 +488,18 @@ const ContainerRequest = ({ user }) => {
                     </Box>
                 );
 
+
             default:
                 const cargoIndex = currentStepIndex - 2;
                 const currentCargo = cargos[cargoIndex];
 
                 if (!currentCargo) return 'Unknown step';
+
+                const selectedContainer = currentCargo.serviceType === 'Consolidation'
+                    ? currentCargo.selectedContainer
+                    : selectedContainers[currentCargo.id];
+
+                const currentCarrier = cargoCarriers[currentCargo.id];
 
                 return (
                     <Box sx={{ p: 2 }}>
@@ -445,53 +507,78 @@ const ContainerRequest = ({ user }) => {
                             Container Selection for: {currentCargo.name}
                         </Typography>
                         <Typography variant="subtitle1" color="textSecondary" gutterBottom>
-                            Service Type: {currentCargo.serviceType === 'fullContainer' ? 'Full Container' : 'Consolidation'}
+                            Service Type: {currentCargo.serviceType === 'Full Container' ? 'Full Container' : 'Consolidation'}
                         </Typography>
 
-                        {currentCargo.serviceType === 'consolidation' && (
-                            <Box sx={{ mb: 3 }}>
-                                <TextField
-                                    label="Required Space (ft³)"
-                                    type="number"
-                                    value={currentCargo.consolidationSpace || ''}
-                                    onChange={(e) => {
-                                        setCargos(prevCargos => prevCargos.map(c =>
-                                            c.id === currentCargo.id
-                                                ? { ...c, consolidationSpace: e.target.value }
-                                                : c
-                                        ));
-                                    }}
-                                    fullWidth
-                                    sx={{ mb: 2 }}
-                                />
-                            </Box>
-                        )}
-                        {currentCargo.serviceType === 'fullContainer' && (
-                            <Grid container spacing={3}>
-                                {Object.entries(availableContainers).map(([carrierName, containers]) => (
-                                    <React.Fragment key={carrierName}>
-                                        <Grid item xs={12}>
-                                            <Typography variant="h6" color="primary">
-                                                {carrierName}
-                                            </Typography>
-                                        </Grid>
-                                        {containers.map((container, index) => (
-                                            <Grid item xs={12} sm={6} md={4} key={index}>
-                                                <ContainerCard
-                                                    container={container}
-                                                    cargoId={currentCargo.id}
-                                                    onSelect={handleContainerSelection}
-                                                    isSelected={
-                                                        selectedContainers[currentCargo.id]?.name === container.name
-                                                    }
-                                                    serviceType={currentCargo.serviceType}
-                                                    carrierName={carrierName}
-                                                />
-                                            </Grid>
-                                        ))}
-                                    </React.Fragment>
+                        <FormControl fullWidth sx={{ mb: 3 }}>
+                            <InputLabel>Select Carrier</InputLabel>
+                            <Select
+                                value={currentCarrier || ''}
+                                onChange={(e) => {
+                                    const newCarrierId = e.target.value;
+                                    setCargoCarriers(prev => ({
+                                        ...prev,
+                                        [currentCargo.id]: newCarrierId
+                                    }));
+                                }}
+                            >
+                                {Object.keys(availableContainers).map((carrierName) => (
+                                    <MenuItem key={carrierName} value={carrierName}>
+                                        {carrierName}
+                                    </MenuItem>
                                 ))}
-                            </Grid>
+                            </Select>
+                        </FormControl>
+
+                        {currentCarrier && (
+                            <>
+                                {currentCargo.serviceType === 'Consolidation' && (
+                                    <Box sx={{ mb: 3 }}>
+                                        <TextField
+                                            label="Required Space (ft³)"
+                                            type="number"
+                                            value={currentCargo.consolidationSpace || ''}
+                                            onChange={(e) => {
+                                                setCargos(prevCargos => prevCargos.map(c =>
+                                                    c.id === currentCargo.id
+                                                        ? { ...c, consolidationSpace: e.target.value }
+                                                        : c
+                                                ));
+                                            }}
+                                            fullWidth
+                                            sx={{ mb: 2 }}
+                                        />
+                                        {currentCargo.consolidationSpace && currentCarrier && (
+                                            <Typography variant="h6" color="primary" gutterBottom>
+                                                Estimated Cost: $
+                                                {((selectedContainer?.consolidationPrice ||
+                                                    availableContainers[currentCarrier][0].consolidationPrice) *
+                                                    currentCargo.consolidationSpace).toFixed(2)}
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                )}
+
+                                <Grid container spacing={3}>
+                                    {availableContainers[currentCarrier].map((container, index) => (
+                                        <Grid item xs={12} sm={6} md={4} key={index}>
+                                            <ContainerCard
+                                                container={container}
+                                                cargoId={currentCargo.id}
+                                                onSelect={handleContainerSelection}
+                                                isSelected={
+                                                    selectedContainer?.name === container.name &&
+                                                    selectedContainer?.carrierName === currentCarrier
+                                                }
+                                                serviceType={currentCargo.serviceType}
+                                                carrierName={currentCarrier}
+                                                showPrice={currentCargo.serviceType === 'Full Container'}
+                                                showConsolidationPrice={currentCargo.serviceType === 'Consolidation'}
+                                            />
+                                        </Grid>
+                                    ))}
+                                </Grid>
+                            </>
                         )}
                     </Box>
                 );
@@ -520,7 +607,21 @@ const ContainerRequest = ({ user }) => {
             const currentCargoIndex = activeStep - 2;
             const currentCargo = cargos[currentCargoIndex];
 
-            if (currentCargo.serviceType === 'fullContainer' && !selectedContainers[currentCargo.id]) {
+            const currentCarrier = cargoCarriers[currentCargo.id];
+            if (!currentCarrier) {
+                setOpenSnackbar({
+                    open: true,
+                    message: "Please select a carrier",
+                    severity: "error"
+                });
+                return;
+            }
+
+            const selectedContainer = currentCargo.serviceType === 'Consolidation'
+                ? currentCargo.selectedContainer
+                : selectedContainers[currentCargo.id];
+
+            if (currentCargo.serviceType === 'Full Container' && !selectedContainer) {
                 setOpenSnackbar({
                     open: true,
                     message: "Please select a container",
@@ -529,13 +630,15 @@ const ContainerRequest = ({ user }) => {
                 return;
             }
 
-            if (currentCargo.serviceType === 'consolidation' && !currentCargo.consolidationSpace) {
-                setOpenSnackbar({
-                    open: true,
-                    message: "Please enter space requirements",
-                    severity: "error"
-                });
-                return;
+            if (currentCargo.serviceType === 'Consolidation') {
+                if (!currentCargo.consolidationSpace) {
+                    setOpenSnackbar({
+                        open: true,
+                        message: "Please enter space requirements",
+                        severity: "error"
+                    });
+                    return;
+                }
             }
         }
 
@@ -552,6 +655,7 @@ const ContainerRequest = ({ user }) => {
         setCargos([]);
         setBookingData(null);
         setSelectedContainers({});
+        setCargoCarriers({});
         setActiveStep(0);
         setIsBookingValid(false);
     };
@@ -689,16 +793,58 @@ const ContainerRequest = ({ user }) => {
                         </Grid>
 
                         {request.consolidationService ? (
-                            <Grid item xs={6}>
-                                <TextField
-                                    fullWidth
-                                    label="Space Required"
-                                    value={`${request.consolidationSpace || ''} ft³`}
-                                    disabled
-                                    variant="outlined"
-                                    size="small"
-                                />
-                            </Grid>
+                            <>
+                                <Grid item xs={6}>
+                                    <TextField
+                                        fullWidth
+                                        label="Space Required"
+                                        value={`${request.consolidationSpace || ''} ft³`}
+                                        disabled
+                                        variant="outlined"
+                                        size="small"
+                                    />
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <TextField
+                                        fullWidth
+                                        label="Container Type"
+                                        value={request.containerDetails?.name || ''}
+                                        disabled
+                                        variant="outlined"
+                                        size="small"
+                                    />
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <TextField
+                                        fullWidth
+                                        label="Size"
+                                        value={`${request.containerDetails?.size || ''} ft`}
+                                        disabled
+                                        variant="outlined"
+                                        size="small"
+                                    />
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <TextField
+                                        fullWidth
+                                        label="Price"
+                                        value={request.containerDetails?.price ? `$${request.containerDetails.price}` : 'TBD'}
+                                        disabled
+                                        variant="outlined"
+                                        size="small"
+                                    />
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <TextField
+                                        fullWidth
+                                        label="Carrier"
+                                        value={request.carrierName || 'Not assigned'}
+                                        disabled
+                                        variant="outlined"
+                                        size="small"
+                                    />
+                                </Grid>
+                            </>
                         ) : (
                             <>
                                 <Grid item xs={6}>
@@ -870,11 +1016,12 @@ const ContainerRequest = ({ user }) => {
                         <TableHead>
                             <TableRow>
                                 <TableCell>Booking ID</TableCell>
-                                <TableCell>Voyage Number</TableCell>
+                                <TableCell>Cargo</TableCell>
+                                <TableCell>Carrier Line</TableCell>
+                                <TableCell>Service Type</TableCell>
                                 <TableCell>Container/Space</TableCell>
                                 <TableCell>Price</TableCell>
                                 <TableCell>Status</TableCell>
-                                <TableCell>Rejection Reason</TableCell>
                                 <TableCell>Actions</TableCell>
                             </TableRow>
                         </TableHead>
@@ -882,47 +1029,49 @@ const ContainerRequest = ({ user }) => {
                             {containerRequests.map((request) => (
                                 <TableRow key={request.id} hover>
                                     <TableCell>{request.bookingId}</TableCell>
-                                    <TableCell>{request.voyageNumber}</TableCell>
+                                    <TableCell>{request.cargoDetails.name}</TableCell>
+                                    <TableCell>{request.carrierName}</TableCell>
+                                    <TableCell>{request.serviceType}</TableCell>
                                     <TableCell>
-                                        {request.containerDetails ? (
+                                        {request.consolidationService ? (
                                             <Box>
                                                 <Typography variant="body2">
-                                                    {request.containerDetails.name}
+                                                    {request.containerDetails?.name || 'N/A'}
                                                 </Typography>
                                                 <Typography variant="caption" color="textSecondary">
-                                                    {request.containerDetails.size}ft
+                                                    Consolidation Space: {request.consolidationSpace}ft³
                                                 </Typography>
                                             </Box>
                                         ) : (
-                                            <Typography variant="body2">
-                                                {request.consolidationSpace}ft³ (Consolidation)
-                                            </Typography>
+                                            <Box>
+                                                <Typography variant="body2">
+                                                    {request.containerDetails?.name || 'N/A'}
+                                                </Typography>
+                                                <Typography variant="caption" color="textSecondary">
+                                                    {request.containerDetails?.size || 'N/A'}ft
+                                                </Typography>
+                                            </Box>
                                         )}
                                     </TableCell>
                                     <TableCell>
-                                        {request.containerDetails?.price ?
-                                            `$${request.containerDetails.price}` :
-                                            'TBD'
-                                        }
+                                        {request.consolidationService ? (
+                                            request.estimatedCost ? `$${request.estimatedCost.toFixed(2)}` : 'TBD'
+                                        ) : (
+                                            request.containerDetails?.price ? `$${request.containerDetails.price}` : 'TBD'
+                                        )}
                                     </TableCell>
                                     <TableCell>
                                         {formatStatus(request.status)}
                                     </TableCell>
-                                    <TableCell>
-                                        {request.rejectionReason ? (
-                                            <Typography variant="body2">
-                                                {request.rejectionReason}
-                                            </Typography>
-                                        ) : (<Typography variant="body2">-</Typography>)
-                                        }
-                                    </TableCell>
+
                                     <TableCell>
                                         <Button
                                             size="small"
-                                            variant="outlined"
+
                                             onClick={() => handleOpenDetails(request)}
+
                                         >
-                                            View Details
+                                            <ViewIcon />
                                         </Button>
                                     </TableCell>
                                 </TableRow>

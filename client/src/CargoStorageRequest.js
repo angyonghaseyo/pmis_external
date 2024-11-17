@@ -582,7 +582,8 @@ const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSucc
                 documents: fileUrls,
                 status: 'Pending',
                 updatedAt: new Date(),
-                createdAt: editingId ? formData.createdAt : new Date()
+                createdAt: editingId ? formData.createdAt : new Date(),
+                requestType: "storageRequests"
             };
 
             if (editingId) {

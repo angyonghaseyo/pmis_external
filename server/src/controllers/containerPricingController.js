@@ -17,19 +17,31 @@ class ContainerPricingController {
         }
     }
 
+
     async assignContainerPrice(req, res) {
+        console.log('Received request:', req.body);
+
         try {
             const { company, ...containerData } = req.body;
-            if (!company || !containerData) {
-                return res.status(400).json({ error: 'Missing required fields' });
+
+            if (!company) {
+                return res.status(400).json({ error: 'Company is required' });
             }
-            const result = await this.containerPricingService.assignContainerPrice(company, containerData);
-            res.status(201).json(result);
+
+            if (!containerData) {
+                return res.status(400).json({ error: 'Container data is required' });
+            }
+
+            const result = await this.containerPricingService.createContainerPrice(company, containerData);
+            return res.status(201).json(result);
         } catch (error) {
             console.error('Error in assignContainerPrice:', error);
-            res.status(500).json({ error: 'Error assigning container price' });
+            return res.status(500).json({
+                error: error.message || 'Internal server error'
+            });
         }
     }
+
 
     async updateContainerPrice(req, res) {
         try {

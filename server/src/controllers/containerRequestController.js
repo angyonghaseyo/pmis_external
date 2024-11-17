@@ -17,6 +17,18 @@ class ContainerRequestController {
     async createContainerRequest(req, res) {
         try {
             const requestData = req.body;
+            console.log(requestData, "123");
+            // Add validation for consolidation service
+            if (requestData.serviceType === "Consolidation") {
+                console.log(requestData, "12345");
+                if (!requestData.consolidationSpace || !requestData.carrierName) {
+                    return res.status(400).json({
+                        error: 'Missing required fields for consolidation service'
+                    });
+                }
+            }
+
+            console.log(requestData, "1234567");
             const result = await this.containerRequestService.createContainerRequest(requestData);
             res.status(201).json(result);
         } catch (error) {

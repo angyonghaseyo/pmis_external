@@ -801,25 +801,26 @@ export const getContainerTypesForCompany = async (company) => {
 export const addContainerType = async (company, containerData) => {
   try {
     const formData = new FormData();
-    formData.append("company", company);
-    formData.append("size", containerData.size);
-    formData.append("price", containerData.price);
-    formData.append("name", containerData.name);
+    formData.append('company', company);
+    formData.append('size', containerData.size);
+    formData.append('price', containerData.price);
+    formData.append('name', containerData.name);
+    formData.append('consolidationPrice', containerData.consolidationPrice);
     if (containerData.imageFile) {
-      formData.append("image", containerData.imageFile);
+      formData.append('image', containerData.imageFile);
     }
 
     const response = await fetch(`${API_URL}/container-types`, {
-      method: "POST",
-      body: formData,
+      method: 'POST',
+      body: formData
     });
 
     if (!response.ok) {
-      throw new Error("Error adding container type");
+      throw new Error('Error adding container type');
     }
     return await response.json();
   } catch (error) {
-    console.error("Error in addContainerType:", error);
+    console.error('Error in addContainerType:', error);
     throw error;
   }
 };
@@ -857,6 +858,7 @@ export const assignContainerPrice = async (company, containerData) => {
     if (!response.ok) {
       throw new Error("Error assigning container price");
     }
+
     return await response.json();
   } catch (error) {
     console.error("Error in assignContainerPrice:", error);
@@ -1070,33 +1072,33 @@ export const uploadBookingDocument = async (
 
 export const retrieveBookingDocument = async (bookingId, cargoId, documentType) => {
   try {
-      const response = await fetch(
-          `${API_URL}/bookings/${bookingId}`
-      );
+    const response = await fetch(
+      `${API_URL}/bookings/${bookingId}`
+    );
 
-      if (!response.ok) {
-          throw new Error('Failed to retrieve document');
-      }
+    if (!response.ok) {
+      throw new Error('Failed to retrieve document');
+    }
 
-      const data = await response.json();
-      const documentUrl = data.cargo[cargoId].documents[documentType];
-      console.log(documentUrl);
-      if (documentType === "Safety Data Sheet") {
-        await updateDoc(doc(db, "bookings", bookingId), {
-          [`cargo.${cargoId}.documentStatus['UN Classification Sheet']`]: {
-            status: "IN_PROGRESS",
-            lastUpdated: serverTimestamp(),
-            comments: "Prerequisites met, waiting for agency review"
-          }
-        });
-      }
-      return {
-          url: documentUrl,
-          fileName: documentUrl.split('/').pop()
-      };
+    const data = await response.json();
+    const documentUrl = data.cargo[cargoId].documents[documentType];
+    console.log(documentUrl);
+    if (documentType === "Safety Data Sheet") {
+      await updateDoc(doc(db, "bookings", bookingId), {
+        [`cargo.${cargoId}.documentStatus['UN Classification Sheet']`]: {
+          status: "IN_PROGRESS",
+          lastUpdated: serverTimestamp(),
+          comments: "Prerequisites met, waiting for agency review"
+        }
+      });
+    }
+    return {
+      url: documentUrl,
+      fileName: documentUrl.split('/').pop()
+    };
   } catch (error) {
-      console.error('Error retrieving document:', error);
-      throw error;
+    console.error('Error retrieving document:', error);
+    throw error;
   }
 };
 
@@ -1368,13 +1370,14 @@ export const getBillingRequestsByMonth1 = async (companyId, monthRange) => {
   }
 };
 
+
 export const getPricingRates = async () => {
   try {
     const ratesDoc = await getDoc(doc(db, 'pricing', 'rates'));
     if (ratesDoc.exists()) {
       return ratesDoc.data();
     } else {
-      return null; 
+      return null;
     }
   } catch (error) {
     console.error('Error fetching pricing rates:', error);
@@ -1382,7 +1385,123 @@ export const getPricingRates = async () => {
   }
 };
 
+export const submitSamplingRequest = async (requestData) => {
+  try {
+    const formData = new FormData();
+    console.log(requestData.schedule, "1234", typeof requestData.schedule);
+    formData.append('samplingDetails', JSON.stringify({
+      cargoDetails: requestData.cargoDetails,
+      samplingDetails: requestData.samplingDetails,
+      schedule: requestData.schedule,
+      specialInstructions: requestData.specialInstructions || ''
+    }));
 
+    if (requestData.documents?.safetyDataSheet instanceof File) {
+      formData.append('safetyDataSheet', requestData.documents.safetyDataSheet);
+    }
+
+    if (Array.isArray(requestData.documents?.additionalDocs)) {
+      requestData.documents.additionalDocs.forEach((doc) => {
+        if (doc instanceof File) {
+          formData.append('additionalDoc', doc);
+        }
+      });
+    }
+
+    const response = await fetch(`${API_URL}/sampling-requests`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error('Error submitting sampling request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in submitSamplingRequest:', error);
+    throw error;
+  }
+};
+
+export const updateSamplingRequest = async (requestId, requestData) => {
+  try {
+    const formData = new FormData();
+    formData.append('samplingDetails', JSON.stringify({
+      cargoDetails: requestData.cargoDetails,
+      samplingDetails: requestData.samplingDetails,
+      schedule: requestData.schedule,
+      specialInstructions: requestData.specialInstructions,
+      status: requestData.status
+    }));
+
+    if (requestData.documents?.safetyDataSheet instanceof File) {
+      formData.append('safetyDataSheet', requestData.documents.safetyDataSheet);
+    }
+
+    const response = await fetch(`${API_URL}/sampling-requests/${requestId}`, {
+      method: 'PUT',
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error('Error updating sampling request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in updateSamplingRequest:', error);
+    throw error;
+  }
+};
+
+export const getSamplingRequests = async (filters = {}) => {
+  try {
+    const queryParams = new URLSearchParams(filters);
+    const response = await fetch(`${API_URL}/sampling-requests?${queryParams}`);
+
+    if (!response.ok) {
+      throw new Error('Error fetching sampling requests');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in getSamplingRequests:', error);
+    throw error;
+  }
+};
+
+export const deleteSamplingRequest = async (requestId) => {
+  try {
+    const response = await fetch(`${API_URL}/sampling-requests/${requestId}`, {
+      method: 'DELETE'
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({
+        error: 'Error deleting sampling request'
+      }));
+      throw new Error(errorData.error || 'Error deleting sampling request');
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error in deleteSamplingRequest:', error);
+    throw error;
+  }
+};
+
+export const getSamplingRequestById = async (requestId) => {
+  try {
+    const response = await fetch(`${API_URL}/sampling-requests/${requestId}`);
+
+    if (!response.ok) {
+      throw new Error('Error fetching sampling request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in getSamplingRequestById:', error);
+    throw error;
+  }
+};
 
 const api = {
   loginUser,
@@ -1463,6 +1582,11 @@ const api = {
   uploadBookingDocument,
   retrieveBookingDocument,
   getPricingRates,
+  updateSamplingRequest,
+  submitSamplingRequest,
+  getSamplingRequests,
+  deleteSamplingRequest,
+  getSamplingRequestById
 };
 
 export default api;

@@ -47,47 +47,17 @@ import {
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import ErrorIcon from "@mui/icons-material/Error";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
-import ArchiveIcon from '@mui/icons-material/Archive';
+import ArchiveIcon from "@mui/icons-material/Archive";
 import {
   getBookings,
   getBookingById,
   uploadBookingDocument,
   retrieveBookingDocument,
+  updateBooking,
 } from "./services/api";
 import { validateDocumentWithOCR, DocumentKeywords } from "./OCRValidation.js";
 import { HSCodeCategories, ProcessStatus } from "./HSCodeCategories.js";
 
-// const CategoryIcon = ({ category }) => {
-//   switch (category) {
-//     case "EXPLOSIVES_AND_PYROTECHNICS":
-//       return <Warning />;
-//     case "FRESH_FRUITS":
-//       return <LocalFlorist />;
-//     case "PHARMACEUTICALS":
-//       return <Medication />;
-//     default:
-//       return null;
-//   }
-// };
-
-// const StatusChip = ({ status }) => {
-//   const getStatusColor = () => {
-//     switch (status) {
-//       case ProcessStatus.COMPLETED:
-//         return "success";
-//       case ProcessStatus.IN_PROGRESS:
-//         return "primary";
-//       case ProcessStatus.REJECTED:
-//         return "error";
-//       default:
-//         return "default";
-//     }
-//   };
-
-//   const displayStatus = status ? status.replace(/_/g, " ") : "NOT STARTED";
-
-//   return <Chip label={displayStatus} color={getStatusColor()} size="small" />;
-// };
 const UploadDialog = ({
   open,
   onClose,
@@ -174,7 +144,7 @@ const DocumentListItem = ({
 
   const currentStatus = status?.status || "NOT_STARTED";
   const hasDocument = cargoDetails?.documents?.[doc.name];
-  console.log(hasDocument);
+  // console.log(hasDocument);
   const isClickable = isExporterDoc;
 
   const getStatusColor = (status) => {
@@ -211,6 +181,8 @@ const DocumentListItem = ({
         return "primary";
       case "PENDING":
         return "secondary";
+      case "APPROVED":
+        return "success";
       default:
         return "default";
     }
@@ -225,12 +197,14 @@ const DocumentListItem = ({
           return <Warning />;
         case "IN_PROGRESS":
           return <PendingActions />;
+        case "APPROVED":
+          return <CheckCircle sx={{ color: "green" }} />;
         default:
           return <PendingActions />;
       }
     } else {
       if (hasDocument) {
-        return <CheckCircle sx={{ color: 'green' }}/>;
+        return <CheckCircle sx={{ color: "green" }} />;
       }
       return <UploadFile />;
     }
@@ -240,7 +214,30 @@ const DocumentListItem = ({
     if (isAgencyDoc) {
       const prerequisites = docDetails.requiresDocuments;
       if (prerequisites?.length > 0) {
-        return `Requires: ${prerequisites.join(", ")}`;
+        // Create a status list of required documents
+        return (
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              Required Documents:
+            </Typography>
+            {prerequisites.map((reqDoc) => (
+              <Chip
+                key={reqDoc}
+                size="small"
+                label={reqDoc}
+                icon={
+                  cargoDetails.documents[reqDoc] ? (
+                    <CheckCircle fontSize="small" />
+                  ) : (
+                    <ErrorIcon fontSize="small" />
+                  )
+                }
+                color={cargoDetails.documents[reqDoc] ? "success" : "default"}
+                sx={{ ml: 1, mb: 1 }}
+              />
+            ))}
+          </Box>
+        );
       }
       return `To be issued by: ${docDetails.issuedBy}`;
     } else {
@@ -356,7 +353,7 @@ const CustomsPreview = () => {
     const fetchBookings = async () => {
       try {
         setLoading(true);
-        console.log("Fetching bookings..."); // Debug log
+        // console.log("Fetching bookings..."); // Debug log
 
         // Add timeout to prevent infinite loading
         const timeoutPromise = new Promise((_, reject) =>
@@ -369,7 +366,7 @@ const CustomsPreview = () => {
           timeoutPromise,
         ]);
 
-        console.log("Bookings received:", bookingsData); // Debug log
+        // console.log("Bookings received:", bookingsData); // Debug log
 
         if (!Array.isArray(bookingsData)) {
           throw new Error("Invalid data format received");
@@ -530,39 +527,89 @@ const CustomsPreview = () => {
         file
       );
 
-      // Update local state to reflect the upload
+      // First update: Update the main cargo details with new document and set status to COMPLETED
       const updatedCargoDetails = {
         ...cargoDetails,
         documents: {
           ...cargoDetails.documents,
-          [selectedDocument]: uploadResult.url, // Store the document URL
+          [selectedDocument]: uploadResult.url,
         },
         documentStatus: {
           ...cargoDetails.documentStatus,
           [selectedDocument]: {
             ...cargoDetails.documentStatus[selectedDocument],
-            status: "IN_PROGRESS",
+            status: "COMPLETED",
+            lastUpdated: new Date(),
+            comments: null,
           },
         },
       };
 
+      // Update local state with the first update
       setCargoDetails(updatedCargoDetails);
 
-      if (selectedDocument === "Safety Data Sheet") {
-        const updatedStatus = {
-          ...cargoDetails.documentStatus,
-          "UN Classification Sheet": {
-            ...cargoDetails.documentStatus["UN Classification Sheet"],
-            status: "IN_PROGRESS",
-            lastUpdated: new Date(),
-            comments: "Prerequisites met, waiting for agency review"
+      // Get the current booking data
+      const bookingData = bookings.find((b) => b.bookingId === selectedBooking);
+
+      // First database update
+      await updateBooking(selectedBooking, {
+        ...bookingData,
+        cargo: {
+          ...bookingData.cargo,
+          [selectedCargo]: updatedCargoDetails,
+        },
+      });
+
+      // Second update: Handle cascading updates for agency documents
+      if (selectedDocument && category) {
+        // Get all agency documents that require the uploaded document
+        const affectedAgencyDocs = category.documents.agency.filter((doc) =>
+          doc.requiresDocuments.includes(selectedDocument)
+        );
+
+        // Start with the status from the first update
+        const updatedStatus = { ...updatedCargoDetails.documentStatus };
+
+        // Check each affected agency document
+        affectedAgencyDocs.forEach((agencyDoc) => {
+          // Check if all required documents are now uploaded
+          const allRequiredDocsUploaded = agencyDoc.requiresDocuments.every(
+            (reqDoc) =>
+              updatedCargoDetails.documents[reqDoc] ||
+              reqDoc === selectedDocument
+          );
+
+          // If all required docs are now available, update the agency doc status
+          if (allRequiredDocsUploaded) {
+            updatedStatus[agencyDoc.name] = {
+              ...updatedStatus[agencyDoc.name],
+              status: "PENDING",
+              lastUpdated: new Date(),
+              comments: "Prerequisites met, waiting for agency review",
+              issuedBy: updatedStatus[agencyDoc.name].issuedBy,
+              requiresDocuments:
+                updatedStatus[agencyDoc.name].requiresDocuments,
+            };
           }
+        });
+
+        // Create final update that includes both the uploaded document and agency document changes
+        const finalUpdatedCargoDetails = {
+          ...updatedCargoDetails,
+          documentStatus: updatedStatus,
         };
-      
-        setCargoDetails(prev => ({
-          ...prev,
-          documentStatus: updatedStatus
-        }));
+
+        // Update local state with the final version
+        setCargoDetails(finalUpdatedCargoDetails);
+
+        // Second database update
+        await updateBooking(selectedBooking, {
+          ...bookingData,
+          cargo: {
+            ...bookingData.cargo,
+            [selectedCargo]: finalUpdatedCargoDetails,
+          },
+        });
       }
 
       // Set success status after successful upload
@@ -571,12 +618,14 @@ const CustomsPreview = () => {
         [selectedDocument]: "success",
       }));
 
+      // Show success message
       setSnackbar({
         open: true,
         message: "Document uploaded successfully",
         severity: "success",
       });
 
+      // Close the upload dialog
       setUploadDialogOpen(false);
 
       // Clear upload status after a delay
@@ -588,6 +637,7 @@ const CustomsPreview = () => {
         });
       }, 3000);
     } catch (error) {
+      // Error handling
       console.error("Upload error:", error);
       setUploadStatus((prev) => ({
         ...prev,
@@ -720,7 +770,7 @@ const CustomsPreview = () => {
     return (
       <Button
         variant="outlined"
-        startIcon={<ArchiveIcon/>}
+        startIcon={<ArchiveIcon />}
         onClick={() => handleDownloadAllDocuments(cargoId)}
         disabled={!hasDocuments}
         sx={{ borderRadius: "8px" }}

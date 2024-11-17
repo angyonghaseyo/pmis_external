@@ -19,12 +19,14 @@ class ContainerRequestService {
 
     async createContainerRequest(requestData) {
         try {
+            console.log(requestData, "service");
+
             const docRef = await this.db.collection('container_requests').add({
                 ...requestData,
                 createdAt: new Date().toISOString(),
                 status: 'Pending'
             });
-            
+
             return {
                 id: docRef.id,
                 ...requestData
@@ -42,7 +44,7 @@ class ContainerRequestService {
                 ...requestData,
                 updatedAt: new Date().toISOString()
             });
-            
+
             const doc = await docRef.get();
             return {
                 id: doc.id,

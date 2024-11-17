@@ -55,13 +55,13 @@ function App() {
   }, [login]);
 
   const hasAccessRights = (requiredRights) => {
-    console.log('User access rights:', user?.accessRights);
-    console.log('Required rights:', requiredRights);
+    // console.log('User access rights:', user?.accessRights);
+    // console.log('Required rights:', requiredRights);
     if (!user || !user.accessRights) return false;
     const hasRights = requiredRights.some((right) =>
       user.accessRights.includes(right)
     );
-    console.log('Has required rights:', hasRights);
+    // console.log('Has required rights:', hasRights);
     return hasRights;
   };
 
