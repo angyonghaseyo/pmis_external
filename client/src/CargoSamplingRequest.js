@@ -30,10 +30,10 @@ import { Close as CloseIcon, CloudUpload as CloudUploadIcon } from '@mui/icons-m
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DateTimePicker } from '@mui/x-date-pickers';
 import { styled } from '@mui/material/styles';
-import { submitSamplingRequest, updateSamplingRequest, getSamplingRequestById } from './services/api';
-import { API_URL } from './config/apiConfig';
+import { doc, getDoc, setDoc, addDoc, collection, getDocs } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from './firebaseConfig';
 import { useAuth } from "./AuthContext";
-
 
 const VisuallyHiddenInput = styled('input')`
   clip: rect(0 0 0 0);
@@ -100,7 +100,6 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
         status: 'Pending'
     });
 
-    const { user } = useAuth();
     const [activeStep, setActiveStep] = useState(0);
     const [errors, setErrors] = useState({});
     const [loading, setLoading] = useState(false);
@@ -108,6 +107,7 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
     const [cargoNumbers, setCargoNumbers] = useState([]);
     const [selectedCargo, setSelectedCargo] = useState('');
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+    const { user } = useAuth();
 
     const handleCloseSnackbar = (event, reason) => {
         if (reason === 'clickaway') {
@@ -119,14 +119,14 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
     useEffect(() => {
         const fetchBookings = async () => {
             try {
-                const response = await fetch(`${API_URL}/bookings`);
-                if (!response.ok) {
-                    throw new Error('Error fetching bookings');
-                }
-                const bookingsData = await response.json();
+                const querySnapshot = await getDocs(collection(db, "bookings"));
+                const bookingsArray = querySnapshot.docs.map((doc) => ({
+                    bookingId: doc.id,
+                    ...doc.data(),
+                }));
 
-                // Process cargo numbers from bookings
-                const allCargoNumbers = bookingsData.reduce((acc, booking) => {
+                // Process cargo numbers from all bookings
+                const allCargoNumbers = bookingsArray.reduce((acc, booking) => {
                     if (booking.cargo) {
                         Object.entries(booking.cargo).forEach(([cargoNumber, cargoDetails]) => {
                             acc.push({
@@ -145,11 +145,7 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
                 setCargoNumbers(allCargoNumbers);
             } catch (error) {
                 console.error('Error fetching bookings:', error);
-                setSnackbar({
-                    open: true,
-                    message: 'Error fetching bookings data',
-                    severity: 'error'
-                });
+                // Handle error appropriately
             }
         };
 
@@ -165,26 +161,26 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
     const fetchRequestData = async () => {
         try {
             setLoading(true);
-            const data = await getSamplingRequestById(editingId);
+            const docRef = doc(db, 'samplingRequests', editingId);
+            const docSnap = await getDoc(docRef);
 
-            // Format dates - assuming the API returns ISO date strings
-            const formattedData = {
-                ...data,
-                schedule: {
-                    startDate: data.schedule?.startDate ? new Date(data.schedule.startDate) : null,
-                    endDate: data.schedule?.endDate ? new Date(data.schedule.endDate) : null
-                }
-            };
+            if (docSnap.exists()) {
+                const data = docSnap.data();
 
-            setFormData(formattedData);
+                // Convert Firestore Timestamps to JavaScript Date objects
+                const formattedData = {
+                    ...data,
+                    schedule: {
+                        startDate: data.schedule?.startDate?.toDate() || null,
+                        endDate: data.schedule?.endDate?.toDate() || null
+                    }
+                };
+
+                setFormData(formattedData);
+            }
         } catch (error) {
             console.error('Error fetching request:', error);
             setSubmitError('Error loading request data');
-            setSnackbar({
-                open: true,
-                message: 'Error loading request data',
-                severity: 'error'
-            });
         } finally {
             setLoading(false);
         }
@@ -630,39 +626,65 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
             setLoading(true);
             setSubmitError(null);
 
+            const fileUrls = await uploadFiles();
+
             const requestData = {
                 ...formData,
-                company: user.company,
+                documents: fileUrls,
                 status: 'Pending',
                 updatedAt: new Date(),
-                createdAt: editingId ? formData.createdAt : new Date()
+                createdAt: editingId ? formData.createdAt : new Date(),
+                company: user.company
             };
 
             if (editingId) {
-                await updateSamplingRequest(editingId, requestData);
+                await setDoc(doc(db, 'samplingRequests', editingId), requestData);
             } else {
-                await submitSamplingRequest(requestData);
+                const docRef = await addDoc(collection(db, 'samplingRequests'), requestData);
+                await setDoc(docRef, { id: docRef.id }, { merge: true });
             }
 
             onSubmitSuccess?.();
             handleClose();
-            setSnackbar({
-                open: true,
-                message: 'Sampling Request submitted successfully',
-                severity: 'success'
-            });
+            setSnackbar({ open: true, message: 'Sampling Request created successfully', severity: 'success' });
         } catch (error) {
             console.error('Error submitting request:', error);
             setSubmitError('Failed to submit request. Please try again.');
-            setSnackbar({
-                open: true,
-                message: 'Failed to submit request. Please try again.',
-                severity: 'error'
-            });
+            setSnackbar({ open: true, message: 'Failed to submit request. Please try again.', severity: 'error' });
         } finally {
             setLoading(false);
         }
     };
+
+    const uploadFiles = async () => {
+        const uploads = {};
+
+        if (formData.documents.safetyDataSheet) {
+            uploads.safetyDataSheet = await uploadFile(
+                formData.documents.safetyDataSheet,
+                'safety-sheets'
+            );
+        }
+
+        if (formData.documents.additionalDocs?.length > 0) {
+            uploads.additionalDocs = await Promise.all(
+                formData.documents.additionalDocs.map(
+                    file => uploadFile(file, 'additional')
+                )
+            );
+        }
+
+        return uploads;
+    };
+
+    const uploadFile = async (file, path) => {
+        if (!file) return null;
+        const storageRef = ref(storage, `sampling-requests/${path}/${Date.now()}_${file.name}`);
+        await uploadBytes(storageRef, file);
+        return await getDownloadURL(storageRef);
+    };
+
+    // Rest of your component remains the same...
 
     return (
         <>
