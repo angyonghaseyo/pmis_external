@@ -43,7 +43,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorIcon from "@mui/icons-material/Error";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import CancelIcon from "@mui/icons-material/Cancel";
-import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityIcon from "@mui/icons-material/Visibility";
 import {
   getBookings,
   createBooking,
@@ -54,9 +54,12 @@ import {
   getVesselVisits,
 } from "./services/api";
 import { HSCodeCategories, ProcessStatus } from "./HSCodeCategories.js";
-import QRCode from 'qrcode';
+import QRCode from "qrcode";
+import { useAuth } from "./AuthContext";
+
 
 const HSCodeLookup = ({ value, onChange, error, helperText }) => {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [options, setOptions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -250,7 +253,10 @@ const BookingForm = ({ user }) => {
     const fetchBookings = async () => {
       try {
         const bookings = await getBookings();
-        setBookingData(bookings);
+        const filteredBookings = bookings.filter(
+          (booking) => booking.userEmail === user.email
+        );
+        setBookingData(filteredBookings);
       } catch (error) {
         console.error("Error fetching bookings:", error);
       }
@@ -360,30 +366,6 @@ const BookingForm = ({ user }) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
-
-  // const handleSubmit = async () => {
-  //   const newBooking = {
-  //     ...formData,
-  //     userEmail: user.email,
-  //   };
-
-  //   try {
-  //     if (editingId) {
-  //       const updatedBooking = await updateBooking(editingId, newBooking);
-  //       setBookingData(prevBookings =>
-  //         prevBookings.map(booking =>
-  //           booking.bookingId === editingId ? updatedBooking : booking
-  //         )
-  //       );
-  //     } else {
-  //       const createdBooking = await createBooking(newBooking);
-  //       setBookingData(prev => [...prev, createdBooking]);
-  //     }
-  //     handleCloseDialog();
-  //   } catch (error) {
-  //     console.error('Error saving booking:', error);
-  //   }
-  // };
 
   const handleSubmit = async () => {
     // First validate all cargo items
@@ -712,6 +694,7 @@ const BookingForm = ({ user }) => {
         file
       );
 
+      // Only update the specific document without modifying other document statuses
       const updatedFormData = {
         ...formData,
         cargo: {
@@ -726,12 +709,21 @@ const BookingForm = ({ user }) => {
         },
       };
 
+      // Check if all required exporter documents are uploaded
       const allDocsUploaded =
         updatedFormData.cargo[cargoId].documents.vgm &&
         updatedFormData.cargo[cargoId].documents.advancedDeclaration &&
         updatedFormData.cargo[cargoId].documents.exportDocument;
 
-      updatedFormData.cargo[cargoId].isDocumentsChecked = allDocsUploaded;
+      // Only update isDocumentsChecked flag
+      if (
+        allDocsUploaded !== updatedFormData.cargo[cargoId].isDocumentsChecked
+      ) {
+        updatedFormData.cargo[cargoId] = {
+          ...updatedFormData.cargo[cargoId],
+          isDocumentsChecked: allDocsUploaded,
+        };
+      }
 
       setFormData(updatedFormData);
       setUploadStatus((prev) => ({
@@ -750,7 +742,7 @@ const BookingForm = ({ user }) => {
   const handleDownloadQRCode = async (requestId) => {
     try {
       const qrCodeDataUrl = await QRCode.toDataURL(requestId);
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = qrCodeDataUrl;
       link.download = `qr-code-${requestId}.png`;
       document.body.appendChild(link);
@@ -780,11 +772,15 @@ const BookingForm = ({ user }) => {
 
     const handleViewDocument = async (cargoId, documentType) => {
       try {
-        const document = await retrieveBookingDocument(editingId, cargoId, documentType);
+        const document = await retrieveBookingDocument(
+          editingId,
+          cargoId,
+          documentType
+        );
         // document now has {url: "https://storage...", fileName: "filename.pdf"}
 
         // Simply open in new tab
-        window.open(document.url, '_blank');
+        window.open(document.url, "_blank");
 
         // Or if you want to force download:
         // const link = document.createElement('a');
@@ -794,11 +790,10 @@ const BookingForm = ({ user }) => {
         // link.click();
         // document.body.removeChild(link);
       } catch (error) {
-        console.error('Error viewing document:', error);
+        console.error("Error viewing document:", error);
         // Handle error - maybe show an alert or notification
       }
     };
-
 
     return (
       <Grid item xs={12}>
@@ -1042,7 +1037,13 @@ const BookingForm = ({ user }) => {
                               Object.entries(booking.cargo).map(
                                 ([key, cargoItem]) => (
                                   <Paper key={key} sx={{ p: 2, mb: 2 }}>
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <Box
+                                      sx={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                      }}
+                                    >
                                       <Typography>
                                         <strong>Cargo Item {key}:</strong>
                                       </Typography>
@@ -1051,8 +1052,10 @@ const BookingForm = ({ user }) => {
                                         color="primary"
                                         size="medium"
                                         startIcon={<DownloadIcon />}
-                                        onClick={() => handleDownloadQRCode(key)}
-                                        sx={{ textTransform: 'none' }} // keeps the text casing as is
+                                        onClick={() =>
+                                          handleDownloadQRCode(key)
+                                        }
+                                        sx={{ textTransform: "none" }} // keeps the text casing as is
                                       >
                                         QR Code
                                       </Button>
@@ -1285,9 +1288,9 @@ const BookingForm = ({ user }) => {
                         value={
                           cargoItem.hsCode
                             ? {
-                              code: cargoItem.hsCode,
-                              description: cargoItem.hsCodeDescription,
-                            }
+                                code: cargoItem.hsCode,
+                                description: cargoItem.hsCodeDescription,
+                              }
                             : null
                         }
                         onChange={(value) =>

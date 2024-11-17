@@ -9,6 +9,7 @@ import {
 } from 'firebase/firestore';
 import {
   getBookings,
+  uploadBookingDocument
 } from "./services/api";
 
 const AgencySimulator = () => {
@@ -47,6 +48,7 @@ const AgencySimulator = () => {
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [prerequisites, setPrerequisites] = useState([]);
+  const [selectedFile, setSelectedFile] = useState(null);
 
   // Fetch bookings using api.js
   useEffect(() => {
@@ -88,13 +90,18 @@ const AgencySimulator = () => {
     
     const missingDocs = requiredDocs.filter(docName => {
       const docStatus = cargoData.documentStatus?.[docName];
-      return !docStatus || docStatus.status !== 'COMPLETED';
-    });
+      console.log("sd: " + docStatus + " " + docStatus.status);
+      return !docStatus || (docStatus.status !== 'COMPLETED' && docStatus.status !== 'APPROVED');
+        });
 
     return {
       isValid: missingDocs.length === 0,
       missingDocs
     };
+  };
+
+  const handleFileChange = (event) => {
+    setSelectedFile(event.target.files[0]);
   };
 
   // Update document status in Firebase
@@ -133,6 +140,14 @@ const AgencySimulator = () => {
         }
       }
 
+        // Upload the agency document
+        const uploadResult = await uploadBookingDocument(
+          selectedBooking,
+          selectedCargo,
+          selectedDocument,
+          selectedFile
+        );
+
       // Prepare update data
       const updateData = {
         [`cargo.${selectedCargo}.documentStatus.${selectedDocument}`]: {
@@ -157,10 +172,13 @@ const AgencySimulator = () => {
 
       setSuccess('Document status updated successfully');
       setComments('');
+      setSelectedFile(null);
+
 
       // Reset form except agency selection
       setSelectedDocument('');
       setDocumentStatus('PENDING');
+      
 
     } catch (error) {
       setError(error.message);
@@ -294,6 +312,23 @@ const AgencySimulator = () => {
           </div>
         </div>
 
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Upload Document
+          </label>
+          <input
+            type="file"
+            onChange={handleFileChange}
+            className="w-full border border-gray-300 rounded-md p-2"
+            accept=".pdf,.doc,.docx"
+          />
+          {selectedFile && (
+            <p className="mt-2 text-sm text-gray-500">
+              Selected file: {selectedFile.name}
+            </p>
+          )}
+        </div>
+
         {/* Prerequisites Display */}
         {prerequisites.length > 0 && (
           <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
@@ -337,7 +372,7 @@ const AgencySimulator = () => {
         {/* Submit Button */}
         <button
           className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md disabled:bg-gray-400"
-          disabled={isLoading || !selectedAgency || !selectedBooking || !selectedCargo || !selectedDocument}
+          disabled={isLoading || !selectedAgency || !selectedBooking || !selectedCargo || !selectedDocument || !selectedFile}
           onClick={updateDocumentStatus}
         >
           {isLoading ? 'Updating...' : 'Update Document Status'}

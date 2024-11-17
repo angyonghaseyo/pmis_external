@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useAuth } from "./AuthContext";
 import {
   Box,
   Stepper,
@@ -295,16 +296,18 @@ const DocumentListItem = ({
                 color={getChipColor(currentStatus)}
                 sx={{ minWidth: "100px" }}
               />
-              {hasDocument && (
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={() => onViewDocument(doc.name)}
-                  startIcon={<VisibilityIcon />}
-                >
-                  View
-                </Button>
-              )}
+              {hasDocument &&
+                (currentStatus === "APPROVED" ||
+                  currentStatus === "REJECTED") && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => onViewDocument(doc.name)}
+                    startIcon={<VisibilityIcon />}
+                  >
+                    View Document
+                  </Button>
+                )}
             </Box>
           )}
         </Stack>
@@ -337,7 +340,9 @@ const CustomsPreview = () => {
     message: "",
     severity: "error",
   });
-  const [uploadStatus, setUploadStatus] = useState({}); // Add this
+  const [uploadStatus, setUploadStatus] = useState({});
+  const { user } = useAuth();
+
 
   // Handle Snackbar close
   const handleSnackbarClose = (event, reason) => {
@@ -353,9 +358,6 @@ const CustomsPreview = () => {
     const fetchBookings = async () => {
       try {
         setLoading(true);
-        // console.log("Fetching bookings..."); // Debug log
-
-        // Add timeout to prevent infinite loading
         const timeoutPromise = new Promise((_, reject) =>
           setTimeout(() => reject(new Error("Request timeout")), 10000)
         );
@@ -372,7 +374,12 @@ const CustomsPreview = () => {
           throw new Error("Invalid data format received");
         }
 
-        setBookings(bookingsData);
+        // setBookings(bookingsData);
+        const filteredBookings = bookingsData.filter(
+          booking => booking.userEmail === user.email
+        );
+        
+        setBookings(filteredBookings);
       } catch (error) {
         console.error("Detailed fetch error:", error);
         setSnackbar({
@@ -836,6 +843,7 @@ const CustomsPreview = () => {
             </FormControl>
           </Grid>
 
+
           {!cargoDetails && (
             <Grid item xs={12}>
               <Alert severity="warning">
@@ -845,73 +853,114 @@ const CustomsPreview = () => {
             </Grid>
           )}
 
-          {/* {cargoDetails && !category && (
-            <Grid item xs={12}>
-              <Alert severity="warning">
-                The selected cargo's HS code ({cargoDetails.hsCode}) does not
-                match any supported categories. Supported categories are: Live
-                Animals (01), Fresh Fruits (08), and Pharmaceuticals (30).
-              </Alert>
-            </Grid>
-          )} */}
-
           {cargoDetails && category && (
             <>
-              <Grid item xs={12} md={12}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      Required Exporter Documents
-                    </Typography>
-                    <List>
-                      {category.documents.exporter.map((doc) => (
-                        <DocumentListItem
-                          key={doc.name}
-                          doc={doc}
-                          status={cargoDetails.documentStatus[doc.name]}
-                          onUploadClick={handleUploadClick}
-                          onViewDocument={handleViewDocument}
-                          category={category}
-                          cargoDetails={cargoDetails}
-                          uploadStatus={uploadStatus[doc.name]}
-                        />
-                      ))}
-                    </List>
-                    <Stack
-                      direction="row"
-                      spacing={2}
-                      alignItems="center"
-                      justifyContent="space-between"
-                      sx={{ mb: 2 }}
-                    >
-                      <DownloadAllButton cargoId={selectedCargo} />
-                    </Stack>
-                  </CardContent>
-                </Card>
-              </Grid>
+              {!cargoDetails.isDocumentsChecked ? (
+                <Grid item xs={12}>
+                  <Alert
+                    severity="warning"
+                    sx={{
+                      mb: 3,
+                      "& .MuiAlert-message": {
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                      },
+                    }}
+                    icon={<Warning />}
+                  >
+                    <Box>
+                      <Typography
+                        variant="subtitle2"
+                        sx={{ fontWeight: "bold", mb: 0.5 }}
+                      >
+                        Customs Clearance Process Not Available
+                      </Typography>
+                      <Typography variant="body2">
+                        This process is currently not accessible because either:
+                        <ul style={{ marginTop: "0.5rem", marginBottom: 0 }}>
+                          <li>
+                            Required port documents have not been submitted
+                            (VGM, Advanced Declaration, Export Document), or
+                          </li>
+                          <li>
+                            The port has not verified the submitted documents
+                          </li>
+                        </ul>
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          mt: 1,
+                          fontWeight: "medium",
+                          color: "warning.dark",
+                        }}
+                      >
+                        Please ensure all port documents are submitted and
+                        verified before proceeding with customs clearance.
+                      </Typography>
+                    </Box>
+                  </Alert>
+                </Grid>
+              ) : (
+                <>
+                  <Grid item xs={12} md={12}>
+                    <Card>
+                      <CardContent>
+                        <Typography variant="h6" gutterBottom>
+                          Required Exporter Documents
+                        </Typography>
+                        <List>
+                          {category.documents.exporter.map((doc) => (
+                            <DocumentListItem
+                              key={doc.name}
+                              doc={doc}
+                              status={cargoDetails.documentStatus[doc.name]}
+                              onUploadClick={handleUploadClick}
+                              onViewDocument={handleViewDocument}
+                              category={category}
+                              cargoDetails={cargoDetails}
+                              uploadStatus={uploadStatus[doc.name]}
+                            />
+                          ))}
+                        </List>
+                        <Stack
+                          direction="row"
+                          spacing={2}
+                          alignItems="center"
+                          justifyContent="space-between"
+                          sx={{ mb: 2 }}
+                        >
+                          <DownloadAllButton cargoId={selectedCargo} />
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  </Grid>
 
-              <Grid item xs={12} md={12}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      Agency Issued Documents
-                    </Typography>
-                    <List>
-                      {category.documents.agency.map((doc) => (
-                        <DocumentListItem
-                          key={doc.name}
-                          doc={doc}
-                          status={cargoDetails.documentStatus[doc.name]}
-                          onViewDocument={handleViewDocument}
-                          category={category}
-                          cargoDetails={cargoDetails}
-                          uploadStatus={uploadStatus[doc.name]}
-                        />
-                      ))}
-                    </List>
-                  </CardContent>
-                </Card>
-              </Grid>
+                  <Grid item xs={12} md={12}>
+                    <Card>
+                      <CardContent>
+                        <Typography variant="h6" gutterBottom>
+                          Agency Issued Documents
+                        </Typography>
+                        <List>
+                          {category.documents.agency.map((doc) => (
+                            <DocumentListItem
+                              key={doc.name}
+                              doc={doc}
+                              status={cargoDetails.documentStatus[doc.name]}
+                              onViewDocument={handleViewDocument}
+                              category={category}
+                              cargoDetails={cargoDetails}
+                              uploadStatus={uploadStatus[doc.name]}
+                            />
+                          ))}
+                        </List>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                </>
+              )}
             </>
           )}
         </Grid>

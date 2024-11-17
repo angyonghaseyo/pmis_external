@@ -24,17 +24,16 @@ const BookingSteps = ({ isContainerRented, isTruckBooked, isCustomsCleared, isDo
       status: isTruckBooked,
     },
     {
-      label: "Customs Clearance",
-      status: isCustomsCleared,
-      // Add tooltip or helper text
-      helperText: isCustomsCleared ? 
-        "Customs declaration approved" : 
-        "Pending customs clearance"
-    },
-    {
       label: "Document Check",
       status: isDocumentsChecked,
     },
+    {
+      label: "Customs Clearance",
+      status: isCustomsCleared,
+      helperText: isCustomsCleared ?
+        "Customs declaration approved" :
+        "Pending customs clearance"
+    }
   ];
 
   return (
