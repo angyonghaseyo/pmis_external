@@ -77,7 +77,9 @@ function Header() {
   }
 
   return (
-    <AppBar
+    <>
+    {user?.email !== "agency@gmail.com" && (
+      <AppBar
       position="fixed"
       sx={{
         backgroundColor: "#ffffff",
@@ -330,6 +332,8 @@ function Header() {
         </Box>
       </Toolbar>
     </AppBar>
+      )}
+  </>
   );
 }
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { HSCodeCategories } from './HSCodeCategories';
 import { db } from './firebaseConfig';
+import EmptyLayout from './layout/EmptyLayout';
 import { 
   doc, 
   getDoc,
@@ -198,6 +199,7 @@ const AgencySimulator = () => {
   }, [selectedDocument]);
 
   return (
+    <EmptyLayout>
     <div className="max-w-4xl mx-auto p-6">
       <div className="bg-white rounded-lg shadow-lg p-6">
         <h1 className="text-2xl font-bold mb-6">Dangerous Goods Document Simulator</h1>
@@ -379,6 +381,7 @@ const AgencySimulator = () => {
         </button>
       </div>
     </div>
+    </EmptyLayout>
   );
 };
 
