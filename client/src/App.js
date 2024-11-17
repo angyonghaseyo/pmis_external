@@ -336,7 +336,7 @@ function App() {
                 hasAccessRights(['View Cargo Status']) && (
 
                   <Route
-                    path="/cargo/cargo-tracking"
+                    path="/cargos/cargo-tracking"
                     element={<CargoTracking />}
                   />
                 )

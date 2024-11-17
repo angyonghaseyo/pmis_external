@@ -561,27 +561,6 @@ const CargoTracking = () => {
                                                         sx={{ fontWeight: 500, borderRadius: '8px' }}
                                                     />
                                                 </Grid>
-                                                <Grid item xs={12} sm={3}>
-                                                    <Button
-                                                        variant="contained"
-                                                        fullWidth
-                                                        onClick={() => {
-                                                            setSelectedService(service);
-                                                            setOpenStatusDialog(true);
-                                                        }}
-                                                        startIcon={<Edit />}
-                                                        sx={{
-                                                            backgroundColor: '#3f51b5',
-                                                            '&:hover': {
-                                                                backgroundColor: '#303f9f',
-                                                            },
-                                                            borderRadius: '8px',
-                                                            boxShadow: '0 3px 5px rgba(0, 0, 0, 0.1)',
-                                                        }}
-                                                    >
-                                                        Update Status
-                                                    </Button>
-                                                </Grid>
                                             </Grid>
                                         </Paper>
                                     </Grid>
@@ -589,39 +568,6 @@ const CargoTracking = () => {
                             </Grid>
                         </Grid>
 
-                        <Stack spacing={3}>
-
-                            <TextField
-                                label="Location"
-                                variant="outlined"
-                                value={location}
-                                onChange={(e) => setLocation(e.target.value)}
-                                fullWidth
-                                placeholder="Enter current location"
-                                InputLabelProps={{ shrink: true }}
-                            />
-
-                            <TextField
-                                label="Action"
-                                variant="outlined"
-                                value={action}
-                                onChange={(e) => setAction(e.target.value)}
-                                fullWidth
-                                placeholder="Enter action taken"
-                                InputLabelProps={{ shrink: true }}
-                            />
-
-                            <Button
-                                variant="contained"
-                                startIcon={<Save />}
-                                onClick={handleSaveAction}
-                                disabled={!location || !action}
-                                size="large"
-                                sx={{ mt: 2 }}
-                            >
-                                Save Action
-                            </Button>
-                        </Stack>
                     </Paper>
 
                     <Paper sx={{ p: 3 }}>
