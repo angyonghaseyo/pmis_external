@@ -32,6 +32,8 @@ import { styled } from '@mui/material/styles';
 import { doc, getDoc, setDoc, addDoc, collection, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from './firebaseConfig';
+import { useAuth } from "./AuthContext";
+
 
 const VisuallyHiddenInput = styled('input')`
   clip: rect(0 0 0 0);
@@ -90,6 +92,7 @@ const CargoTransloadingRequest = ({ open, handleClose, editingId = null, onSubmi
         status: 'Pending'
     });
 
+    const { user } = useAuth();
     const [activeStep, setActiveStep] = useState(0);
     const [errors, setErrors] = useState({});
     const [loading, setLoading] = useState(false);
@@ -580,6 +583,7 @@ const CargoTransloadingRequest = ({ open, handleClose, editingId = null, onSubmi
 
             const requestData = {
                 ...formData,
+                company: user.company,
                 documents: fileUrls,
                 status: 'Pending',
                 updatedAt: new Date(),
