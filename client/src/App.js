@@ -37,6 +37,7 @@ import BillingRequests from "./BillingRequests";
 import Invoice from './invoice';
 import DatabaseSetup from "./DatabaseSetup";
 import PricingRates from "./components/PricingRates";
+import CargoTracking from "./CargoTracking";
 
 const drawerWidth = 240;
 
@@ -98,7 +99,7 @@ function App() {
         <Routes>
           {user ? (
             <>
-            <Route path="/setup" element={<DatabaseSetup />} />
+              <Route path="/setup" element={<DatabaseSetup />} />
               <Route path="/" element={<UserWorkspace user={user} />} />
               {
                 hasAccessRights([
@@ -248,20 +249,20 @@ function App() {
                 "Register Truck",
                 "View Truck Registrations",
               ]) && (
-                <Route
-                  path="/cargos/truck-registration"
-                  element={<TruckRegistration user={user} />}
-                />
-              )}
+                  <Route
+                    path="/cargos/truck-registration"
+                    element={<TruckRegistration user={user} />}
+                  />
+                )}
               {hasAccessRights([
                 "View Container Requests",
                 "Approve Container Requests",
               ]) && (
-                <Route
-                  path="/cargos/container-requests-list"
-                  element={<ContainerRequestsList user={user} />}
-                />
-              )}
+                  <Route
+                    path="/cargos/container-requests-list"
+                    element={<ContainerRequestsList user={user} />}
+                  />
+                )}
               {hasAccessRights(["Create Facility Rental"]) && (
                 <Route
                   path="/cargos/facility-and-space-rental"
@@ -280,7 +281,7 @@ function App() {
                   element={<CustomsPreview />}
                 />
               )}
-               {hasAccessRights(['Manage Documents']) && (
+              {hasAccessRights(['Manage Documents']) && (
                 <Route
                   path="/abcd"
                   element={<AgencySimulator />}
@@ -328,6 +329,15 @@ function App() {
                   <Route
                     path="/financial/pricing-rates"
                     element={<PricingRates />}
+                  />
+                )
+              }
+              {
+                hasAccessRights(['View Cargo Status']) && (
+
+                  <Route
+                    path="/cargo/cargo-tracking"
+                    element={<CargoTracking />}
                   />
                 )
               }

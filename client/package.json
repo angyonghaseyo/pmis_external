@@ -17,6 +17,7 @@
     "dayjs": "^1.11.13",
     "fast-xml-parser": "^4.5.0",
     "firebase": "^9.8.1",
+    "html5-qrcode": "^2.3.8",
     "jspdf": "^2.5.2",
     "jspdf-autotable": "^3.8.4",
     "jszip": "^3.10.1",
@@ -32,6 +33,7 @@
     "react-router-dom": "^6.26.2",
     "react-scripts": "^5.0.1",
     "react-signature-canvas": "^1.0.6",
+    "reactflow": "^11.11.4",
     "tesseract.js": "^5.1.1",
     "web-vitals": "^2.1.4"
   },
