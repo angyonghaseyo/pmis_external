@@ -33,8 +33,6 @@ import {
 } from '@mui/material';
 import { Edit2, Trash2 } from 'lucide-react';
 import { getUsers, updateUser, deleteUser, inviteUser, getCurrentUser, cancelInvitation, getAllUsersInCompany, getUserData } from '../services/api';
-import { doc, getDoc } from 'firebase/firestore';
-import { db, auth } from '../firebaseConfig';
 import Pagination from '@mui/material/Pagination';
 import { useAuth } from '../AuthContext'
 
