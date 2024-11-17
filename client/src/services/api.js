@@ -1385,91 +1385,120 @@ export const getPricingRates = async () => {
   }
 };
 
-export const getSamplingRequests = async () => {
-  try {
-    const response = await fetch('http://localhost:5001/sampling-requests');
-    if (!response.ok) {
-      throw new Error('Failed to fetch sampling requests');
-    }
-    return await response.json();
-  } catch (error) {
-    console.error('Error fetching sampling requests:', error);
-    throw error;
-  }
-};
-
-export const createSamplingRequest = async (requestData) => {
-  try {
-    const response = await fetch('http://localhost:5001/sampling-requests', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestData),
-    });
-    if (!response.ok) {
-      throw new Error('Failed to create sampling request');
-    }
-    return await response.json();
-  } catch (error) {
-    console.error('Error creating sampling request:', error);
-    throw error;
-  }
-};
-
-export const updateSamplingRequest = async (id, requestData) => {
-  try {
-    const response = await fetch(`http://localhost:5001/sampling-requests/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestData),
-    });
-    if (!response.ok) {
-      throw new Error('Failed to update sampling request');
-    }
-    return await response.json();
-  } catch (error) {
-    console.error('Error updating sampling request:', error);
-    throw error;
-  }
-};
-
-export const deleteSamplingRequest = async (id) => {
-  try {
-    const response = await fetch(`http://localhost:5001/sampling-requests/${id}`, {
-      method: 'DELETE',
-    });
-    if (!response.ok) {
-      throw new Error('Failed to delete sampling request');
-    }
-    return await response.json();
-  } catch (error) {
-    console.error('Error deleting sampling request:', error);
-    throw error;
-  }
-};
-
-export const uploadSamplingDocument = async (requestId, documentType, file) => {
+export const submitSamplingRequest = async (requestData) => {
   try {
     const formData = new FormData();
-    formData.append('document', file);
-    formData.append('documentType', documentType);
+    console.log(requestData.schedule, "1234", typeof requestData.schedule);
+    formData.append('samplingDetails', JSON.stringify({
+      cargoDetails: requestData.cargoDetails,
+      samplingDetails: requestData.samplingDetails,
+      schedule: requestData.schedule,
+      specialInstructions: requestData.specialInstructions || ''
+    }));
 
-    const response = await fetch(
-      `http://localhost:5001/sampling-requests/${requestId}/documents`,
-      {
-        method: 'POST',
-        body: formData,
-      }
-    );
+    if (requestData.documents?.safetyDataSheet instanceof File) {
+      formData.append('safetyDataSheet', requestData.documents.safetyDataSheet);
+    }
+
+    if (Array.isArray(requestData.documents?.additionalDocs)) {
+      requestData.documents.additionalDocs.forEach((doc) => {
+        if (doc instanceof File) {
+          formData.append('additionalDoc', doc);
+        }
+      });
+    }
+
+    const response = await fetch(`${API_URL}/sampling-requests`, {
+      method: 'POST',
+      body: formData
+    });
+
     if (!response.ok) {
-      throw new Error('Failed to upload document');
+      throw new Error('Error submitting sampling request');
     }
     return await response.json();
   } catch (error) {
-    console.error('Error uploading document:', error);
+    console.error('Error in submitSamplingRequest:', error);
+    throw error;
+  }
+};
+
+export const updateSamplingRequest = async (requestId, requestData) => {
+  try {
+    const formData = new FormData();
+    formData.append('samplingDetails', JSON.stringify({
+      cargoDetails: requestData.cargoDetails,
+      samplingDetails: requestData.samplingDetails,
+      schedule: requestData.schedule,
+      specialInstructions: requestData.specialInstructions,
+      status: requestData.status
+    }));
+
+    if (requestData.documents?.safetyDataSheet instanceof File) {
+      formData.append('safetyDataSheet', requestData.documents.safetyDataSheet);
+    }
+
+    const response = await fetch(`${API_URL}/sampling-requests/${requestId}`, {
+      method: 'PUT',
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error('Error updating sampling request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in updateSamplingRequest:', error);
+    throw error;
+  }
+};
+
+export const getSamplingRequests = async (filters = {}) => {
+  try {
+    const queryParams = new URLSearchParams(filters);
+    const response = await fetch(`${API_URL}/sampling-requests?${queryParams}`);
+
+    if (!response.ok) {
+      throw new Error('Error fetching sampling requests');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in getSamplingRequests:', error);
+    throw error;
+  }
+};
+
+export const deleteSamplingRequest = async (requestId) => {
+  try {
+    const response = await fetch(`${API_URL}/sampling-requests/${requestId}`, {
+      method: 'DELETE'
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({
+        error: 'Error deleting sampling request'
+      }));
+      throw new Error(errorData.error || 'Error deleting sampling request');
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error in deleteSamplingRequest:', error);
+    throw error;
+  }
+};
+
+export const getSamplingRequestById = async (requestId) => {
+  try {
+    const response = await fetch(`${API_URL}/sampling-requests/${requestId}`);
+
+    if (!response.ok) {
+      throw new Error('Error fetching sampling request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in getSamplingRequestById:', error);
     throw error;
   }
 };
@@ -1553,6 +1582,11 @@ const api = {
   uploadBookingDocument,
   retrieveBookingDocument,
   getPricingRates,
+  updateSamplingRequest,
+  submitSamplingRequest,
+  getSamplingRequests,
+  deleteSamplingRequest,
+  getSamplingRequestById
 };
 
 export default api;

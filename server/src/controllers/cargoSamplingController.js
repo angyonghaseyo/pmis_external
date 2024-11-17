@@ -5,35 +5,64 @@ class CargoSamplingController {
 
     async getSamplingRequests(req, res) {
         try {
-            const { status } = req.query;
-            const requests = await this.cargoSamplingService.getSamplingRequests(status);
+            const { status, searchQuery, dateRange } = req.query;
+            const filters = {
+                status: status !== 'all' ? status : null,
+                searchQuery,
+                dateRange
+            };
+            const requests = await this.cargoSamplingService.fetchSamplingRequests(filters);
             res.status(200).json(requests);
         } catch (error) {
-            console.error('Error in getSamplingRequests:', error);
-            res.status(500).json({ error: 'Error fetching sampling requests' });
+            console.error('Error fetching sampling requests:', error);
+            res.status(500).send('Error fetching sampling requests');
         }
     }
 
-    async createSamplingRequest(req, res) {
+    async getSamplingRequestById(req, res) {
         try {
-            const requestData = req.body;
-            const result = await this.cargoSamplingService.createSamplingRequest(requestData);
+            const { id } = req.params;
+            const request = await this.cargoSamplingService.fetchSamplingRequestById(id);
+            if (!request) {
+                return res.status(404).send('Sampling request not found');
+            }
+            res.status(200).json(request);
+        } catch (error) {
+            console.error('Error fetching sampling request:', error);
+            res.status(500).send('Error fetching sampling request');
+        }
+    }
+
+    async submitSamplingRequest(req, res) {
+        try {
+            const requestData = JSON.parse(req.body.samplingDetails);
+            const files = {
+                safetyDataSheet: req.files?.safetyDataSheet?.[0],
+                additionalDocs: req.files?.additionalDoc
+            };
+
+            const result = await this.cargoSamplingService.createSamplingRequest(requestData, files);
             res.status(201).json(result);
         } catch (error) {
-            console.error('Error in createSamplingRequest:', error);
-            res.status(500).json({ error: 'Error creating sampling request' });
+            console.error('Error submitting sampling request:', error);
+            res.status(500).send('Error submitting sampling request');
         }
     }
 
     async updateSamplingRequest(req, res) {
         try {
             const { id } = req.params;
-            const updateData = req.body;
-            await this.cargoSamplingService.updateSamplingRequest(id, updateData);
-            res.status(200).json({ message: 'Sampling request updated successfully' });
+            const requestData = JSON.parse(req.body.samplingDetails);
+            const files = {
+                safetyDataSheet: req.files?.safetyDataSheet?.[0],
+                additionalDocs: req.files?.additionalDoc
+            };
+
+            await this.cargoSamplingService.updateSamplingRequest(id, requestData, files);
+            res.status(200).send('Sampling request updated successfully');
         } catch (error) {
-            console.error('Error in updateSamplingRequest:', error);
-            res.status(500).json({ error: 'Error updating sampling request' });
+            console.error('Error updating sampling request:', error);
+            res.status(500).send('Error updating sampling request');
         }
     }
 
@@ -43,22 +72,8 @@ class CargoSamplingController {
             await this.cargoSamplingService.deleteSamplingRequest(id);
             res.status(200).json({ message: 'Sampling request deleted successfully' });
         } catch (error) {
-            console.error('Error in deleteSamplingRequest:', error);
+            console.error('Error deleting sampling request:', error);
             res.status(500).json({ error: 'Error deleting sampling request' });
-        }
-    }
-
-    async uploadSamplingDocument(req, res) {
-        try {
-            const { id } = req.params;
-            const { documentType } = req.body;
-            const file = req.file;
-
-            const result = await this.cargoSamplingService.uploadSamplingDocument(id, documentType, file);
-            res.status(200).json(result);
-        } catch (error) {
-            console.error('Error in uploadSamplingDocument:', error);
-            res.status(500).json({ error: 'Error uploading document' });
         }
     }
 }

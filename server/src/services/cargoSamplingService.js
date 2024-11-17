@@ -1,6 +1,6 @@
 const { Storage } = require('@google-cloud/storage');
 const path = require('path');
-const { Timestamp } = require('firebase-admin/firestore');
+const admin = require('firebase-admin');
 
 class CargoSamplingService {
     constructor(db) {
@@ -12,88 +12,117 @@ class CargoSamplingService {
         this.bucket = this.storage.bucket('pmis-47493.appspot.com');
     }
 
-    // Helper method to convert Firestore document
-    convertDocument(doc) {
-        const data = doc.data();
-        return {
-            id: doc.id,
-            ...data,
-            createdAt: data.createdAt?.toDate?.() || data.createdAt,
-            updatedAt: data.updatedAt?.toDate?.() || data.updatedAt,
-            schedule: data.schedule ? {
-                startDate: data.schedule.startDate?.toDate?.() || data.schedule.startDate,
-                endDate: data.schedule.endDate?.toDate?.() || data.schedule.endDate
-            } : null
-        };
-    }
-
-    async getSamplingRequests(status) {
+    async fetchSamplingRequestById(id) {
         try {
-            const samplingRef = this.db.collection('samplingRequests');
-            let query = samplingRef;
-
-            if (status) {
-                query = query.where('status', '==', status);
+            const doc = await this.db.collection('samplingRequests').doc(id).get();
+            if (!doc.exists) {
+                return null;
             }
-
-            const snapshot = await query.orderBy('createdAt', 'desc').get();
-            return snapshot.docs.map(doc => this.convertDocument(doc));
+            return { id: doc.id, ...doc.data() };
         } catch (error) {
-            console.error('Error fetching sampling requests:', error);
+            console.error('Error in fetchSamplingRequestById:', error);
             throw error;
         }
     }
 
-    async createSamplingRequest(requestData) {
+    async createSamplingRequest(requestData, files) {
         try {
-            // Ensure proper Timestamp objects are created for dates
-            const timestamp = Timestamp.now();
+            const documentUrls = await this.uploadDocuments(files);
 
-            // Convert schedule dates to Timestamps if they exist
-            const schedule = requestData.schedule ? {
-                startDate: Timestamp.fromDate(new Date(requestData.schedule.startDate)),
-                endDate: Timestamp.fromDate(new Date(requestData.schedule.endDate))
-            } : null;
+            // Convert dates to Firestore Timestamps
+            const formattedSchedule = {
+                ...requestData.schedule,
+                startDate: requestData.schedule.startDate ?
+                    admin.firestore.Timestamp.fromDate(new Date(requestData.schedule.startDate)) : null,
+                endDate: requestData.schedule.endDate ?
+                    admin.firestore.Timestamp.fromDate(new Date(requestData.schedule.endDate)) : null
+            };
 
-            const docRef = await this.db.collection('samplingRequests').add({
+            console.log(typeof formattedSchedule.startDate, "1234", formattedSchedule.endDate);
+
+            const samplingRequest = {
                 ...requestData,
-                schedule,
+                schedule: formattedSchedule,
+                documents: documentUrls,
                 status: 'Pending',
-                createdAt: timestamp,
-                updatedAt: timestamp
-            });
+                createdAt: admin.firestore.Timestamp.now(),
+                updatedAt: admin.firestore.Timestamp.now()
+            };
 
-            await docRef.update({ id: docRef.id });
-
-            const newDoc = await docRef.get();
-            return this.convertDocument(newDoc);
+            const docRef = await this.db.collection('samplingRequests').add(samplingRequest);
+            return { id: docRef.id, ...samplingRequest };
         } catch (error) {
-            console.error('Error creating sampling request:', error);
+            console.error('Error in createSamplingRequest:', error);
             throw error;
         }
     }
 
-    async updateSamplingRequest(id, updateData) {
+    async fetchSamplingRequests(filters) {
         try {
-            const docRef = this.db.collection('samplingRequests').doc(id);
+            let query = this.db.collection('samplingRequests');
 
-            // Convert schedule dates to Timestamps if they exist in updateData
-            if (updateData.schedule) {
-                updateData.schedule = {
-                    startDate: Timestamp.fromDate(new Date(updateData.schedule.startDate)),
-                    endDate: Timestamp.fromDate(new Date(updateData.schedule.endDate))
-                };
+            if (filters.status) {
+                query = query.where('status', '==', filters.status);
             }
 
-            await docRef.update({
-                ...updateData,
-                updatedAt: Timestamp.now()
-            });
+            if (filters.dateRange && filters.dateRange !== 'all') {
+                const dateRanges = {
+                    'today': [new Date().setHours(0, 0, 0, 0), new Date().setHours(23, 59, 59, 999)],
+                    'week': [new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), new Date()],
+                    'month': [new Date(new Date().setDate(1)), new Date()]
+                };
+                const [start, end] = dateRanges[filters.dateRange];
+                query = query.where('createdAt', '>=', admin.firestore.Timestamp.fromDate(new Date(start)))
+                    .where('createdAt', '<=', admin.firestore.Timestamp.fromDate(new Date(end)));
+            }
 
-            const updatedDoc = await docRef.get();
-            return this.convertDocument(updatedDoc);
+            const snapshot = await query.get();
+            let requests = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+            }));
+
+            if (filters.searchQuery) {
+                const searchLower = filters.searchQuery.toLowerCase();
+                requests = requests.filter(request =>
+                    request.cargoDetails.cargoNumber.toLowerCase().includes(searchLower) ||
+                    request.cargoDetails.cargoType.toLowerCase().includes(searchLower)
+                );
+            }
+
+            return requests;
         } catch (error) {
-            console.error('Error updating sampling request:', error);
+            console.error('Error in fetchSamplingRequests:', error);
+            throw error;
+        }
+    }
+
+    async updateSamplingRequest(id, requestData, files) {
+        try {
+            const documentUrls = await this.uploadDocuments(files);
+
+            // Convert dates to Firestore Timestamps
+            const formattedSchedule = {
+                ...requestData.schedule,
+                startDate: requestData.schedule.startDate ?
+                    admin.firestore.Timestamp.fromDate(new Date(requestData.schedule.startDate)) : null,
+                endDate: requestData.schedule.endDate ?
+                    admin.firestore.Timestamp.fromDate(new Date(requestData.schedule.endDate)) : null
+            };
+
+            const updateData = {
+                ...requestData,
+                schedule: formattedSchedule,
+                updatedAt: admin.firestore.Timestamp.now()
+            };
+
+            if (Object.keys(documentUrls).length > 0) {
+                updateData.documents = documentUrls;
+            }
+
+            await this.db.collection('samplingRequests').doc(id).update(updateData);
+        } catch (error) {
+            console.error('Error in updateSamplingRequest:', error);
             throw error;
         }
     }
@@ -101,37 +130,41 @@ class CargoSamplingService {
     async deleteSamplingRequest(id) {
         try {
             await this.db.collection('samplingRequests').doc(id).delete();
-            return true;
         } catch (error) {
-            console.error('Error deleting sampling request:', error);
+            console.error('Error in deleteSamplingRequest:', error);
             throw error;
         }
     }
 
-    async uploadSamplingDocument(requestId, file) {
-        try {
-            const fileExtension = file.originalname.split('.').pop();
-            const fileName = `sampling_requests/${requestId}_${Date.now()}.${fileExtension}`;
+    async uploadDocuments(files) {
+        const documentUrls = {};
+
+        if (files.safetyDataSheet) {
+            const file = files.safetyDataSheet;
+            const fileName = `samplingRequests/sds_${Date.now()}_${file.originalname}`;
             const fileRef = this.bucket.file(fileName);
-
             await fileRef.save(file.buffer, {
-                metadata: { contentType: file.mimetype },
+                metadata: { contentType: file.mimetype }
             });
-
             await fileRef.makePublic();
-            const downloadUrl = `https://storage.googleapis.com/${this.bucket.name}/${fileName}`;
-
-            const docRef = this.db.collection('samplingRequests').doc(requestId);
-            await docRef.update({
-                documentUrl: downloadUrl,
-                updatedAt: Timestamp.now()
-            });
-
-            return { documentUrl: downloadUrl };
-        } catch (error) {
-            console.error('Error uploading sampling document:', error);
-            throw error;
+            documentUrls.safetyDataSheet = `https://storage.googleapis.com/${this.bucket.name}/${fileName}`;
         }
+
+        if (files.additionalDocs) {
+            documentUrls.additionalDocs = await Promise.all(
+                files.additionalDocs.map(async (file) => {
+                    const fileName = `samplingRequests/additional_${Date.now()}_${file.originalname}`;
+                    const fileRef = this.bucket.file(fileName);
+                    await fileRef.save(file.buffer, {
+                        metadata: { contentType: file.mimetype }
+                    });
+                    await fileRef.makePublic();
+                    return `https://storage.googleapis.com/${this.bucket.name}/${fileName}`;
+                })
+            );
+        }
+
+        return documentUrls;
     }
 }
 

@@ -30,9 +30,8 @@ import { Close as CloseIcon, CloudUpload as CloudUploadIcon } from '@mui/icons-m
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DateTimePicker } from '@mui/x-date-pickers';
 import { styled } from '@mui/material/styles';
-import { doc, getDoc, setDoc, addDoc, collection, getDocs } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from './firebaseConfig';
+import { submitSamplingRequest, updateSamplingRequest, getSamplingRequestById } from './services/api';
+import { API_URL } from './config/apiConfig';
 
 const VisuallyHiddenInput = styled('input')`
   clip: rect(0 0 0 0);
@@ -117,14 +116,14 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
     useEffect(() => {
         const fetchBookings = async () => {
             try {
-                const querySnapshot = await getDocs(collection(db, "bookings"));
-                const bookingsArray = querySnapshot.docs.map((doc) => ({
-                    bookingId: doc.id,
-                    ...doc.data(),
-                }));
+                const response = await fetch(`${API_URL}/bookings`);
+                if (!response.ok) {
+                    throw new Error('Error fetching bookings');
+                }
+                const bookingsData = await response.json();
 
-                // Process cargo numbers from all bookings
-                const allCargoNumbers = bookingsArray.reduce((acc, booking) => {
+                // Process cargo numbers from bookings
+                const allCargoNumbers = bookingsData.reduce((acc, booking) => {
                     if (booking.cargo) {
                         Object.entries(booking.cargo).forEach(([cargoNumber, cargoDetails]) => {
                             acc.push({
@@ -143,7 +142,11 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
                 setCargoNumbers(allCargoNumbers);
             } catch (error) {
                 console.error('Error fetching bookings:', error);
-                // Handle error appropriately
+                setSnackbar({
+                    open: true,
+                    message: 'Error fetching bookings data',
+                    severity: 'error'
+                });
             }
         };
 
@@ -159,26 +162,26 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
     const fetchRequestData = async () => {
         try {
             setLoading(true);
-            const docRef = doc(db, 'samplingRequests', editingId);
-            const docSnap = await getDoc(docRef);
+            const data = await getSamplingRequestById(editingId);
 
-            if (docSnap.exists()) {
-                const data = docSnap.data();
+            // Format dates - assuming the API returns ISO date strings
+            const formattedData = {
+                ...data,
+                schedule: {
+                    startDate: data.schedule?.startDate ? new Date(data.schedule.startDate) : null,
+                    endDate: data.schedule?.endDate ? new Date(data.schedule.endDate) : null
+                }
+            };
 
-                // Convert Firestore Timestamps to JavaScript Date objects
-                const formattedData = {
-                    ...data,
-                    schedule: {
-                        startDate: data.schedule?.startDate?.toDate() || null,
-                        endDate: data.schedule?.endDate?.toDate() || null
-                    }
-                };
-
-                setFormData(formattedData);
-            }
+            setFormData(formattedData);
         } catch (error) {
             console.error('Error fetching request:', error);
             setSubmitError('Error loading request data');
+            setSnackbar({
+                open: true,
+                message: 'Error loading request data',
+                severity: 'error'
+            });
         } finally {
             setLoading(false);
         }
@@ -624,64 +627,38 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
             setLoading(true);
             setSubmitError(null);
 
-            const fileUrls = await uploadFiles();
-
             const requestData = {
                 ...formData,
-                documents: fileUrls,
                 status: 'Pending',
                 updatedAt: new Date(),
                 createdAt: editingId ? formData.createdAt : new Date()
             };
 
             if (editingId) {
-                await setDoc(doc(db, 'samplingRequests', editingId), requestData);
+                await updateSamplingRequest(editingId, requestData);
             } else {
-                const docRef = await addDoc(collection(db, 'samplingRequests'), requestData);
-                await setDoc(docRef, { id: docRef.id }, { merge: true });
+                await submitSamplingRequest(requestData);
             }
 
             onSubmitSuccess?.();
             handleClose();
-            setSnackbar({ open: true, message: 'Sampling Request created successfully', severity: 'success' });
+            setSnackbar({
+                open: true,
+                message: 'Sampling Request submitted successfully',
+                severity: 'success'
+            });
         } catch (error) {
             console.error('Error submitting request:', error);
             setSubmitError('Failed to submit request. Please try again.');
-            setSnackbar({ open: true, message: 'Failed to submit request. Please try again.', severity: 'error' });
+            setSnackbar({
+                open: true,
+                message: 'Failed to submit request. Please try again.',
+                severity: 'error'
+            });
         } finally {
             setLoading(false);
         }
     };
-
-    const uploadFiles = async () => {
-        const uploads = {};
-
-        if (formData.documents.safetyDataSheet) {
-            uploads.safetyDataSheet = await uploadFile(
-                formData.documents.safetyDataSheet,
-                'safety-sheets'
-            );
-        }
-
-        if (formData.documents.additionalDocs?.length > 0) {
-            uploads.additionalDocs = await Promise.all(
-                formData.documents.additionalDocs.map(
-                    file => uploadFile(file, 'additional')
-                )
-            );
-        }
-
-        return uploads;
-    };
-
-    const uploadFile = async (file, path) => {
-        if (!file) return null;
-        const storageRef = ref(storage, `sampling-requests/${path}/${Date.now()}_${file.name}`);
-        await uploadBytes(storageRef, file);
-        return await getDownloadURL(storageRef);
-    };
-
-    // Rest of your component remains the same...
 
     return (
         <>
