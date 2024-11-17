@@ -100,7 +100,9 @@ function App() {
           {user ? (
             <>
               <Route path="/setup" element={<DatabaseSetup />} />
+              {user.email !== "agency@gmail.com" && (
               <Route path="/" element={<UserWorkspace user={user} />} />
+              )}
               {
                 hasAccessRights([
                   "View Inquiries and Feedbacks",
@@ -281,9 +283,9 @@ function App() {
                   element={<CustomsPreview />}
                 />
               )}
-              {hasAccessRights(['Manage Documents']) && (
+              {hasAccessRights(['Agent']) && (
                 <Route
-                  path="/abcd"
+                  path="/"
                   element={<AgencySimulator />}
                 />
               )}
