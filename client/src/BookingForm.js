@@ -227,6 +227,11 @@ const BookingForm = ({ user }) => {
   const [vesselVisits, setVesselVisits] = useState([]);
   const [selectedVessel, setSelectedVessel] = useState("");
   const [availableVoyages, setAvailableVoyages] = useState([]);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'info'
+  });
 
   const cargoTypes = [
     "General Cargo",
@@ -264,6 +269,13 @@ const BookingForm = ({ user }) => {
     };
     fetchVesselVisits();
   }, []);
+
+  const handleCloseSnackbar = (event, reason) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+    setSnackbar({ ...snackbar, open: false });
+  };
 
   const handleVesselChange = (event) => {
     const selectedVesselName = event.target.value;
@@ -392,7 +404,11 @@ const BookingForm = ({ user }) => {
     });
 
     if (cargoValidationErrors.length > 0) {
-      alert(cargoValidationErrors.join("\n"));
+      setSnackbar({
+        open: true,
+        message: cargoValidationErrors.join("\n"),
+        severity: 'error'
+      });
       return;
     }
 
@@ -543,6 +559,11 @@ const BookingForm = ({ user }) => {
               : booking
           )
         );
+        setSnackbar({
+          open: true,
+          message: 'Booking updated successfully',
+          severity: 'success'
+        });
       } else {
         // Create new booking
         const response = await createBooking(bookingData);
@@ -550,11 +571,20 @@ const BookingForm = ({ user }) => {
           ...prev,
           { ...bookingData, bookingId: response.id },
         ]);
+        setSnackbar({
+          open: true,
+          message: 'Booking created successfully',
+          severity: 'success'
+        });
       }
       handleCloseDialog();
     } catch (error) {
       console.error("Error saving booking:", error);
-      alert("Error saving booking: " + error.message);
+      setSnackbar({
+        open: true,
+        message: `Error saving booking: ${error.message}`,
+        severity: 'error'
+      });
     }
   };
 
@@ -564,8 +594,18 @@ const BookingForm = ({ user }) => {
       setBookingData((prev) =>
         prev.filter((booking) => booking.bookingId !== id)
       );
+      setSnackbar({
+        open: true,
+        message: 'Booking deleted successfully',
+        severity: 'success'
+      });
     } catch (error) {
       console.error("Error deleting booking:", error);
+      setSnackbar({
+        open: true,
+        message: `Error deleting booking: ${error.message}`,
+        severity: 'error'
+      });
     }
   };
 
@@ -716,9 +756,18 @@ const BookingForm = ({ user }) => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      setSnackbar({
+        open: true,
+        message: 'QR Code downloaded successfully',
+        severity: 'success'
+      });
     } catch (error) {
       console.error('Error generating QR code:', error);
-
+      setSnackbar({
+        open: true,
+        message: 'Error generating QR Code',
+        severity: 'error'
+      });
     }
   };
 
