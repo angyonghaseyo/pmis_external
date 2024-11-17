@@ -31,7 +31,7 @@ import CargoStorage from './CargoStorage';
 import CargoTransloading from './CargoTransloading';
 import { jwtDecode } from "jwt-decode";
 import ElectronicTradeDocuments from "./ElectronicTradeDocument";
-import CustomsPreview from "./CustomsPreview";
+import DocumentManager from "./DocumentManager";
 import AgencySimulator from "./AgencySimulator"
 import BillingRequests from "./BillingRequests";
 import Invoice from './invoice';
@@ -279,8 +279,8 @@ function App() {
               )}
               {hasAccessRights(['Manage Documents']) && (
                 <Route
-                  path="/customs-and-trade-documents/something"
-                  element={<CustomsPreview />}
+                  path="/customs-and-trade-documents/document-manager"
+                  element={<DocumentManager />}
                 />
               )}
               {hasAccessRights(['Agent']) && (

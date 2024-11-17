@@ -192,10 +192,10 @@ const Sidebar = ({ user }) => {
       icon: <FileText />,
       path: "/customs-and-trade-documents",
       children: [
-        {
-          name: "Electronic Trade Documents",
-          accessRights: ["View Documents"],
-        },
+        // {
+        //   name: "Electronic Trade Documents",
+        //   accessRights: ["View Documents"],
+        // },
         { name: "Document Manager", accessRights: ["Manage Documents"] },
       ],
       accessRights: ["View Documents", "Manage Documents"],

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useAuth } from "./AuthContext";
+import { useAuth } from "./AuthContext.js";
 import {
   Box,
   Stepper,
@@ -55,7 +55,7 @@ import {
   uploadBookingDocument,
   retrieveBookingDocument,
   updateBooking,
-} from "./services/api";
+} from "./services/api.js";
 import { validateDocumentWithOCR, DocumentKeywords } from "./OCRValidation.js";
 import { HSCodeCategories, ProcessStatus } from "./HSCodeCategories.js";
 
@@ -327,7 +327,7 @@ const DocumentListItem = ({
   );
 };
 
-const CustomsPreview = () => {
+const DocumentManager = () => {
   const [bookings, setBookings] = useState([]);
   const [selectedBooking, setSelectedBooking] = useState("");
   const [selectedCargo, setSelectedCargo] = useState("");
@@ -353,7 +353,6 @@ const CustomsPreview = () => {
   };
 
   // Fetch bookings on component mount
-  // In CustomsPreview.js
   useEffect(() => {
     const fetchBookings = async () => {
       try {
@@ -990,4 +989,4 @@ const CustomsPreview = () => {
   );
 };
 
-export default CustomsPreview;
+export default DocumentManager;
