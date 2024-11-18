@@ -163,6 +163,10 @@ const Sidebar = ({ user }) => {
           name: "Cargo Transloading",
           accessRights: ["Create Transloading Request"],
         },
+        {
+          name: "Cargo Tracking",
+          accessRights: ["View Cargo Status"],
+        },
       ],
       accessRights: [
         "Create Cargo Booking",
