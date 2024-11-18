@@ -32,6 +32,7 @@ import {
   LinearProgress,
   CircularProgress,
   Autocomplete,
+  Snackbar
 } from "@mui/material";
 import { ExpandMore } from "@mui/icons-material";
 import EditIcon from "@mui/icons-material/Edit";
@@ -1417,6 +1418,20 @@ const BookingForm = ({ user }) => {
           </Button>
         </DialogActions>
       </Dialog>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 };
