@@ -43,7 +43,7 @@ const AgencySimulator = () => {
   const [selectedBooking, setSelectedBooking] = useState('');
   const [selectedCargo, setSelectedCargo] = useState('');
   const [selectedDocument, setSelectedDocument] = useState('');
-  const [documentStatus, setDocumentStatus] = useState('PENDING');
+  const [documentStatus, setDocumentStatus] = useState('');
   const [comments, setComments] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -149,10 +149,11 @@ const AgencySimulator = () => {
           selectedFile
         );
 
+
       // Prepare update data
       const updateData = {
         [`cargo.${selectedCargo}.documentStatus.${selectedDocument}`]: {
-          status: documentStatus,
+          status: documentStatus || "APPROVED",
           lastUpdated: serverTimestamp(),
           updatedBy: agencies[selectedAgency].name,
           agencyType: agencies[selectedAgency].type,
@@ -307,7 +308,6 @@ const AgencySimulator = () => {
               value={documentStatus}
               onChange={(e) => setDocumentStatus(e.target.value)}
             >
-              <option value="PENDING">Pending</option>
               <option value="APPROVED">Approved</option>
               <option value="REJECTED">Rejected</option>
             </select>

@@ -221,22 +221,31 @@ const DocumentListItem = ({
             <Typography variant="caption" color="text.secondary">
               Required Documents:
             </Typography>
-            {prerequisites.map((reqDoc) => (
-              <Chip
-                key={reqDoc}
-                size="small"
-                label={reqDoc}
-                icon={
-                  cargoDetails.documents[reqDoc] ? (
-                    <CheckCircle fontSize="small" />
-                  ) : (
-                    <ErrorIcon fontSize="small" />
-                  )
-                }
-                color={cargoDetails.documents[reqDoc] ? "success" : "default"}
-                sx={{ ml: 1, mb: 1 }}
-              />
-            ))}
+            <Box
+              sx={{
+                display: "flex",
+                flexWrap: "wrap", // This enables wrapping
+                gap: 1, // This provides consistent spacing between chips
+                mt: 0.5, // Small margin top after the "Required Documents" text
+              }}
+            >
+              {prerequisites.map((reqDoc) => (
+                <Chip
+                  key={reqDoc}
+                  size="small"
+                  label={reqDoc}
+                  icon={
+                    cargoDetails.documents[reqDoc] ? (
+                      <CheckCircle fontSize="small" />
+                    ) : (
+                      <ErrorIcon fontSize="small" />
+                    )
+                  }
+                  color={cargoDetails.documents[reqDoc] ? "success" : "default"}
+                  sx={{ ml: 1, mb: 1 }}
+                />
+              ))}
+            </Box>
           </Box>
         );
       }
@@ -343,7 +352,6 @@ const DocumentManager = () => {
   const [uploadStatus, setUploadStatus] = useState({});
   const { user } = useAuth();
 
-
   // Handle Snackbar close
   const handleSnackbarClose = (event, reason) => {
     if (reason === "clickaway") {
@@ -375,9 +383,9 @@ const DocumentManager = () => {
 
         // setBookings(bookingsData);
         const filteredBookings = bookingsData.filter(
-          booking => booking.userEmail === user.email
+          (booking) => booking.userEmail === user.email
         );
-        
+
         setBookings(filteredBookings);
       } catch (error) {
         console.error("Detailed fetch error:", error);
@@ -842,7 +850,6 @@ const DocumentManager = () => {
             </FormControl>
           </Grid>
 
-
           {!cargoDetails && (
             <Grid item xs={12}>
               <Alert severity="warning">
@@ -929,9 +936,7 @@ const DocumentManager = () => {
                           alignItems="center"
                           justifyContent="space-between"
                           sx={{ mb: 2 }}
-                        >
-                          <DownloadAllButton cargoId={selectedCargo} />
-                        </Stack>
+                        ></Stack>
                       </CardContent>
                     </Card>
                   </Grid>
@@ -957,6 +962,9 @@ const DocumentManager = () => {
                         </List>
                       </CardContent>
                     </Card>
+                  </Grid>
+                  <Grid item xs={12} md={12}>
+                    <DownloadAllButton cargoId={selectedCargo} />
                   </Grid>
                 </>
               )}

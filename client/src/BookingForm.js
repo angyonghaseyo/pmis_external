@@ -711,10 +711,10 @@ const BookingForm = ({ user }) => {
       };
 
       // Check if all required exporter documents are uploaded
-      const allDocsUploaded =
+      const allDocsUploaded = Boolean(
         updatedFormData.cargo[cargoId].documents.vgm &&
         updatedFormData.cargo[cargoId].documents.advancedDeclaration &&
-        updatedFormData.cargo[cargoId].documents.exportDocument;
+        updatedFormData.cargo[cargoId].documents.exportDocument);
 
       // Only update isDocumentsChecked flag
       if (
@@ -802,13 +802,31 @@ const BookingForm = ({ user }) => {
           <Typography variant="subtitle1" gutterBottom fontWeight="medium">
             Required Documents
           </Typography>
-          {!formData.cargo[cargoId].isDocumentsChecked && (
+          {!formData.cargo[cargoId].isDocumentsChecked && formData.cargo[cargoId].isContainerRented && formData.cargo[cargoId].isTruckBooked && (
+            <Alert
+              severity="warning"
+              sx={{ mt: 2, mb: 2, borderRadius: "8px" }}
+              icon={<CancelIcon fontSize="small" />}
+            >
+              Please Submit All Port Documents
+            </Alert>
+          )}
+          {!formData.cargo[cargoId].isContainerRented && (
             <Alert
               severity="error"
               sx={{ mt: 2, mb: 2, borderRadius: "8px" }}
               icon={<CancelIcon fontSize="small" />}
             >
-              Please Submit All Documents
+              You must first rent a container for your cargo before you upload any documents!
+            </Alert>
+          )}
+           {!formData.cargo[cargoId].isTruckBooked && (
+            <Alert
+              severity="error"
+              sx={{ mt: 2, mb: 2, borderRadius: "8px" }}
+              icon={<CancelIcon fontSize="small" />}
+            >
+              You must first rent a truck to transport your cargo before you upload any documents!
             </Alert>
           )}
           {formData.cargo[cargoId].isDocumentsChecked && (
@@ -839,6 +857,7 @@ const BookingForm = ({ user }) => {
                         onChange={(e) =>
                           handleDocumentUpload(cargoId, type, e.target.files[0])
                         }
+                        disabled={formData.cargo[cargoId].isDocumentsChecked || !formData.cargo[cargoId].isContainerRented || !formData.cargo[cargoId].isTruckBooked }
                       />
                       <label
                         htmlFor={`${type}-upload-${cargoId}`}
@@ -866,6 +885,7 @@ const BookingForm = ({ user }) => {
                             textTransform: "none",
                             minHeight: "36px",
                           }}
+                          disabled={formData.cargo[cargoId].isDocumentsChecked || !formData.cargo[cargoId].isContainerRented || !formData.cargo[cargoId].isTruckBooked }
                         >
                           {formData.cargo[cargoId]?.documents?.[type]
                             ? "Replace Document"
