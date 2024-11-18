@@ -134,6 +134,7 @@ const CargoRepacking = () => {
                 message: 'Request deleted successfully',
                 severity: 'success'
             });
+            setDeleteConfirmation(null);
         } catch (error) {
             console.error('Error deleting request:', error);
             setSnackbar({
@@ -310,6 +311,16 @@ const CargoRepacking = () => {
                                 <Typography variant="subtitle1" gutterBottom>Special Instructions</Typography>
                                 <Paper sx={{ p: 2 }}>
                                     <Typography variant="body1">{request.specialInstructions}</Typography>
+                                </Paper>
+                            </Grid>
+                        )}
+
+                        {/* Rejection Section */}
+                        {request?.rejectionReason && (
+                            <Grid item xs={12}>
+                                <Typography variant="subtitle1" gutterBottom>Rejection Reason</Typography>
+                                <Paper sx={{ p: 2 }}>
+                                    <Typography variant="body1">{request.rejectionReason}</Typography>
                                 </Paper>
                             </Grid>
                         )}

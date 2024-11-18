@@ -286,6 +286,16 @@ const CargoSampling = () => {
                                 </Paper>
                             </Grid>
                         )}
+
+                        {/* Rejection Section */}
+                        {request?.rejectionReason && (
+                            <Grid item xs={12}>
+                                <Typography variant="subtitle1" gutterBottom>Rejection Reason</Typography>
+                                <Paper sx={{ p: 2 }}>
+                                    <Typography variant="body1">{request.rejectionReason}</Typography>
+                                </Paper>
+                            </Grid>
+                        )}
                     </Grid>
                 </DialogContent>
                 <DialogActions>
@@ -453,7 +463,6 @@ const CargoSampling = () => {
                     onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
                     severity={snackbar.severity}
                     elevation={6}
-                    variant="filled"
                 >
                     {snackbar.message}
                 </Alert>
