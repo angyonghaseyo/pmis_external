@@ -1255,6 +1255,40 @@ export const updateDocumentStatus = async (
   }
 };
 
+export const getAgencyByKey = async (agencyKey) => {
+  try {
+    const response = await fetch(`${API_URL}/agencies/${agencyKey}`);
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('Agency not found');
+      }
+      throw new Error('Error fetching agency details');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in getAgencyByKey:', error);
+    throw error;
+  }
+};
+
+export const getDocumentRequirements = async (agencyKey, documentType) => {
+  try {
+    const response = await fetch(
+      `${API_URL}/agencies/${agencyKey}/document-requirements?documentType=${encodeURIComponent(documentType)}`
+    );
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('Agency or document type not found');
+      }
+      throw new Error('Error fetching document requirements');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in getDocumentRequirements:', error);
+    throw error;
+  }
+};
+
 // Dashboard data
 export const getLeaveStatistics = () =>
   authAxios.get("/leave-statistics").catch(handleApiError);
@@ -1586,7 +1620,12 @@ const api = {
   submitSamplingRequest,
   getSamplingRequests,
   deleteSamplingRequest,
-  getSamplingRequestById
+  getSamplingRequestById,
+  getAgencies,
+  verifyAgencyAccess,
+  updateDocumentStatus,
+  getAgencyByKey,
+  getDocumentRequirements
 };
 
 export default api;

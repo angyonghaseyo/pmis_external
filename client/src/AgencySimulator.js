@@ -1,9 +1,47 @@
 import React, { useState, useEffect } from "react";
-import { HSCodeCategories } from "./HSCodeCategories";
-import { db } from "./firebaseConfig";
+import {
+  getAgencies,
+  verifyAgencyAccess,
+  updateDocumentStatus,
+  getBookings,
+  uploadBookingDocument,
+} from "./services/api";
 import EmptyLayout from "./layout/EmptyLayout";
-import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
-import { getBookings, uploadBookingDocument } from "./services/api";
+import { Alert } from '@mui/material';
+import { InfoOutlined as AlertCircle } from '@mui/icons-material';
+
+const HSCodeCategories = {
+  EXPLOSIVES_AND_PYROTECHNICS: {
+    documents: {
+      agency: [
+        {
+          name: "Dangerous_Goods_Declaration",
+          requiresDocuments: ["Safety_Data_Sheet"],
+        },
+        {
+          name: "UN_Classification_Sheet",
+          requiresDocuments: ["Dangerous_Goods_Declaration"],
+        },
+        {
+          name: "Packaging_Certification",
+          requiresDocuments: ["Dangerous_Goods_Declaration"],
+        },
+        {
+          name: "Transport_Safety_Permit",
+          requiresDocuments: ["Packaging_Certification"],
+        },
+        {
+          name: "Customs_Clearance_Certificate",
+          requiresDocuments: [
+            "Dangerous_Goods_Declaration",
+            "UN_Classification_Sheet",
+            "Transport_Safety_Permit",
+          ],
+        },
+      ],
+    },
+  },
+};
 
 const AgencySimulator = () => {
   // State management
@@ -40,7 +78,7 @@ const AgencySimulator = () => {
   const [prerequisites, setPrerequisites] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
 
-  // Fetch bookings using api.js
+  // Fetch bookings on component mount
   useEffect(() => {
     const fetchBookings = async () => {
       try {
@@ -48,7 +86,6 @@ const AgencySimulator = () => {
         const bookingsData = await getBookings();
         // Filter bookings for explosives based on HS code
         const explosivesBookings = bookingsData.filter((booking) => {
-          // Check if any cargo in the booking has an HS code starting with '36'
           return Object.values(booking.cargo || {}).some((cargo) =>
             cargo.hsCode?.startsWith("36")
           );
@@ -70,29 +107,21 @@ const AgencySimulator = () => {
     const agencyDoc = explosivesCategory.documents.agency.find(
       (doc) => doc.name === documentName
     );
-    console.log(
-      "asdfasfd" + JSON.stringify(agencyDoc.requiresDocuments, null, 2)
-    );
-    console.log(typeof agencyDoc.requiresDocuments);
     return agencyDoc ? agencyDoc.requiresDocuments : [];
   };
 
   // Check document prerequisites
   const checkDocumentPrerequisites = (cargoData, documentName) => {
     const requiredDocs = getDocumentRequirements(documentName);
-    console.log("required documents are " + requiredDocs);
     if (!requiredDocs.length) return { isValid: true, missingDocs: [] };
 
     const missingDocs = requiredDocs.filter((docName) => {
       const docStatus = cargoData.documentStatus?.[docName];
-      console.log("sd: " + docStatus + " " + docStatus.status);
       return (
         !docStatus ||
         (docStatus.status !== "COMPLETED" && docStatus.status !== "APPROVED")
       );
     });
-    console.log(missingDocs);
-    console.log(missingDocs.length === 0);
 
     return {
       isValid: missingDocs.length === 0,
@@ -100,19 +129,21 @@ const AgencySimulator = () => {
     };
   };
 
+  // Handle file selection
   const handleFileChange = (event) => {
     setSelectedFile(event.target.files[0]);
   };
 
-  // Update document status in Firebase
-  const updateDocumentStatus = async () => {
+  // Update document status
+  const updateDocumentStatusHandler = async () => {
     if (
       !selectedAgency ||
       !selectedBooking ||
       !selectedCargo ||
-      !selectedDocument
+      !selectedDocument ||
+      !selectedFile
     ) {
-      setError("Please fill in all required fields");
+      setError("Please fill in all required fields and upload a document");
       return;
     }
 
@@ -122,24 +153,25 @@ const AgencySimulator = () => {
       setSuccess("");
 
       // Get current booking data
-      const bookingRef = doc(db, "bookings", selectedBooking);
-      const bookingDoc = await getDoc(bookingRef);
-
-      if (!bookingDoc.exists()) {
-        throw new Error("Booking not found");
+      const selectedBookingData = bookings.find(
+        (b) => b.bookingId === selectedBooking
+      );
+      if (!selectedBookingData) {
+        throw new Error("Selected booking not found");
       }
 
-      const bookingData = bookingDoc.data();
-      const cargoData = bookingData.cargo[selectedCargo];
+      const cargoData = selectedBookingData.cargo[selectedCargo];
 
-      // Check if document type is allowed for this agency
-      if (
-        !agencies[selectedAgency].allowedDocuments.includes(selectedDocument)
-      ) {
-        throw new Error("Agency not authorized to update this document type");
+      // Check agency authorization
+      const verifyResult = await verifyAgencyAccess(
+        selectedAgency,
+        selectedDocument
+      );
+      if (!verifyResult.isValid) {
+        throw new Error(verifyResult.error);
       }
-      console.log("document status is " + documentStatus);
-      // If trying to approve, check prerequisites
+
+      // Check prerequisites for approval
       if (documentStatus === "APPROVED") {
         const { isValid, missingDocs } = checkDocumentPrerequisites(
           cargoData,
@@ -152,37 +184,23 @@ const AgencySimulator = () => {
         }
       }
 
-      // Upload the agency document
-      const uploadResult = await uploadBookingDocument(
+      // Upload the document
+      await uploadBookingDocument(
         selectedBooking,
         selectedCargo,
         selectedDocument,
         selectedFile
       );
 
-      // Prepare update data
-      const updateData = {
-        [`cargo.${selectedCargo}.documentStatus.${selectedDocument}`]: {
-          status: documentStatus || "APPROVED",
-          lastUpdated: serverTimestamp(),
-          updatedBy: agencies[selectedAgency].name,
-          agencyType: agencies[selectedAgency].type,
-          comments: comments,
-        },
-      };
-
-      // Update document status
-      await updateDoc(bookingRef, updateData);
-
-      // If approved and this is Customs Clearance Certificate, update customs cleared status
-      if (
-        documentStatus === "APPROVED" &&
-        selectedDocument === "Customs_Clearance_Certificate"
-      ) {
-        await updateDoc(bookingRef, {
-          [`cargo.${selectedCargo}.isCustomsCleared`]: true,
-        });
-      }
+      // Update the document status
+      await updateDocumentStatus(
+        selectedAgency,
+        selectedBooking,
+        selectedCargo,
+        selectedDocument,
+        documentStatus,
+        comments
+      );
 
       setSuccess("Document status updated successfully");
       setComments("");
@@ -214,7 +232,7 @@ const AgencySimulator = () => {
         <div className="bg-white rounded-lg shadow-lg p-6">
           <h1 className="text-2xl font-bold mb-6">
             TradeNet Portal for Agencies that handle Explosives and Pyrotechnics
-            (HS Code 36){" "}
+            (HS Code 36)
           </h1>
 
           {/* Agency Selection */}
@@ -337,6 +355,7 @@ const AgencySimulator = () => {
             </div>
           </div>
 
+          {/* File Upload */}
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Upload Document
@@ -384,16 +403,19 @@ const AgencySimulator = () => {
 
           {/* Error Display */}
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-400 rounded-md text-red-700">
-              {error}
-            </div>
+            <Alert severity="error" className="mb-6">
+              <div className="flex items-center">
+                <AlertCircle className="h-4 w-4 mr-2" />
+                {error}
+              </div>
+            </Alert>
           )}
 
           {/* Success Display */}
           {success && (
-            <div className="mb-6 p-4 bg-green-50 border border-green-400 rounded-md text-green-700">
+            <Alert severity="success" className="mb-6">
               {success}
-            </div>
+            </Alert>
           )}
 
           {/* Submit Button */}
@@ -407,7 +429,7 @@ const AgencySimulator = () => {
               !selectedDocument ||
               !selectedFile
             }
-            onClick={updateDocumentStatus}
+            onClick={updateDocumentStatusHandler}
           >
             {isLoading ? "Updating..." : "Update Document Status"}
           </button>
