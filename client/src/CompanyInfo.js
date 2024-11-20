@@ -14,9 +14,7 @@ import {
   Container
 } from '@mui/material';
 import PhotoCamera from '@mui/icons-material/PhotoCamera';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from './firebaseConfig';
-import { getCompanyInfo, updateCompanyInfo } from './services/api';
+import { getCompanyInfo, updateCompanyInfo, uploadCompanyLogo } from './services/api';
 import { useAuth } from './AuthContext';
 
 const currencies = [
@@ -62,7 +60,6 @@ const CompanyInfo = () => {
     }
   }, [user]);
 
-
   const hasRole = (requiredRoles) => {
     if (!user || !Array.isArray(user.accessRights)) return false;
     const hasRequiredRole = requiredRoles.some(role => user.accessRights.includes(role));
@@ -97,10 +94,9 @@ const CompanyInfo = () => {
     const file = event.target.files[0];
     if (file) {
       try {
-        const storageRef = ref(storage, `company_logos/${companyData.name}`);
-        await uploadBytes(storageRef, file);
-        const logoUrl = await getDownloadURL(storageRef);
+        const logoUrl = await uploadCompanyLogo(companyData.name, file);
         setCompanyData(prev => ({ ...prev, logoUrl }));
+        setSuccessMessage('Logo uploaded successfully');
       } catch (err) {
         console.error('Error uploading logo:', err);
         setError('Failed to upload logo: ' + err.message);
@@ -119,11 +115,8 @@ const CompanyInfo = () => {
         address: companyData.address,
         zipCode: companyData.zipCode,
         currencySymbol: companyData.currencySymbol,
+        logoUrl: companyData.logoUrl
       };
-
-      if (companyData.logoUrl) {
-        updatedData.logoUrl = companyData.logoUrl;
-      }
 
       const requiredFields = ['country', 'state', 'city', 'area', 'address', 'zipCode'];
       const missingFields = requiredFields.filter(field => !updatedData[field]);

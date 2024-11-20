@@ -37,6 +37,23 @@ class CompanyController {
             res.status(500).send(`Failed to update company information: ${error.message}`);
         }
     }
+
+    async uploadCompanyLogo(req, res) {
+        try {
+          const { companyName } = req.body;
+          const logoFile = req.file;
+      
+          if (!companyName || !logoFile) {
+            return res.status(400).send('Company name and logo file are required');
+          }
+      
+          const logoUrl = await this.companyService.uploadCompanyLogo(companyName, logoFile);
+          res.status(200).json({ logoUrl });
+        } catch (error) {
+          console.error('Error uploading company logo:', error);
+          res.status(500).send('Error uploading company logo');
+        }
+      }
 }
 
 module.exports = CompanyController;

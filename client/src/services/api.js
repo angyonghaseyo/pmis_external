@@ -360,6 +360,31 @@ export const updateCompanyInfo = async (companyName, data) => {
     throw new Error(`Failed to update company information: ${error.message}`);
   }
 };
+
+export const uploadCompanyLogo = async (companyName, file) => {
+  try {
+    const formData = new FormData();
+    formData.append('logo', file);
+    formData.append('companyName', companyName);
+    
+    const response = await fetch(`${API_URL}/company-data/upload-logo`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to upload logo');
+    }
+
+    const data = await response.json();
+    return data.logoUrl;
+  } catch (error) {
+    console.error('Error uploading company logo:', error);
+    throw error;
+  }
+};
+
+
 export const getOperatorRequisitions = async (userId) => {
   try {
     const response = await fetch(`${API_URL}/operator-requisitions/${userId}`);
