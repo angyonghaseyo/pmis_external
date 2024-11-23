@@ -273,17 +273,6 @@ const CargoSampling = () => {
                                                 </Button>
                                             </Grid>
                                         )}
-                                        {request.documents.additionalDocs?.map((doc, index) => (
-                                            <Grid item xs={12} key={index}>
-                                                <Button
-                                                    variant="outlined"
-                                                    startIcon={<Download />}
-                                                    onClick={() => window.open(doc, '_blank')}
-                                                >
-                                                    Additional Document {index + 1}
-                                                </Button>
-                                            </Grid>
-                                        ))}
                                     </Grid>
                                 </Paper>
                             </Grid>

@@ -1652,6 +1652,134 @@ export const getRepackingRequests = async (filters = {}) => {
   }
 };
 
+export const getStorageRequests = async (filters = {}) => {
+  try {
+    const queryParams = new URLSearchParams(filters);
+    const response = await fetch(`${API_URL}/storage-requests?${queryParams}`);
+
+    if (!response.ok) {
+      throw new Error('Error fetching storage requests');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in getStorageRequests:', error);
+    throw error;
+  }
+};
+
+// Get a single storage request by ID
+export const getStorageRequestById = async (requestId) => {
+  try {
+    const response = await fetch(`${API_URL}/storage-requests/${requestId}`);
+
+    if (!response.ok) {
+      throw new Error('Error fetching storage request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in getStorageRequestById:', error);
+    throw error;
+  }
+};
+
+// Submit a new storage request
+export const submitStorageRequest = async (requestData) => {
+  try {
+    const formData = new FormData();
+    formData.append('storageDetails', JSON.stringify({
+      cargoDetails: requestData.cargoDetails,
+      warehouseRequirement: requestData.warehouseRequirement,
+      schedule: requestData.schedule,
+      specialInstructions: requestData.specialInstructions || '',
+      company: requestData.company
+    }));
+
+    if (requestData.documents?.storageChecklist instanceof File) {
+      formData.append('storageChecklist', requestData.documents.storageChecklist);
+    }
+
+    if (Array.isArray(requestData.documents?.additionalDocs)) {
+      requestData.documents.additionalDocs.forEach((doc) => {
+        if (doc instanceof File) {
+          formData.append('additionalDoc', doc);
+        }
+      });
+    }
+
+    const response = await fetch(`${API_URL}/storage-requests`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error('Error submitting storage request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in submitStorageRequest:', error);
+    throw error;
+  }
+};
+
+// Update an existing storage request
+export const updateStorageRequest = async (requestId, requestData) => {
+  try {
+    const formData = new FormData();
+    formData.append('storageDetails', JSON.stringify({
+      cargoDetails: requestData.cargoDetails,
+      warehouseRequirement: requestData.warehouseRequirement,
+      schedule: requestData.schedule,
+      specialInstructions: requestData.specialInstructions,
+      status: requestData.status
+    }));
+
+    if (requestData.documents?.storageChecklist instanceof File) {
+      formData.append('storageChecklist', requestData.documents.storageChecklist);
+    }
+
+    const response = await fetch(`${API_URL}/storage-requests/${requestId}`, {
+      method: 'PUT',
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error('Error updating storage request');
+    }
+
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      return await response.json();
+    }
+
+    return { success: true, message: 'Storage request updated successfully' };
+  } catch (error) {
+    console.error('Error in updateStorageRequest:', error);
+    throw error;
+  }
+};
+
+// Delete a storage request
+export const deleteStorageRequest = async (requestId) => {
+  try {
+    const response = await fetch(`${API_URL}/storage-requests/${requestId}`, {
+      method: 'DELETE'
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({
+        error: 'Error deleting storage request'
+      }));
+      throw new Error(errorData.error || 'Error deleting storage request');
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error in deleteStorageRequest:', error);
+    throw error;
+  }
+};
+
 const api = {
   loginUser,
   registerUser,
@@ -1740,7 +1868,12 @@ const api = {
   updateRepackingRequest,
   getRepackingRequestById,
   deleteRepackingRequest,
-  getRepackingRequests
+  getRepackingRequests,
+  getStorageRequests,
+  getStorageRequestById,
+  submitStorageRequest,
+  updateStorageRequest,
+  deleteStorageRequest
 };
 
 export default api;

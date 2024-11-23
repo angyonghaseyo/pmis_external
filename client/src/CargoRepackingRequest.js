@@ -240,7 +240,6 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
 
     const handleInputChange = (section, field, value) => {
         if (section === 'specialInstructions') {
-            // Handle special instructions directly since it's not nested
             setFormData(prev => ({
                 ...prev,
                 specialInstructions: value
@@ -258,7 +257,6 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
                     }
                 };
             } else {
-                // Handle direct field updates
                 return {
                     ...prev,
                     [field]: value
@@ -266,7 +264,6 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
             }
         });
 
-        // Clear related errors when field is updated
         if (errors[field]) {
             setErrors(prev => ({
                 ...prev,
@@ -279,7 +276,6 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
         const selectedCargoNumber = event.target.value;
         setSelectedCargo(selectedCargoNumber);
 
-        // Find the cargo details from cargoNumbers array directly
         const selectedCargoDetails = cargoNumbers.find(
             cargo => cargo.cargoNumber === selectedCargoNumber
         );
@@ -613,8 +609,6 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
             </Grid>
         </Grid>
     );
-    // Your existing renderStepContent function here...
-    // (Keep the cargo details, sampling requirements, and schedule & documents steps as they were)
 
     const renderStepContent = (step) => {
         switch (step) {

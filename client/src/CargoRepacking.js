@@ -241,27 +241,26 @@ const CargoRepacking = () => {
                             </Paper>
                         </Grid>
 
-                        {/* Documents Section */}
-                        {/* <Grid item xs={12}>
-                            <Typography variant="subtitle1" gutterBottom>Documents</Typography>
-                            <Paper sx={{ p: 2 }}>
-                                <Grid container spacing={2}>
-                                    <Grid item xs={12}>
-                                        <Typography variant="body2" color="textSecondary" gutterBottom>
-                                            Repacking Checklist
-                                        </Typography>
-
-
-                                        <InsertDriveFileIcon sx={{ mr: 1 }} />
-                                        <Link href={request.documents.repackagingChecklist} target="_blank" rel="noopener noreferrer">
-                                            Document
-                                        </Link>
-
-
+                        {request.documents && (
+                            <Grid item xs={12}>
+                                <Typography variant="subtitle1" gutterBottom>Documents</Typography>
+                                <Paper sx={{ p: 2 }}>
+                                    <Grid container spacing={2}>
+                                        {request.documents.repackagingChecklist && (
+                                            <Grid item xs={12}>
+                                                <Button
+                                                    variant="outlined"
+                                                    startIcon={<Download />}
+                                                    onClick={() => window.open(request.documents.repackagingChecklist, '_blank')}
+                                                >
+                                                    Repacking Checklist
+                                                </Button>
+                                            </Grid>
+                                        )}
                                     </Grid>
-                                </Grid>
-                            </Paper>
-                        </Grid> */}
+                                </Paper>
+                            </Grid>
+                        )}
 
                         {/* Special Instructions Section */}
                         {request.specialInstructions && (
@@ -284,25 +283,6 @@ const CargoRepacking = () => {
                         )}
                     </Grid>
                 </DialogContent>
-                {/* <DialogActions>
-                    {request.status === 'Pending' && (
-                        <Button
-                            color="primary"
-                            onClick={() => handleStatusChange(request.id, 'In Progress')}
-                        >
-                            Start Repacking
-                        </Button>
-                    )}
-                    {request.status === 'In Progress' && (
-                        <Button
-                            color="success"
-                            onClick={() => handleStatusChange(request.id, 'Completed')}
-                        >
-                            Mark as Completed
-                        </Button>
-                    )}
-                    <Button onClick={onClose}>Close</Button>
-                </DialogActions> */}
             </Dialog>
         );
     };
@@ -416,13 +396,6 @@ const CargoRepacking = () => {
                                                 </IconButton>
                                             </Tooltip>
                                         )}
-                                        {/* {request.status === 'Completed' && (
-                                            <Tooltip title="Download Report">
-                                                <IconButton size="small">
-                                                    <Download />
-                                                </IconButton>
-                                            </Tooltip>
-                                        )} */}
                                         {request.status === 'Pending' && (
                                             <Tooltip title="Delete">
                                                 <IconButton

@@ -263,32 +263,6 @@ const CargoTransloading = () => {
                             </Paper>
                         </Grid>
 
-                        {/* Documents Section */}
-                        {/* <Grid item xs={12}>
-                            <Typography variant="subtitle1" gutterBottom>Documents</Typography>
-                            <Paper sx={{ p: 2 }}>
-                                <Grid container spacing={2}>
-                                    <Grid item xs={12}>
-                                        <Typography variant="body2" color="textSecondary" gutterBottom>
-                                            Storage Checklist
-                                        </Typography>
-
-
-                                        <InsertDriveFileIcon sx={{ mr: 1 }} />
-                                        <Link
-                                            href={request.documents.storageChecklist}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            sx={{ textDecoration: 'none' }}
-                                        >
-
-                                        </Link>
-
-
-                                    </Grid>
-                                </Grid>
-                            </Paper>
-                        </Grid> */}
 
                         {/* Special Instructions Section */}
                         {request.specialInstructions && (
@@ -324,25 +298,6 @@ const CargoTransloading = () => {
                         )}
                     </Grid>
                 </DialogContent>
-                {/* <DialogActions>
-                    {request.status === 'Pending' && (
-                        <Button
-                            color="primary"
-                            onClick={() => handleStatusChange(request.id, 'In Progress')}
-                        >
-                            Start Storage
-                        </Button>
-                    )}
-                    {request.status === 'In Progress' && (
-                        <Button
-                            color="success"
-                            onClick={() => handleStatusChange(request.id, 'Completed')}
-                        >
-                            Mark as Completed
-                        </Button>
-                    )}
-                    <Button onClick={onClose}>Close</Button>
-                </DialogActions> */}
             </Dialog>
         );
     };
@@ -445,13 +400,6 @@ const CargoTransloading = () => {
                                                 </IconButton>
                                             </Tooltip>
                                         )}
-                                        {/* {request.status === 'Completed' && (
-                                            <Tooltip title="Download Report">
-                                                <IconButton size="small">
-                                                    <Download />
-                                                </IconButton>
-                                            </Tooltip>
-                                        )} */}
                                         {request.status === 'Pending' && (
                                             <Tooltip title="Delete">
                                                 <IconButton

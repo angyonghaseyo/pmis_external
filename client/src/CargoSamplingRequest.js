@@ -160,7 +160,6 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
                 }
                 const bookingsData = await response.json();
 
-                // Process cargo numbers from bookings
                 const allCargoNumbers = bookingsData.reduce((acc, booking) => {
                     if (booking.cargo) {
                         Object.entries(booking.cargo).forEach(([cargoNumber, cargoDetails]) => {
@@ -240,7 +239,6 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
         }
     };
 
-    // Helper function to format date for display (if needed)
     const formatTimestamp = (timestamp) => {
         if (!timestamp || !timestamp._seconds) return null;
         return new Date(timestamp._seconds * 1000);
@@ -249,7 +247,6 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
 
     const handleInputChange = (section, field, value) => {
         if (section === 'specialInstructions') {
-            // Handle special instructions directly since it's not nested
             setFormData(prev => ({
                 ...prev,
                 specialInstructions: value
