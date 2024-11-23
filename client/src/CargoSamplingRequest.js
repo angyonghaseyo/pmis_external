@@ -701,7 +701,7 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
             }
 
             onSubmitSuccess?.();
-            handleClose();
+            handleDialogClose();
             setSnackbar({
                 open: true,
                 message: 'Sampling Request submitted successfully',
@@ -736,7 +736,7 @@ const CargoSamplingRequest = ({ open, handleClose, editingId = null, onSubmitSuc
                         <Typography variant="h6">
                             {editingId ? 'Edit Sampling Request' : 'New Sampling Request'}
                         </Typography>
-                        <IconButton onClick={handleClose} size="small">
+                        <IconButton onClick={handleDialogClose} size="small">
                             <CloseIcon />
                         </IconButton>
                     </Box>

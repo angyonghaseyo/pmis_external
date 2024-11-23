@@ -31,8 +31,13 @@ import { LocalizationProvider, DateTimePicker } from '@mui/x-date-pickers';
 import { styled } from '@mui/material/styles';
 import { doc, getDoc, setDoc, addDoc, collection, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from './firebaseConfig';
 import { useAuth } from "./AuthContext";
+import { API_URL } from './config/apiConfig';
+import {
+    submitRepackingRequest,
+    updateRepackingRequest,
+    getRepackingRequestById
+} from './services/api';
 
 
 const VisuallyHiddenInput = styled('input')`
@@ -99,6 +104,48 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
         status: 'Pending'
     });
 
+    const initialFormState = {
+        cargoDetails: {
+            cargoNumber: '',
+            cargoType: '',
+            quantity: '',
+            unit: 'CBM',
+            currentPackaging: '',
+            desiredPackaging: ''
+        },
+        repackingDetails: {
+            requirements: [],
+        },
+        schedule: {
+            startDate: null,
+            endDate: null
+        },
+        documents: {
+            repackagingChecklist: []
+        },
+        specialInstructions: '',
+        status: 'Pending'
+    };
+
+    const resetDialog = () => {
+        setFormData(initialFormState);
+        setActiveStep(0);
+        setErrors({});
+        setSubmitError(null);
+        setSelectedCargo('');
+    };
+
+    const handleDialogClose = () => {
+        resetDialog();
+        handleClose();
+    };
+
+    useEffect(() => {
+        if (!open) {
+            resetDialog();
+        }
+    }, [open]);
+
     const { user } = useAuth();
     const [activeStep, setActiveStep] = useState(0);
     const [errors, setErrors] = useState({});
@@ -118,14 +165,14 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
     useEffect(() => {
         const fetchBookings = async () => {
             try {
-                const querySnapshot = await getDocs(collection(db, "bookings"));
-                const bookingsArray = querySnapshot.docs.map((doc) => ({
-                    bookingId: doc.id,
-                    ...doc.data(),
-                }));
+                const response = await fetch(`${API_URL}/bookings`);
+                if (!response.ok) {
+                    throw new Error('Error fetching bookings');
+                }
+                const bookingsData = await response.json();
 
-                // Process cargo numbers from all bookings
-                const allCargoNumbers = bookingsArray.reduce((acc, booking) => {
+                // Process cargo numbers from bookings
+                const allCargoNumbers = bookingsData.reduce((acc, booking) => {
                     if (booking.cargo) {
                         Object.entries(booking.cargo).forEach(([cargoNumber, cargoDetails]) => {
                             acc.push({
@@ -144,7 +191,11 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
                 setCargoNumbers(allCargoNumbers);
             } catch (error) {
                 console.error('Error fetching bookings:', error);
-                // Handle error appropriately
+                setSnackbar({
+                    open: true,
+                    message: 'Error fetching bookings data',
+                    severity: 'error'
+                });
             }
         };
 
@@ -160,26 +211,27 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
     const fetchRequestData = async () => {
         try {
             setLoading(true);
-            const docRef = doc(db, 'repackingRequests', editingId);
-            const docSnap = await getDoc(docRef);
+            const data = await getRepackingRequestById(editingId);
 
-            if (docSnap.exists()) {
-                const data = docSnap.data();
+            const formattedData = {
+                ...data,
+                schedule: {
+                    startDate: data.schedule?.startDate?._seconds ?
+                        new Date(data.schedule.startDate._seconds * 1000) : null,
+                    endDate: data.schedule?.endDate?._seconds ?
+                        new Date(data.schedule.endDate._seconds * 1000) : null
+                }
+            };
 
-                // Convert Firestore Timestamps to JavaScript Date objects
-                const formattedData = {
-                    ...data,
-                    schedule: {
-                        startDate: data.schedule?.startDate?.toDate() || null,
-                        endDate: data.schedule?.endDate?.toDate() || null
-                    }
-                };
-
-                setFormData(formattedData);
-            }
+            setFormData(formattedData);
         } catch (error) {
             console.error('Error fetching request:', error);
             setSubmitError('Error loading request data');
+            setSnackbar({
+                open: true,
+                message: 'Error loading request data',
+                severity: 'error'
+            });
         } finally {
             setLoading(false);
         }
@@ -635,7 +687,6 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
     };
 
     const handleSubmit = async () => {
-
         if (!validateForm()) {
             setSubmitError('Please fill in all required fields');
             return;
@@ -645,54 +696,38 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
             setLoading(true);
             setSubmitError(null);
 
-            const fileUrls = await uploadFiles();
-
             const requestData = {
                 ...formData,
-                company: user.company,
-                documents: fileUrls,
                 status: 'Pending',
                 updatedAt: new Date(),
                 createdAt: editingId ? formData.createdAt : new Date(),
-                requestType: "repackingRequests"
+                company: user.company,
             };
 
             if (editingId) {
-                await setDoc(doc(db, 'repackingRequests', editingId), requestData);
+                await updateRepackingRequest(editingId, requestData);
             } else {
-                const docRef = await addDoc(collection(db, 'repackingRequests'), requestData);
-                await setDoc(docRef, { id: docRef.id }, { merge: true });
+                await submitRepackingRequest(requestData);
             }
 
             onSubmitSuccess?.();
-            handleClose();
-            setSnackbar({ open: true, message: 'Repacking Request created successfully', severity: 'success' });
+            handleDialogClose();
+            setSnackbar({
+                open: true,
+                message: 'Repacking request submitted successfully',
+                severity: 'success'
+            });
         } catch (error) {
             console.error('Error submitting request:', error);
-            setSnackbar({ open: true, message: 'Failed to submit request. Please try again.', severity: 'error' });
+            setSubmitError('Failed to submit request. Please try again.');
+            setSnackbar({
+                open: true,
+                message: 'Failed to submit request. Please try again.',
+                severity: 'error'
+            });
         } finally {
             setLoading(false);
         }
-    };
-
-    const uploadFiles = async () => {
-        const uploads = {};
-
-        if (formData.documents.repackagingChecklist) {
-            uploads.repackagingChecklist = await uploadFile(
-                formData.documents.repackagingChecklist,
-                'repackaging-checlist'
-            );
-        }
-
-        return uploads;
-    };
-
-    const uploadFile = async (file, path) => {
-        if (!file) return null;
-        const storageRef = ref(storage, `repackaging-requests/${path}/${Date.now()}_${file.name}`);
-        await uploadBytes(storageRef, file);
-        return await getDownloadURL(storageRef);
     };
 
 
@@ -700,7 +735,7 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
         <>
             <Dialog
                 open={open}
-                onClose={handleClose}
+                onClose={handleDialogClose}
                 maxWidth="md"
                 fullWidth
                 PaperProps={{
@@ -712,7 +747,7 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
                         <Typography variant="h6">
                             {editingId ? 'Edit Repackaging Request' : 'New Repackaging Request'}
                         </Typography>
-                        <IconButton onClick={handleClose} size="small">
+                        <IconButton onClick={handleDialogClose} size="small">
                             <CloseIcon />
                         </IconButton>
                     </Box>
@@ -737,7 +772,7 @@ const CargoRepackingRequest = ({ open, handleClose, editingId = null, onSubmitSu
                 </DialogContent>
 
                 <DialogActions>
-                    <Button onClick={handleClose}>Cancel</Button>
+                    <Button onClick={handleDialogClose}>Cancel</Button>
                     <Box sx={{ flex: '1 1 auto' }} />
                     <Button
                         disabled={activeStep === 0}

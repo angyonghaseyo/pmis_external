@@ -1537,6 +1537,121 @@ export const getSamplingRequestById = async (requestId) => {
   }
 };
 
+export const submitRepackingRequest = async (requestData) => {
+  try {
+    const formData = new FormData();
+    formData.append('repackingDetails', JSON.stringify({
+      cargoDetails: requestData.cargoDetails,
+      repackingDetails: requestData.repackingDetails,
+      schedule: requestData.schedule,
+      specialInstructions: requestData.specialInstructions || '',
+      company: requestData.company
+    }));
+
+    if (requestData.documents?.repackagingChecklist instanceof File) {
+      formData.append('repackagingChecklist', requestData.documents.repackagingChecklist);
+    }
+
+    const response = await fetch(`${API_URL}/repacking-requests`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error('Error submitting repacking request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in submitRepackingRequest:', error);
+    throw error;
+  }
+};
+
+export const updateRepackingRequest = async (requestId, requestData) => {
+  try {
+    const formData = new FormData();
+    formData.append('repackingDetails', JSON.stringify({
+      cargoDetails: requestData.cargoDetails,
+      repackingDetails: requestData.repackingDetails,
+      schedule: requestData.schedule,
+      specialInstructions: requestData.specialInstructions,
+      status: requestData.status
+    }));
+
+    if (requestData.documents?.repackagingChecklist instanceof File) {
+      formData.append('repackagingChecklist', requestData.documents.repackagingChecklist);
+    }
+
+    const response = await fetch(`${API_URL}/repacking-requests/${requestId}`, {
+      method: 'PUT',
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error('Error updating repacking request');
+    }
+
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      return await response.json();
+    }
+
+    return { success: true, message: 'Repacking request updated successfully' };
+  } catch (error) {
+    console.error('Error in updateRepackingRequest:', error);
+    throw error;
+  }
+};
+
+export const getRepackingRequestById = async (requestId) => {
+  try {
+    const response = await fetch(`${API_URL}/repacking-requests/${requestId}`);
+
+    if (!response.ok) {
+      throw new Error('Error fetching repacking request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in getRepackingRequestById:', error);
+    throw error;
+  }
+};
+
+export const deleteRepackingRequest = async (requestId) => {
+  try {
+    const response = await fetch(`${API_URL}/repacking-requests/${requestId}`, {
+      method: 'DELETE'
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({
+        error: 'Error deleting repacking request'
+      }));
+      throw new Error(errorData.error || 'Error deleting repacking request');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error in deleteRepackingRequest:', error);
+    throw error;
+  }
+};
+
+export const getRepackingRequests = async (filters = {}) => {
+  try {
+    const queryParams = new URLSearchParams(filters);
+    const response = await fetch(`${API_URL}/repacking-requests?${queryParams}`);
+
+    if (!response.ok) {
+      throw new Error('Error fetching repacking requests');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in getRepackingRequests:', error);
+    throw error;
+  }
+};
+
 const api = {
   loginUser,
   registerUser,
@@ -1620,7 +1735,12 @@ const api = {
   submitSamplingRequest,
   getSamplingRequests,
   deleteSamplingRequest,
-  getSamplingRequestById
+  getSamplingRequestById,
+  submitRepackingRequest,
+  updateRepackingRequest,
+  getRepackingRequestById,
+  deleteRepackingRequest,
+  getRepackingRequests
 };
 
 export default api;
