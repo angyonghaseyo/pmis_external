@@ -1780,6 +1780,129 @@ export const deleteStorageRequest = async (requestId) => {
   }
 };
 
+export const getTransloadingRequests = async (filters = {}) => {
+  try {
+    const queryParams = new URLSearchParams(filters);
+    const response = await fetch(`${API_URL}/transloading-requests?${queryParams}`);
+
+    if (!response.ok) {
+      throw new Error('Error fetching transloading requests');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in getTransloadingRequests:', error);
+    throw error;
+  }
+};
+
+export const getTransloadingRequestById = async (requestId) => {
+  try {
+    const response = await fetch(`${API_URL}/transloading-requests/${requestId}`);
+
+    if (!response.ok) {
+      throw new Error('Error fetching transloading request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in getTransloadingRequestById:', error);
+    throw error;
+  }
+};
+
+export const submitTransloadingRequest = async (requestData) => {
+  try {
+    const formData = new FormData();
+    formData.append('transloadingDetails', JSON.stringify({
+      cargoDetails: requestData.cargoDetails,
+      destinationArea: requestData.destinationArea,
+      transloadingTimeWindow: requestData.transloadingTimeWindow,
+      specialInstructions: requestData.specialInstructions || '',
+      company: requestData.company
+    }));
+
+    if (requestData.documents?.transloadingSheet instanceof File) {
+      formData.append('transloadingSheet', requestData.documents.transloadingSheet);
+    }
+
+    if (Array.isArray(requestData.documents?.additionalDocs)) {
+      requestData.documents.additionalDocs.forEach((doc) => {
+        if (doc instanceof File) {
+          formData.append('additionalDoc', doc);
+        }
+      });
+    }
+
+    const response = await fetch(`${API_URL}/transloading-requests`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error('Error submitting transloading request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in submitTransloadingRequest:', error);
+    throw error;
+  }
+};
+
+export const updateTransloadingRequest = async (requestId, requestData) => {
+  try {
+    const formData = new FormData();
+    formData.append('transloadingDetails', JSON.stringify({
+      cargoDetails: requestData.cargoDetails,
+      destinationArea: requestData.destinationArea,
+      transloadingTimeWindow: requestData.transloadingTimeWindow,
+      specialInstructions: requestData.specialInstructions,
+      status: requestData.status
+    }));
+
+    if (requestData.documents?.transloadingSheet instanceof File) {
+      formData.append('transloadingSheet', requestData.documents.transloadingSheet);
+    }
+
+    const response = await fetch(`${API_URL}/transloading-requests/${requestId}`, {
+      method: 'PUT',
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error('Error updating transloading request');
+    }
+
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      return await response.json();
+    }
+
+    return { success: true, message: 'Transloading request updated successfully' };
+  } catch (error) {
+    console.error('Error in updateTransloadingRequest:', error);
+    throw error;
+  }
+};
+
+export const deleteTransloadingRequest = async (requestId) => {
+  try {
+    const response = await fetch(`${API_URL}/transloading-requests/${requestId}`, {
+      method: 'DELETE'
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({
+        error: 'Error deleting transloading request'
+      }));
+      throw new Error(errorData.error || 'Error deleting transloading request');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error in deleteTransloadingRequest:', error);
+    throw error;
+  }
+};
+
 const api = {
   loginUser,
   registerUser,
@@ -1873,7 +1996,13 @@ const api = {
   getStorageRequestById,
   submitStorageRequest,
   updateStorageRequest,
-  deleteStorageRequest
+  deleteStorageRequest,
+  getTransloadingRequests,
+  getTransloadingRequestById,
+  submitTransloadingRequest,
+  updateTransloadingRequest,
+  deleteTransloadingRequest
+
 };
 
 export default api;

@@ -32,13 +32,15 @@ import {
     Warehouse
 } from '@mui/icons-material';
 import { Edit, Delete, Visibility, Search, Download } from '@mui/icons-material';
-import { collection, query, where, getDocs, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { db } from './firebaseConfig';
 import CargoTransloadingRequest from './CargoTransloadingRequest';
 import { format, differenceInDays } from 'date-fns';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import CloseIcon from '@mui/icons-material/Close';
-import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
+import {
+    getTransloadingRequests,
+    deleteTransloadingRequest
+
+} from './services/api';
 
 
 
@@ -63,33 +65,8 @@ const CargoTransloading = () => {
     const fetchRequests = async () => {
         try {
             setLoading(true);
-            let q = query(collection(db, 'transloadingRequests'), orderBy('createdAt', 'desc'));
-
-            if (filters.status !== 'all') {
-                q = query(q, where('status', '==', filters.status));
-            }
-
-            const querySnapshot = await getDocs(q);
-            const requestData = querySnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data(),
-                createdAt: doc.data().createdAt?.toDate()
-            }));
-
-            // Apply search filter
-            const filteredData = requestData.filter(request => {
-                if (filters.searchQuery) {
-                    return (
-                        request.cargoDetails.cargoNumber.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
-                        request.cargoDetails.cargoType.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
-                        request.status.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
-                        request.id.toLowerCase().includes(filters.searchQuery.toLowerCase())
-                    );
-                }
-                return true;
-            });
-
-            setRequests(filteredData);
+            const requestData = await getTransloadingRequests(filters);
+            setRequests(requestData);
         } catch (error) {
             console.error('Error fetching requests:', error);
             setSnackbar({
@@ -106,39 +83,17 @@ const CargoTransloading = () => {
         fetchRequests();
     }, [filters]);
 
-    const handleStatusChange = async (requestId, newStatus) => {
-        try {
-            await updateDoc(doc(db, 'transloadingRequests', requestId), {
-                status: newStatus,
-                updatedAt: new Date()
-            });
-            await fetchRequests();
-            setSnackbar({
-                open: true,
-                message: 'Status updated successfully',
-                severity: 'success'
-            });
-        } catch (error) {
-            console.error('Error updating status:', error);
-            setSnackbar({
-                open: true,
-                message: 'Error updating status',
-                severity: 'error'
-            });
-        }
-    };
 
     const handleDelete = async (requestId) => {
-
         try {
-            await deleteDoc(doc(db, 'transloadingRequests', requestId));
+            await deleteTransloadingRequest(requestId);
             await fetchRequests();
             setSnackbar({
                 open: true,
                 message: 'Request deleted successfully',
                 severity: 'success'
             });
-            setDeleteConfirmation(null)
+            setDeleteConfirmation(null);
         } catch (error) {
             console.error('Error deleting request:', error);
             setSnackbar({
@@ -147,7 +102,6 @@ const CargoTransloading = () => {
                 severity: 'error'
             });
         }
-
     };
 
     const getStatusColor = (status) => {
@@ -158,6 +112,11 @@ const CargoTransloading = () => {
             'Rejected': 'error'
         };
         return colors[status] || 'default';
+    };
+
+    const formatDate = (timestamp) => {
+        if (!timestamp || typeof timestamp._seconds !== 'number') return 'N/A';
+        return new Date(timestamp._seconds * 1000).toLocaleString();
     };
 
     const renderMetrics = () => {
@@ -250,13 +209,13 @@ const CargoTransloading = () => {
                                     <Grid item xs={6}>
                                         <Typography variant="body2" color="textSecondary">Start Date</Typography>
                                         <Typography variant="body1">
-                                            {format(request.transloadingTimeWindow.startDate.toDate(), 'PPpp')}
+                                            {formatDate(request.transloadingTimeWindow.startDate)}
                                         </Typography>
                                     </Grid>
                                     <Grid item xs={6}>
                                         <Typography variant="body2" color="textSecondary">End Date</Typography>
                                         <Typography variant="body1">
-                                            {format(request.transloadingTimeWindow.endDate.toDate(), 'PPpp')}
+                                            {formatDate(request.transloadingTimeWindow.endDate)}
                                         </Typography>
                                     </Grid>
                                 </Grid>
@@ -274,18 +233,28 @@ const CargoTransloading = () => {
                             </Grid>
                         )}
 
-                        {/* Storage Duration Section */}
-                        <Grid item xs={12}>
-                            <Typography variant="subtitle1" gutterBottom>Storage Duration</Typography>
-                            <Paper sx={{ p: 2 }}>
-                                <Typography variant="body1">
-                                    {differenceInDays(
-                                        request.transloadingTimeWindow.endDate.toDate(),
-                                        request.transloadingTimeWindow.startDate.toDate()
-                                    )} days
-                                </Typography>
-                            </Paper>
-                        </Grid>
+
+                        {request.documents && (
+                            <Grid item xs={12}>
+                                <Typography variant="subtitle1" gutterBottom>Documents</Typography>
+                                <Paper sx={{ p: 2 }}>
+                                    <Grid container spacing={2}>
+                                        {request.documents.transloadingSheet && (
+                                            <Grid item xs={12}>
+                                                <Button
+                                                    variant="outlined"
+                                                    startIcon={<Download />}
+                                                    onClick={() => window.open(request.documents.transloadingSheet, '_blank')}
+                                                >
+                                                    Transloading Sheet
+                                                </Button>
+                                            </Grid>
+                                        )}
+                                    </Grid>
+                                </Paper>
+                            </Grid>
+                        )}
+
 
                         {/* Rejection Section */}
                         {request?.rejectionReason && (
@@ -372,7 +341,7 @@ const CargoTransloading = () => {
                                     <TableCell>{request.cargoDetails.cargoType}</TableCell>
 
                                     <TableCell>
-                                        {format(request.createdAt, 'dd/MM/yyyy HH:mm')}
+                                        {formatDate(request.createdAt)}
                                     </TableCell>
                                     <TableCell>
                                         <Chip

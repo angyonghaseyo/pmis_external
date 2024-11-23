@@ -29,11 +29,14 @@ import { Close as CloseIcon, CloudUpload as CloudUploadIcon } from '@mui/icons-m
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DateTimePicker } from '@mui/x-date-pickers';
 import { styled } from '@mui/material/styles';
-import { doc, getDoc, setDoc, addDoc, collection, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from './firebaseConfig';
 import { useAuth } from "./AuthContext";
-
+import {
+    submitTransloadingRequest,
+    updateTransloadingRequest,
+    getTransloadingRequestById
+} from './services/api';
+import { API_URL } from './config/apiConfig';
 
 const VisuallyHiddenInput = styled('input')`
   clip: rect(0 0 0 0);
@@ -92,6 +95,25 @@ const CargoTransloadingRequest = ({ open, handleClose, editingId = null, onSubmi
         status: 'Pending'
     });
 
+    const initialFormState = {
+        cargoDetails: {
+            cargoNumber: '',
+            cargoType: '',
+            quantity: '',
+            unit: 'CBM',
+        },
+        destinationArea: '',
+        transloadingTimeWindow: {
+            startDate: null,
+            endDate: null
+        },
+        documents: {
+            transloadingSheet: []
+        },
+        specialInstructions: '',
+        status: 'Pending'
+    };
+
     const { user } = useAuth();
     const [activeStep, setActiveStep] = useState(0);
     const [errors, setErrors] = useState({});
@@ -111,14 +133,14 @@ const CargoTransloadingRequest = ({ open, handleClose, editingId = null, onSubmi
     useEffect(() => {
         const fetchBookings = async () => {
             try {
-                const querySnapshot = await getDocs(collection(db, "bookings"));
-                const bookingsArray = querySnapshot.docs.map((doc) => ({
-                    bookingId: doc.id,
-                    ...doc.data(),
-                }));
+                const response = await fetch(`${API_URL}/bookings`);
+                if (!response.ok) {
+                    throw new Error('Error fetching bookings');
+                }
+                const bookingsData = await response.json();
 
-                // Process cargo numbers from all bookings
-                const allCargoNumbers = bookingsArray.reduce((acc, booking) => {
+                // Process cargo numbers from bookings
+                const allCargoNumbers = bookingsData.reduce((acc, booking) => {
                     if (booking.cargo) {
                         Object.entries(booking.cargo).forEach(([cargoNumber, cargoDetails]) => {
                             acc.push({
@@ -137,7 +159,11 @@ const CargoTransloadingRequest = ({ open, handleClose, editingId = null, onSubmi
                 setCargoNumbers(allCargoNumbers);
             } catch (error) {
                 console.error('Error fetching bookings:', error);
-                // Handle error appropriately
+                setSnackbar({
+                    open: true,
+                    message: 'Error fetching bookings data',
+                    severity: 'error'
+                });
             }
         };
 
@@ -153,31 +179,45 @@ const CargoTransloadingRequest = ({ open, handleClose, editingId = null, onSubmi
     const fetchRequestData = async () => {
         try {
             setLoading(true);
-            const docRef = doc(db, 'transloadingRequests', editingId);
-            const docSnap = await getDoc(docRef);
+            const data = await getTransloadingRequestById(editingId);
 
-            if (docSnap.exists()) {
-                const data = docSnap.data();
+            // Format dates from the API response
+            const formattedData = {
+                ...data,
+                transloadingTimeWindow: {
+                    startDate: data.transloadingTimeWindow?.startDate?._seconds ?
+                        new Date(data.transloadingTimeWindow.startDate._seconds * 1000) : null,
+                    endDate: data.transloadingTimeWindow?.endDate?._seconds ?
+                        new Date(data.transloadingTimeWindow.endDate._seconds * 1000) : null
+                }
+            };
 
-                // Convert Firestore Timestamps to JavaScript Date objects
-                const formattedData = {
-                    ...data,
-                    transloadingTimeWindow: {
-                        startDate: data.transloadingTimeWindow?.startDate?.toDate() || null,
-                        endDate: data.transloadingTimeWindow?.endDate?.toDate() || null
-                    }
-                };
-
-                setFormData(formattedData);
-            }
+            setFormData(formattedData);
         } catch (error) {
             console.error('Error fetching request:', error);
             setSubmitError('Error loading request data');
+            setSnackbar({
+                open: true,
+                message: 'Error loading request data',
+                severity: 'error'
+            });
         } finally {
             setLoading(false);
         }
     };
 
+    const resetDialog = () => {
+        setFormData(initialFormState);
+        setActiveStep(0);
+        setErrors({});
+        setSubmitError(null);
+        setSelectedCargo('');
+    };
+
+    const handleDialogClose = () => {
+        resetDialog();
+        handleClose();
+    };
 
     const handleInputChange = (section, field, value) => {
         if (section === 'specialInstructions') {
@@ -569,7 +609,6 @@ const CargoTransloadingRequest = ({ open, handleClose, editingId = null, onSubmi
     };
 
     const handleSubmit = async () => {
-
         if (!validateForm()) {
             setSubmitError('Please fill in all required fields correctly');
             return;
@@ -579,64 +618,43 @@ const CargoTransloadingRequest = ({ open, handleClose, editingId = null, onSubmi
             setLoading(true);
             setSubmitError(null);
 
-            const fileUrls = await uploadFiles();
-
             const requestData = {
                 ...formData,
                 company: user.company,
-                documents: fileUrls,
                 status: 'Pending',
-                updatedAt: new Date(),
-                createdAt: editingId ? formData.createdAt : new Date(),
-                requestType: "transloadingRequests"
             };
 
             if (editingId) {
-                await setDoc(doc(db, 'transloadingRequests', editingId), requestData);
+                await updateTransloadingRequest(editingId, requestData);
             } else {
-                const docRef = await addDoc(collection(db, 'transloadingRequests'), requestData);
-                await setDoc(docRef, { id: docRef.id }, { merge: true });
+                await submitTransloadingRequest(requestData);
             }
 
             onSubmitSuccess?.();
-            handleClose();
-            setSnackbar({ open: true, message: 'Transloading Request created successfully', severity: 'success' });
+            handleDialogClose();
+            setSnackbar({
+                open: true,
+                message: `Transloading Request ${editingId ? 'updated' : 'created'} successfully`,
+                severity: 'success'
+            });
         } catch (error) {
             console.error('Error submitting request:', error);
-            setSnackbar({ open: true, message: 'Failed to submit request. Please try again.', severity: 'error' });
+            setSnackbar({
+                open: true,
+                message: 'Failed to submit request. Please try again.',
+                severity: 'error'
+            });
         } finally {
             setLoading(false);
         }
     };
-
-    const uploadFiles = async () => {
-        const uploads = {};
-
-        if (formData.documents.transloadingRequests) {
-            uploads.transloadingRequests = await uploadFile(
-                formData.documents.transloadingRequests,
-                'transloading-checlist'
-            );
-        }
-
-        return uploads;
-    };
-
-    const uploadFile = async (file, path) => {
-        if (!file) return null;
-        const storageRef = ref(storage, `transloading-requests/${path}/${Date.now()}_${file.name}`);
-        await uploadBytes(storageRef, file);
-        return await getDownloadURL(storageRef);
-    };
-
-
 
 
     return (
         <>
             <Dialog
                 open={open}
-                onClose={handleClose}
+                onClose={handleDialogClose}
                 maxWidth="md"
                 fullWidth
                 PaperProps={{
@@ -648,7 +666,7 @@ const CargoTransloadingRequest = ({ open, handleClose, editingId = null, onSubmi
                         <Typography variant="h6">
                             {editingId ? 'Edit Transloading Request' : 'New Transloading Request'}
                         </Typography>
-                        <IconButton onClick={handleClose} size="small">
+                        <IconButton onClick={handleDialogClose} size="small">
                             <CloseIcon />
                         </IconButton>
                     </Box>
@@ -673,7 +691,7 @@ const CargoTransloadingRequest = ({ open, handleClose, editingId = null, onSubmi
                 </DialogContent>
 
                 <DialogActions>
-                    <Button onClick={handleClose}>Cancel</Button>
+                    <Button onClick={handleDialogClose}>Cancel</Button>
                     <Box sx={{ flex: '1 1 auto' }} />
                     <Button
                         disabled={activeStep === 0}
