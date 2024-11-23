@@ -2,7 +2,7 @@ const { Storage } = require('@google-cloud/storage');
 const path = require('path');
 const admin = require('firebase-admin');
 
-class CargoSamplingService {
+class CargoStorageService {
     constructor(db) {
         this.db = db;
         this.storage = new Storage({
@@ -12,15 +12,14 @@ class CargoSamplingService {
         this.bucket = this.storage.bucket('pmis-47493.appspot.com');
     }
 
-    async fetchSamplingRequestById(id) {
+    async fetchStorageRequestById(id) {
         try {
-            const doc = await this.db.collection('samplingRequests').doc(id).get();
+            const doc = await this.db.collection('storageRequests').doc(id).get();
             if (!doc.exists) {
                 return null;
             }
 
             const data = doc.data();
-            // Ensure timestamps are properly formatted in the response
             const formattedData = {
                 ...data,
                 schedule: {
@@ -45,16 +44,15 @@ class CargoSamplingService {
 
             return { id: doc.id, ...formattedData };
         } catch (error) {
-            console.error('Error in fetchSamplingRequestById:', error);
+            console.error('Error in fetchStorageRequestById:', error);
             throw error;
         }
     }
 
-    async createSamplingRequest(requestData, files) {
+    async createStorageRequest(requestData, files) {
         try {
             const documentUrls = await this.uploadDocuments(files);
 
-            // Convert dates to Firestore Timestamps
             const formattedSchedule = {
                 ...requestData.schedule,
                 startDate: requestData.schedule.startDate ?
@@ -63,9 +61,7 @@ class CargoSamplingService {
                     admin.firestore.Timestamp.fromDate(new Date(requestData.schedule.endDate)) : null
             };
 
-            console.log(typeof formattedSchedule.startDate, "1234", formattedSchedule.endDate);
-
-            const samplingRequest = {
+            const storageRequest = {
                 ...requestData,
                 schedule: formattedSchedule,
                 documents: documentUrls,
@@ -74,17 +70,17 @@ class CargoSamplingService {
                 updatedAt: admin.firestore.Timestamp.now()
             };
 
-            const docRef = await this.db.collection('samplingRequests').add(samplingRequest);
-            return { id: docRef.id, ...samplingRequest };
+            const docRef = await this.db.collection('storageRequests').add(storageRequest);
+            return { id: docRef.id, ...storageRequest };
         } catch (error) {
-            console.error('Error in createSamplingRequest:', error);
+            console.error('Error in createStorageRequest:', error);
             throw error;
         }
     }
 
-    async fetchSamplingRequests(filters) {
+    async fetchStorageRequests(filters) {
         try {
-            let query = this.db.collection('samplingRequests');
+            let query = this.db.collection('storageRequests');
 
             if (filters.status) {
                 query = query.where('status', '==', filters.status);
@@ -117,16 +113,15 @@ class CargoSamplingService {
 
             return requests;
         } catch (error) {
-            console.error('Error in fetchSamplingRequests:', error);
+            console.error('Error in fetchStorageRequests:', error);
             throw error;
         }
     }
 
-    async updateSamplingRequest(id, requestData, files) {
+    async updateStorageRequest(id, requestData, files) {
         try {
             const documentUrls = await this.uploadDocuments(files);
 
-            // Convert dates to Firestore Timestamps
             const formattedSchedule = {
                 ...requestData.schedule,
                 startDate: requestData.schedule.startDate ?
@@ -145,18 +140,18 @@ class CargoSamplingService {
                 updateData.documents = documentUrls;
             }
 
-            await this.db.collection('samplingRequests').doc(id).update(updateData);
+            await this.db.collection('storageRequests').doc(id).update(updateData);
         } catch (error) {
-            console.error('Error in updateSamplingRequest:', error);
+            console.error('Error in updateStorageRequest:', error);
             throw error;
         }
     }
 
-    async deleteSamplingRequest(id) {
+    async deleteStorageRequest(id) {
         try {
-            await this.db.collection('samplingRequests').doc(id).delete();
+            await this.db.collection('storageRequests').doc(id).delete();
         } catch (error) {
-            console.error('Error in deleteSamplingRequest:', error);
+            console.error('Error in deleteStorageRequest:', error);
             throw error;
         }
     }
@@ -164,21 +159,21 @@ class CargoSamplingService {
     async uploadDocuments(files) {
         const documentUrls = {};
 
-        if (files.safetyDataSheet) {
-            const file = files.safetyDataSheet;
-            const fileName = `samplingRequests/sds_${Date.now()}_${file.originalname}`;
+        if (files.storageChecklist) {
+            const file = files.storageChecklist;
+            const fileName = `storageRequests/checklist_${Date.now()}_${file.originalname}`;
             const fileRef = this.bucket.file(fileName);
             await fileRef.save(file.buffer, {
                 metadata: { contentType: file.mimetype }
             });
             await fileRef.makePublic();
-            documentUrls.safetyDataSheet = `https://storage.googleapis.com/${this.bucket.name}/${fileName}`;
+            documentUrls.storageChecklist = `https://storage.googleapis.com/${this.bucket.name}/${fileName}`;
         }
 
         if (files.additionalDocs) {
             documentUrls.additionalDocs = await Promise.all(
                 files.additionalDocs.map(async (file) => {
-                    const fileName = `samplingRequests/additional_${Date.now()}_${file.originalname}`;
+                    const fileName = `storageRequests/additional_${Date.now()}_${file.originalname}`;
                     const fileRef = this.bucket.file(fileName);
                     await fileRef.save(file.buffer, {
                         metadata: { contentType: file.mimetype }
@@ -193,4 +188,4 @@ class CargoSamplingService {
     }
 }
 
-module.exports = CargoSamplingService;
+module.exports = CargoStorageService;

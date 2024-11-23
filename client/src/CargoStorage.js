@@ -33,11 +33,13 @@ import {
 } from '@mui/icons-material';
 import { Edit, Delete, Visibility, Search, Download } from '@mui/icons-material';
 import { collection, query, where, getDocs, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { db } from './firebaseConfig';
 import CargoStorageRequest from './CargoStorageRequest';
 import { format, differenceInDays } from 'date-fns';
 import CloseIcon from '@mui/icons-material/Close';
-import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
+import {
+    getStorageRequests,
+    deleteStorageRequest
+} from './services/api';
 
 
 const CargoStorage = () => {
@@ -61,33 +63,8 @@ const CargoStorage = () => {
     const fetchRequests = async () => {
         try {
             setLoading(true);
-            let q = query(collection(db, 'storageRequests'), orderBy('createdAt', 'desc'));
-
-            if (filters.status !== 'all') {
-                q = query(q, where('status', '==', filters.status));
-            }
-
-            const querySnapshot = await getDocs(q);
-            const requestData = querySnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data(),
-                createdAt: doc.data().createdAt?.toDate()
-            }));
-
-            // Apply search filter
-            const filteredData = requestData.filter(request => {
-                if (filters.searchQuery) {
-                    return (
-                        request.cargoDetails.cargoNumber.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
-                        request.cargoDetails.cargoType.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
-                        request.status.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
-                        request.id.toLowerCase().includes(filters.searchQuery.toLowerCase())
-                    );
-                }
-                return true;
-            });
-
-            setRequests(filteredData);
+            const requestData = await getStorageRequests(filters);
+            setRequests(requestData);
         } catch (error) {
             console.error('Error fetching requests:', error);
             setSnackbar({
@@ -104,48 +81,24 @@ const CargoStorage = () => {
         fetchRequests();
     }, [filters]);
 
-    const handleStatusChange = async (requestId, newStatus) => {
-        try {
-            await updateDoc(doc(db, 'storageRequests', requestId), {
-                status: newStatus,
-                updatedAt: new Date()
-            });
-            await fetchRequests();
-            setSnackbar({
-                open: true,
-                message: 'Status updated successfully',
-                severity: 'success'
-            });
-        } catch (error) {
-            console.error('Error updating status:', error);
-            setSnackbar({
-                open: true,
-                message: 'Error updating status',
-                severity: 'error'
-            });
-        }
-    };
-
     const handleDelete = async (requestId) => {
-
         try {
-            await deleteDoc(doc(db, 'storageRequests', requestId));
+            await deleteStorageRequest(requestId);
             await fetchRequests();
             setSnackbar({
                 open: true,
                 message: 'Request deleted successfully',
                 severity: 'success'
             });
-            setDeleteConfirmation(null)
+            setDeleteConfirmation(null);
         } catch (error) {
             console.error('Error deleting request:', error);
             setSnackbar({
                 open: true,
-                message: 'Error deleting request',
+                message: error.message || 'Error deleting request',
                 severity: 'error'
             });
         }
-
     };
 
     const getStatusColor = (status) => {
@@ -185,6 +138,12 @@ const CargoStorage = () => {
             </Grid>
         );
     };
+
+    const formatDate = (timestamp) => {
+        if (!timestamp || typeof timestamp._seconds !== 'number') return 'N/A';
+        return new Date(timestamp._seconds * 1000).toLocaleString();
+    };
+
 
     const RequestDetailsDialog = ({ request, onClose }) => {
         if (!request) return null;
@@ -248,43 +207,18 @@ const CargoStorage = () => {
                                     <Grid item xs={6}>
                                         <Typography variant="body2" color="textSecondary">Start Date</Typography>
                                         <Typography variant="body1">
-                                            {format(request.schedule.startDate.toDate(), 'PPpp')}
+                                            {formatDate(request.schedule.startDate)}
                                         </Typography>
                                     </Grid>
                                     <Grid item xs={6}>
                                         <Typography variant="body2" color="textSecondary">End Date</Typography>
                                         <Typography variant="body1">
-                                            {format(request.schedule.endDate.toDate(), 'PPpp')}
+                                            {formatDate(request.schedule.endDate)}
                                         </Typography>
                                     </Grid>
                                 </Grid>
                             </Paper>
                         </Grid>
-
-                        {/* Documents Section */}
-                        {/* <Grid item xs={12}>
-                            <Typography variant="subtitle1" gutterBottom>Documents</Typography>
-                            <Paper sx={{ p: 2 }}>
-                                <Grid container spacing={2}>
-                                    <Grid item xs={12}>
-                                        <Typography variant="body2" color="textSecondary" gutterBottom>
-                                            Storage Checklist
-                                        </Typography>
-
-                                        <InsertDriveFileIcon sx={{ mr: 1 }} />
-                                        <Link
-                                            href={request.documents.storageChecklist}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            sx={{ textDecoration: 'none' }}
-                                        >
-                                        </Link>
-
-
-                                    </Grid>
-                                </Grid>
-                            </Paper>
-                        </Grid> */}
 
                         {/* Special Instructions Section */}
                         {request.specialInstructions && (
@@ -296,19 +230,26 @@ const CargoStorage = () => {
                             </Grid>
                         )}
 
-                        {/* Storage Duration Section */}
-                        <Grid item xs={12}>
-                            <Typography variant="subtitle1" gutterBottom>Storage Duration</Typography>
-                            <Paper sx={{ p: 2 }}>
-                                <Typography variant="body1">
-                                    {differenceInDays(
-                                        request.schedule.endDate.toDate(),
-                                        request.schedule.startDate.toDate()
-                                    )} days
-                                </Typography>
-                            </Paper>
-                        </Grid>
-
+                        {request.documents && (
+                            <Grid item xs={12}>
+                                <Typography variant="subtitle1" gutterBottom>Documents</Typography>
+                                <Paper sx={{ p: 2 }}>
+                                    <Grid container spacing={2}>
+                                        {request.documents.storageChecklist && (
+                                            <Grid item xs={12}>
+                                                <Button
+                                                    variant="outlined"
+                                                    startIcon={<Download />}
+                                                    onClick={() => window.open(request.documents.storageChecklist, '_blank')}
+                                                >
+                                                    Storage Checklist
+                                                </Button>
+                                            </Grid>
+                                        )}
+                                    </Grid>
+                                </Paper>
+                            </Grid>
+                        )}
                         {/* Rejection Section */}
                         {request?.rejectionReason && (
                             <Grid item xs={12}>
@@ -320,25 +261,6 @@ const CargoStorage = () => {
                         )}
                     </Grid>
                 </DialogContent>
-                {/* <DialogActions>
-                    {request.status === 'Pending' && (
-                        <Button
-                            color="primary"
-                            onClick={() => handleStatusChange(request.id, 'In Progress')}
-                        >
-                            Start Storage
-                        </Button>
-                    )}
-                    {request.status === 'In Progress' && (
-                        <Button
-                            color="success"
-                            onClick={() => handleStatusChange(request.id, 'Completed')}
-                        >
-                            Mark as Completed
-                        </Button>
-                    )}
-                    <Button onClick={onClose}>Close</Button>
-                </DialogActions> */}
             </Dialog>
         );
     };
@@ -412,7 +334,7 @@ const CargoStorage = () => {
                                     <TableCell>{request.cargoDetails.cargoType}</TableCell>
 
                                     <TableCell>
-                                        {format(request.createdAt, 'dd/MM/yyyy HH:mm')}
+                                        {formatDate(request.createdAt)}
                                     </TableCell>
                                     <TableCell>
                                         <Chip
@@ -440,13 +362,7 @@ const CargoStorage = () => {
                                                 </IconButton>
                                             </Tooltip>
                                         )}
-                                        {/* {request.status === 'Completed' && (
-                                            <Tooltip title="Download Report">
-                                                <IconButton size="small">
-                                                    <Download />
-                                                </IconButton>
-                                            </Tooltip>
-                                        )} */}
+
                                         {request.status === 'Pending' && (
                                             <Tooltip title="Delete">
                                                 <IconButton
