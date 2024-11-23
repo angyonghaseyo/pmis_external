@@ -366,7 +366,7 @@ export const uploadCompanyLogo = async (companyName, file) => {
     const formData = new FormData();
     formData.append('logo', file);
     formData.append('companyName', companyName);
-    
+
     const response = await fetch(`${API_URL}/company-data/upload-logo`, {
       method: 'POST',
       body: formData
@@ -1418,7 +1418,8 @@ export const submitSamplingRequest = async (requestData) => {
       cargoDetails: requestData.cargoDetails,
       samplingDetails: requestData.samplingDetails,
       schedule: requestData.schedule,
-      specialInstructions: requestData.specialInstructions || ''
+      specialInstructions: requestData.specialInstructions || '',
+      company: requestData.company
     }));
 
     if (requestData.documents?.safetyDataSheet instanceof File) {
@@ -1471,7 +1472,15 @@ export const updateSamplingRequest = async (requestId, requestData) => {
     if (!response.ok) {
       throw new Error('Error updating sampling request');
     }
-    return await response.json();
+
+    // Check if the response has content and is JSON
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      return await response.json();
+    }
+
+    // If not JSON, just return success
+    return { success: true, message: 'Sampling request updated successfully' };
   } catch (error) {
     console.error('Error in updateSamplingRequest:', error);
     throw error;

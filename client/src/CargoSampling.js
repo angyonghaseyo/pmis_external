@@ -14,7 +14,6 @@ import {
     Chip,
     IconButton,
     TextField,
-    MenuItem,
     Grid,
     Card,
     CardContent,
@@ -26,15 +25,18 @@ import {
     DialogContent,
     DialogTitle,
     DialogActions,
+    Menu,
+    MenuItem,
 } from '@mui/material';
-import { Edit, Delete, Visibility, Search, Download } from '@mui/icons-material';
-import { collection, query, where, getDocs, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { db } from './firebaseConfig';
-import CargoSamplingRequest from './CargoSamplingRequest';
-import { format } from 'date-fns';
+import { Edit, Delete, Visibility, Search, Download, FilterList } from '@mui/icons-material';
+import { format, parseISO } from 'date-fns';
 import ScienceIcon from '@mui/icons-material/Science';
 import CloseIcon from '@mui/icons-material/Close';
-
+import CargoSamplingRequest from './CargoSamplingRequest';
+import {
+    getSamplingRequests,
+    deleteSamplingRequest,
+} from './services/api';
 
 const CargoSampling = () => {
     const [requests, setRequests] = useState([]);
@@ -53,37 +55,13 @@ const CargoSampling = () => {
         severity: 'info'
     });
     const [viewRequest, setViewRequest] = useState(null);
+    const [filterAnchorEl, setFilterAnchorEl] = useState(null);
 
     const fetchRequests = async () => {
         try {
             setLoading(true);
-            let q = query(collection(db, 'samplingRequests'), orderBy('createdAt', 'desc'));
-
-            if (filters.status !== 'all') {
-                q = query(q, where('status', '==', filters.status));
-            }
-
-            const querySnapshot = await getDocs(q);
-            const requestData = querySnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data(),
-                createdAt: doc.data().createdAt?.toDate()
-            }));
-
-            // Apply search filter
-            const filteredData = requestData.filter(request => {
-                if (filters.searchQuery) {
-                    return (
-                        request.cargoDetails.cargoNumber.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
-                        request.cargoDetails.cargoType.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
-                        request.id.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
-                        request.status.toLowerCase().includes(filters.searchQuery.toLowerCase())
-                    );
-                }
-                return true;
-            });
-
-            setRequests(filteredData);
+            const requestData = await getSamplingRequests(filters);
+            setRequests(requestData);
         } catch (error) {
             console.error('Error fetching requests:', error);
             setSnackbar({
@@ -100,32 +78,9 @@ const CargoSampling = () => {
         fetchRequests();
     }, [filters]);
 
-    const handleStatusChange = async (requestId, newStatus) => {
-        try {
-            await updateDoc(doc(db, 'samplingRequests', requestId), {
-                status: newStatus,
-                updatedAt: new Date()
-            });
-            await fetchRequests();
-            setSnackbar({
-                open: true,
-                message: 'Status updated successfully',
-                severity: 'success'
-            });
-        } catch (error) {
-            console.error('Error updating status:', error);
-            setSnackbar({
-                open: true,
-                message: 'Error updating status',
-                severity: 'error'
-            });
-        }
-    };
-
     const handleDelete = async (requestId) => {
-
         try {
-            await deleteDoc(doc(db, 'samplingRequests', requestId));
+            await deleteSamplingRequest(requestId);
             await fetchRequests();
             setSnackbar({
                 open: true,
@@ -137,11 +92,10 @@ const CargoSampling = () => {
             console.error('Error deleting request:', error);
             setSnackbar({
                 open: true,
-                message: 'Error deleting request',
+                message: error.message || 'Error deleting request',
                 severity: 'error'
             });
         }
-
     };
 
     const getStatusColor = (status) => {
@@ -153,6 +107,25 @@ const CargoSampling = () => {
         };
         return colors[status] || 'default';
     };
+
+    const handleFilterClick = (event) => {
+        setFilterAnchorEl(event.currentTarget);
+    };
+
+    const handleFilterClose = () => {
+        setFilterAnchorEl(null);
+    };
+
+    const handleFilterChange = (filterType) => {
+        setFilters(prev => ({ ...prev, dateRange: filterType }));
+        handleFilterClose();
+    };
+
+    const formatDate = (timestamp) => {
+        if (!timestamp || typeof timestamp._seconds !== 'number') return 'N/A';
+        return new Date(timestamp._seconds * 1000).toLocaleString();
+    };
+
 
     const renderMetrics = () => {
         const metrics = {
@@ -169,10 +142,8 @@ const CargoSampling = () => {
                         <Card>
                             <CardContent>
                                 <Typography color="textSecondary" gutterBottom>
-                                    {key !== "inProgress" && `${key.charAt(0).toUpperCase() + key.slice(1)} Requests`}
-                                    {key === "inProgress" && `In Progress Requests`}
+                                    {key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')} Requests
                                 </Typography>
-
                                 <Typography variant="h4">{value}</Typography>
                             </CardContent>
                         </Card>
@@ -227,7 +198,6 @@ const CargoSampling = () => {
                             </Paper>
                         </Grid>
 
-
                         <Grid item xs={12}>
                             <Typography variant="subtitle1" gutterBottom>Sampling Details</Typography>
                             <Paper sx={{ p: 2 }}>
@@ -265,13 +235,13 @@ const CargoSampling = () => {
                                     <Grid item xs={6}>
                                         <Typography variant="body2" color="textSecondary">Start Date</Typography>
                                         <Typography variant="body1">
-                                            {format(request.schedule.startDate.toDate(), 'PPpp')}
+                                            {formatDate(request.schedule.startDate)}
                                         </Typography>
                                     </Grid>
                                     <Grid item xs={6}>
                                         <Typography variant="body2" color="textSecondary">End Date</Typography>
                                         <Typography variant="body1">
-                                            {format(request.schedule.endDate.toDate(), 'PPpp')}
+                                            {formatDate(request.schedule.endDate)}
                                         </Typography>
                                     </Grid>
                                 </Grid>
@@ -283,6 +253,38 @@ const CargoSampling = () => {
                                 <Typography variant="subtitle1" gutterBottom>Special Instructions</Typography>
                                 <Paper sx={{ p: 2 }}>
                                     <Typography variant="body1">{request.specialInstructions}</Typography>
+                                </Paper>
+                            </Grid>
+                        )}
+
+                        {request.documents && (
+                            <Grid item xs={12}>
+                                <Typography variant="subtitle1" gutterBottom>Documents</Typography>
+                                <Paper sx={{ p: 2 }}>
+                                    <Grid container spacing={2}>
+                                        {request.documents.safetyDataSheet && (
+                                            <Grid item xs={12}>
+                                                <Button
+                                                    variant="outlined"
+                                                    startIcon={<Download />}
+                                                    onClick={() => window.open(request.documents.safetyDataSheet, '_blank')}
+                                                >
+                                                    Safety Data Sheet
+                                                </Button>
+                                            </Grid>
+                                        )}
+                                        {request.documents.additionalDocs?.map((doc, index) => (
+                                            <Grid item xs={12} key={index}>
+                                                <Button
+                                                    variant="outlined"
+                                                    startIcon={<Download />}
+                                                    onClick={() => window.open(doc, '_blank')}
+                                                >
+                                                    Additional Document {index + 1}
+                                                </Button>
+                                            </Grid>
+                                        ))}
+                                    </Grid>
                                 </Paper>
                             </Grid>
                         )}
@@ -305,7 +307,6 @@ const CargoSampling = () => {
         );
     };
 
-
     return (
         <Container maxWidth="xl" sx={{ mt: 4 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
@@ -326,7 +327,7 @@ const CargoSampling = () => {
 
             <Paper sx={{ p: 2, mb: 3 }}>
                 <Grid container spacing={2} alignItems="center">
-                    <Grid item xs={12} sm={12}>
+                    <Grid item xs={12} sm={9}>
                         <TextField
                             fullWidth
                             label="Search"
@@ -338,6 +339,26 @@ const CargoSampling = () => {
                                 startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />
                             }}
                         />
+                    </Grid>
+                    <Grid item xs={12} sm={3}>
+                        <Button
+                            fullWidth
+                            variant="outlined"
+                            startIcon={<FilterList />}
+                            onClick={handleFilterClick}
+                        >
+                            Filter by Date
+                        </Button>
+                        <Menu
+                            anchorEl={filterAnchorEl}
+                            open={Boolean(filterAnchorEl)}
+                            onClose={handleFilterClose}
+                        >
+                            <MenuItem onClick={() => handleFilterChange('all')}>All Time</MenuItem>
+                            <MenuItem onClick={() => handleFilterChange('today')}>Today</MenuItem>
+                            <MenuItem onClick={() => handleFilterChange('week')}>This Week</MenuItem>
+                            <MenuItem onClick={() => handleFilterChange('month')}>This Month</MenuItem>
+                        </Menu>
                     </Grid>
                 </Grid>
             </Paper>
@@ -385,7 +406,7 @@ const CargoSampling = () => {
                                         ))}
                                     </TableCell>
                                     <TableCell>
-                                        {format(request.createdAt, 'dd/MM/yyyy HH:mm')}
+                                        {formatDate(request.createdAt)}
                                     </TableCell>
                                     <TableCell>
                                         <Chip
@@ -401,33 +422,43 @@ const CargoSampling = () => {
                                             </IconButton>
                                         </Tooltip>
                                         {request.status === 'Pending' && (
-                                            <Tooltip title="Edit">
-                                                <IconButton
-                                                    size="small"
-                                                    onClick={() => {
-                                                        setEditingId(request.id);
-                                                        setOpenDialog(true);
-                                                    }}
-                                                >
-                                                    <Edit />
-                                                </IconButton>
-                                            </Tooltip>
+                                            <>
+                                                <Tooltip title="Edit">
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => {
+                                                            setEditingId(request.id);
+                                                            setOpenDialog(true);
+                                                        }}
+                                                    >
+                                                        <Edit />
+                                                    </IconButton>
+                                                </Tooltip>
+                                                <Tooltip title="Delete">
+                                                    <IconButton
+                                                        size="small"
+                                                        color="error"
+                                                        onClick={() => setDeleteConfirmation(request.id)}
+                                                    >
+                                                        <Delete />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            </>
                                         )}
                                         {request.status === 'Completed' && (
                                             <Tooltip title="Download Report">
-                                                <IconButton size="small">
-                                                    <Download />
-                                                </IconButton>
-                                            </Tooltip>
-                                        )}
-                                        {request.status === 'Pending' && (
-                                            <Tooltip title="Delete">
                                                 <IconButton
                                                     size="small"
-                                                    color="error"
-                                                    onClick={() => setDeleteConfirmation(request.id)}
+                                                    onClick={() => {
+                                                        // Handle download report
+                                                        setSnackbar({
+                                                            open: true,
+                                                            message: 'Report download started',
+                                                            severity: 'info'
+                                                        });
+                                                    }}
                                                 >
-                                                    <Delete />
+                                                    <Download />
                                                 </IconButton>
                                             </Tooltip>
                                         )}
@@ -453,20 +484,6 @@ const CargoSampling = () => {
                 }}
             />
 
-            <Snackbar
-                open={snackbar.open}
-                autoHideDuration={6000}
-                onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-            >
-                <Alert
-                    onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-                    severity={snackbar.severity}
-                    elevation={6}
-                >
-                    {snackbar.message}
-                </Alert>
-            </Snackbar>
             <Dialog
                 open={Boolean(deleteConfirmation)}
                 onClose={() => setDeleteConfirmation(null)}
@@ -474,7 +491,7 @@ const CargoSampling = () => {
                 <DialogTitle>Confirm Delete</DialogTitle>
                 <DialogContent>
                     <Typography>
-                        Are you sure you want to delete this cargo storage request?
+                        Are you sure you want to delete this sampling request?
                         This action cannot be undone.
                     </Typography>
                 </DialogContent>
@@ -497,6 +514,20 @@ const CargoSampling = () => {
                 />
             )}
 
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={6000}
+                onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            >
+                <Alert
+                    onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+                    severity={snackbar.severity}
+                    elevation={6}
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Container>
     );
 };

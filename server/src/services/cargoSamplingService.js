@@ -18,7 +18,32 @@ class CargoSamplingService {
             if (!doc.exists) {
                 return null;
             }
-            return { id: doc.id, ...doc.data() };
+
+            const data = doc.data();
+            // Ensure timestamps are properly formatted in the response
+            const formattedData = {
+                ...data,
+                schedule: {
+                    startDate: data.schedule?.startDate ? {
+                        _seconds: data.schedule.startDate.seconds,
+                        _nanoseconds: data.schedule.startDate.nanoseconds
+                    } : null,
+                    endDate: data.schedule?.endDate ? {
+                        _seconds: data.schedule.endDate.seconds,
+                        _nanoseconds: data.schedule.endDate.nanoseconds
+                    } : null
+                },
+                createdAt: data.createdAt ? {
+                    _seconds: data.createdAt.seconds,
+                    _nanoseconds: data.createdAt.nanoseconds
+                } : null,
+                updatedAt: data.updatedAt ? {
+                    _seconds: data.updatedAt.seconds,
+                    _nanoseconds: data.updatedAt.nanoseconds
+                } : null
+            };
+
+            return { id: doc.id, ...formattedData };
         } catch (error) {
             console.error('Error in fetchSamplingRequestById:', error);
             throw error;
