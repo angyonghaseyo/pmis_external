@@ -36,20 +36,12 @@ class InquiryService {
         });
     }
 
-    async updateInquiryFeedback(incrementalId, data, file) {
-        const inquiriesRef = db.collection('inquiries_feedback');
-        const querySnapshot = await inquiriesRef.get();
-        let docId = null;
+    async updateInquiryFeedback(id, data, file) {
+        const docRef = db.collection('inquiries_feedback').doc(id);
+        const doc = await docRef.get();
 
-        querySnapshot.forEach((doc) => {
-            const inquiryData = doc.data();
-            if (inquiryData.incrementalId.toString() === incrementalId) {
-                docId = doc.id;
-            }
-        });
-
-        if (!docId) {
-            throw new Error(`No inquiry/feedback found with incremental ID: ${incrementalId}`);
+        if (!doc.exists) {
+            throw new Error(`No inquiry/feedback found with ID: ${id}`);
         }
 
         let fileURL = data.fileURL || null;
@@ -67,9 +59,9 @@ class InquiryService {
         const updateData = {
             ...dataWithoutFile,
             fileURL: fileURL,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
         };
 
-        const docRef = db.collection('inquiries_feedback').doc(docId);
         await docRef.update(updateData);
     }
 
@@ -87,20 +79,48 @@ class InquiryService {
         }
 
         const { file: fileData, ...dataWithoutFile } = data;
-        const inquiriesRef = db.collection('inquiries_feedback');
-        const snapshot = await inquiriesRef.get();
-        const newIncrementalId = snapshot.size + 1;
-
         const docData = {
             ...dataWithoutFile,
-            incrementalId: newIncrementalId,
             userId: data.email,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
             status: 'Pending',
             fileURL: fileURL,
         };
 
-        return await inquiriesRef.add(docData);
+        return await db.collection('inquiries_feedback').add(docData);
+    }
+
+    async deleteInquiryFeedback(id) {
+        try {
+            const docRef = db.collection('inquiries_feedback').doc(id);
+            const doc = await docRef.get();
+
+            if (!doc.exists) {
+                throw new Error(`No inquiry/feedback found with ID: ${id}`);
+            }
+
+            const docData = doc.data();
+
+            // If there's an associated file, delete it from storage
+            if (docData.fileURL) {
+                const fileName = docData.fileURL.split('/').pop();
+                const fileRef = bucket.file(`inquiries_feedback/${fileName}`);
+                try {
+                    await fileRef.delete();
+                } catch (error) {
+                    console.warn('Error deleting file from storage:', error);
+                    // Continue with document deletion even if file deletion fails
+                }
+            }
+
+            // Delete the document from Firestore
+            await docRef.delete();
+
+            return { success: true, message: 'Inquiry/feedback deleted successfully' };
+        } catch (error) {
+            console.error('Error in deleteInquiryFeedback:', error);
+            throw error;
+        }
     }
 }
 

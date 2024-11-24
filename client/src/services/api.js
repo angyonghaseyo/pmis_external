@@ -104,6 +104,23 @@ export const updateUserProfile = async (userData) => {
   }
 };
 
+export const getUserUpdatedData = async (userEmail) => {
+  try {
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, where("email", "==", userEmail));
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+      throw new Error("User not found");
+    }
+
+    return querySnapshot.docs[0].data();
+  } catch (error) {
+    console.error("Error fetching updated user data:", error);
+    throw error;
+  }
+};
+
 // Fetch current user's company
 export const getCurrentUserCompany = async () => {
   const user = await auth.currentUser;
@@ -126,9 +143,9 @@ export const sendPasswordResetEmailToUser = (email) =>
 export const confirmUserPasswordReset = (oobCode, newPassword) =>
   confirmPasswordReset(auth, oobCode, newPassword).catch(handleApiError);
 
-export const getUsers = async (userId) => {
+export const getUsers = async (userEmail) => {
   try {
-    const response = await fetch(`${API_URL}/users?email=${userId}`);
+    const response = await fetch(`${API_URL}/users?email=${userEmail}`);
     if (!response.ok) {
       throw new Error("Error fetching users");
     }
@@ -140,10 +157,10 @@ export const getUsers = async (userId) => {
   }
 };
 
-export const getAllUsersInCompany = async (userId) => {
+export const getAllUsersInCompany = async (userEmail) => {
   try {
     const response = await fetch(
-      `${API_URL}/all-users-in-company?email=${userId}`
+      `${API_URL}/all-users-in-company?email=${userEmail}`
     );
     if (!response.ok) {
       throw new Error("Error fetching users in company");
@@ -313,12 +330,25 @@ export const updateInquiryFeedback = async (incrementalId, data) => {
   }
 };
 // Delete inquiry or feedback
-export const deleteInquiryFeedback = async (id) => {
+export const deleteInquiryFeedback = async (incrementalId) => {
   try {
-    const docRef = doc(db, "inquiries_feedback", id);
-    await deleteDoc(docRef);
+    const response = await fetch(`${API_URL}/inquiries-feedback/${incrementalId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({
+        error: 'Error deleting inquiry/feedback'
+      }));
+      throw new Error(errorData.error || 'Error deleting inquiry/feedback');
+    }
+
+    return await response.json();
   } catch (error) {
-    console.error("Error deleting inquiry/feedback:", error);
+    console.error('Error in deleteInquiryFeedback:', error);
     throw error;
   }
 };
@@ -582,23 +612,6 @@ export const getTrainingPrograms = async () => {
   } catch (error) {
       console.error('Error fetching training programs:', error);
       throw error;
-  }
-};
-
-export const getUserUpdatedData = async (userEmail) => {
-  try {
-    const usersRef = collection(db, "users");
-    const q = query(usersRef, where("email", "==", userEmail));
-    const querySnapshot = await getDocs(q);
-
-    if (querySnapshot.empty) {
-      throw new Error("User not found");
-    }
-
-    return querySnapshot.docs[0].data();
-  } catch (error) {
-    console.error("Error fetching updated user data:", error);
-    throw error;
   }
 };
 
