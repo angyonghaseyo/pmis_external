@@ -366,7 +366,7 @@ export const uploadCompanyLogo = async (companyName, file) => {
     const formData = new FormData();
     formData.append('logo', file);
     formData.append('companyName', companyName);
-    
+
     const response = await fetch(`${API_URL}/company-data/upload-logo`, {
       method: 'POST',
       body: formData
@@ -1535,7 +1535,8 @@ export const submitSamplingRequest = async (requestData) => {
       cargoDetails: requestData.cargoDetails,
       samplingDetails: requestData.samplingDetails,
       schedule: requestData.schedule,
-      specialInstructions: requestData.specialInstructions || ''
+      specialInstructions: requestData.specialInstructions || '',
+      company: requestData.company
     }));
 
     if (requestData.documents?.safetyDataSheet instanceof File) {
@@ -1588,7 +1589,15 @@ export const updateSamplingRequest = async (requestId, requestData) => {
     if (!response.ok) {
       throw new Error('Error updating sampling request');
     }
-    return await response.json();
+
+    // Check if the response has content and is JSON
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      return await response.json();
+    }
+
+    // If not JSON, just return success
+    return { success: true, message: 'Sampling request updated successfully' };
   } catch (error) {
     console.error('Error in updateSamplingRequest:', error);
     throw error;
@@ -1641,6 +1650,372 @@ export const getSamplingRequestById = async (requestId) => {
     return await response.json();
   } catch (error) {
     console.error('Error in getSamplingRequestById:', error);
+    throw error;
+  }
+};
+
+export const submitRepackingRequest = async (requestData) => {
+  try {
+    const formData = new FormData();
+    formData.append('repackingDetails', JSON.stringify({
+      cargoDetails: requestData.cargoDetails,
+      repackingDetails: requestData.repackingDetails,
+      schedule: requestData.schedule,
+      specialInstructions: requestData.specialInstructions || '',
+      company: requestData.company
+    }));
+
+    if (requestData.documents?.repackagingChecklist instanceof File) {
+      formData.append('repackagingChecklist', requestData.documents.repackagingChecklist);
+    }
+
+    const response = await fetch(`${API_URL}/repacking-requests`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error('Error submitting repacking request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in submitRepackingRequest:', error);
+    throw error;
+  }
+};
+
+export const updateRepackingRequest = async (requestId, requestData) => {
+  try {
+    const formData = new FormData();
+    formData.append('repackingDetails', JSON.stringify({
+      cargoDetails: requestData.cargoDetails,
+      repackingDetails: requestData.repackingDetails,
+      schedule: requestData.schedule,
+      specialInstructions: requestData.specialInstructions,
+      status: requestData.status
+    }));
+
+    if (requestData.documents?.repackagingChecklist instanceof File) {
+      formData.append('repackagingChecklist', requestData.documents.repackagingChecklist);
+    }
+
+    const response = await fetch(`${API_URL}/repacking-requests/${requestId}`, {
+      method: 'PUT',
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error('Error updating repacking request');
+    }
+
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      return await response.json();
+    }
+
+    return { success: true, message: 'Repacking request updated successfully' };
+  } catch (error) {
+    console.error('Error in updateRepackingRequest:', error);
+    throw error;
+  }
+};
+
+export const getRepackingRequestById = async (requestId) => {
+  try {
+    const response = await fetch(`${API_URL}/repacking-requests/${requestId}`);
+
+    if (!response.ok) {
+      throw new Error('Error fetching repacking request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in getRepackingRequestById:', error);
+    throw error;
+  }
+};
+
+export const deleteRepackingRequest = async (requestId) => {
+  try {
+    const response = await fetch(`${API_URL}/repacking-requests/${requestId}`, {
+      method: 'DELETE'
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({
+        error: 'Error deleting repacking request'
+      }));
+      throw new Error(errorData.error || 'Error deleting repacking request');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error in deleteRepackingRequest:', error);
+    throw error;
+  }
+};
+
+export const getRepackingRequests = async (filters = {}) => {
+  try {
+    const queryParams = new URLSearchParams(filters);
+    const response = await fetch(`${API_URL}/repacking-requests?${queryParams}`);
+
+    if (!response.ok) {
+      throw new Error('Error fetching repacking requests');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in getRepackingRequests:', error);
+    throw error;
+  }
+};
+
+export const getStorageRequests = async (filters = {}) => {
+  try {
+    const queryParams = new URLSearchParams(filters);
+    const response = await fetch(`${API_URL}/storage-requests?${queryParams}`);
+
+    if (!response.ok) {
+      throw new Error('Error fetching storage requests');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in getStorageRequests:', error);
+    throw error;
+  }
+};
+
+// Get a single storage request by ID
+export const getStorageRequestById = async (requestId) => {
+  try {
+    const response = await fetch(`${API_URL}/storage-requests/${requestId}`);
+
+    if (!response.ok) {
+      throw new Error('Error fetching storage request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in getStorageRequestById:', error);
+    throw error;
+  }
+};
+
+// Submit a new storage request
+export const submitStorageRequest = async (requestData) => {
+  try {
+    const formData = new FormData();
+    formData.append('storageDetails', JSON.stringify({
+      cargoDetails: requestData.cargoDetails,
+      warehouseRequirement: requestData.warehouseRequirement,
+      schedule: requestData.schedule,
+      specialInstructions: requestData.specialInstructions || '',
+      company: requestData.company
+    }));
+
+    if (requestData.documents?.storageChecklist instanceof File) {
+      formData.append('storageChecklist', requestData.documents.storageChecklist);
+    }
+
+    if (Array.isArray(requestData.documents?.additionalDocs)) {
+      requestData.documents.additionalDocs.forEach((doc) => {
+        if (doc instanceof File) {
+          formData.append('additionalDoc', doc);
+        }
+      });
+    }
+
+    const response = await fetch(`${API_URL}/storage-requests`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error('Error submitting storage request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in submitStorageRequest:', error);
+    throw error;
+  }
+};
+
+// Update an existing storage request
+export const updateStorageRequest = async (requestId, requestData) => {
+  try {
+    const formData = new FormData();
+    formData.append('storageDetails', JSON.stringify({
+      cargoDetails: requestData.cargoDetails,
+      warehouseRequirement: requestData.warehouseRequirement,
+      schedule: requestData.schedule,
+      specialInstructions: requestData.specialInstructions,
+      status: requestData.status
+    }));
+
+    if (requestData.documents?.storageChecklist instanceof File) {
+      formData.append('storageChecklist', requestData.documents.storageChecklist);
+    }
+
+    const response = await fetch(`${API_URL}/storage-requests/${requestId}`, {
+      method: 'PUT',
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error('Error updating storage request');
+    }
+
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      return await response.json();
+    }
+
+    return { success: true, message: 'Storage request updated successfully' };
+  } catch (error) {
+    console.error('Error in updateStorageRequest:', error);
+    throw error;
+  }
+};
+
+// Delete a storage request
+export const deleteStorageRequest = async (requestId) => {
+  try {
+    const response = await fetch(`${API_URL}/storage-requests/${requestId}`, {
+      method: 'DELETE'
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({
+        error: 'Error deleting storage request'
+      }));
+      throw new Error(errorData.error || 'Error deleting storage request');
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error in deleteStorageRequest:', error);
+    throw error;
+  }
+};
+
+export const getTransloadingRequests = async (filters = {}) => {
+  try {
+    const queryParams = new URLSearchParams(filters);
+    const response = await fetch(`${API_URL}/transloading-requests?${queryParams}`);
+
+    if (!response.ok) {
+      throw new Error('Error fetching transloading requests');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in getTransloadingRequests:', error);
+    throw error;
+  }
+};
+
+export const getTransloadingRequestById = async (requestId) => {
+  try {
+    const response = await fetch(`${API_URL}/transloading-requests/${requestId}`);
+
+    if (!response.ok) {
+      throw new Error('Error fetching transloading request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in getTransloadingRequestById:', error);
+    throw error;
+  }
+};
+
+export const submitTransloadingRequest = async (requestData) => {
+  try {
+    const formData = new FormData();
+    formData.append('transloadingDetails', JSON.stringify({
+      cargoDetails: requestData.cargoDetails,
+      destinationArea: requestData.destinationArea,
+      transloadingTimeWindow: requestData.transloadingTimeWindow,
+      specialInstructions: requestData.specialInstructions || '',
+      company: requestData.company
+    }));
+
+    if (requestData.documents?.transloadingSheet instanceof File) {
+      formData.append('transloadingSheet', requestData.documents.transloadingSheet);
+    }
+
+    if (Array.isArray(requestData.documents?.additionalDocs)) {
+      requestData.documents.additionalDocs.forEach((doc) => {
+        if (doc instanceof File) {
+          formData.append('additionalDoc', doc);
+        }
+      });
+    }
+
+    const response = await fetch(`${API_URL}/transloading-requests`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error('Error submitting transloading request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in submitTransloadingRequest:', error);
+    throw error;
+  }
+};
+
+export const updateTransloadingRequest = async (requestId, requestData) => {
+  try {
+    const formData = new FormData();
+    formData.append('transloadingDetails', JSON.stringify({
+      cargoDetails: requestData.cargoDetails,
+      destinationArea: requestData.destinationArea,
+      transloadingTimeWindow: requestData.transloadingTimeWindow,
+      specialInstructions: requestData.specialInstructions,
+      status: requestData.status
+    }));
+
+    if (requestData.documents?.transloadingSheet instanceof File) {
+      formData.append('transloadingSheet', requestData.documents.transloadingSheet);
+    }
+
+    const response = await fetch(`${API_URL}/transloading-requests/${requestId}`, {
+      method: 'PUT',
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error('Error updating transloading request');
+    }
+
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      return await response.json();
+    }
+
+    return { success: true, message: 'Transloading request updated successfully' };
+  } catch (error) {
+    console.error('Error in updateTransloadingRequest:', error);
+    throw error;
+  }
+};
+
+export const deleteTransloadingRequest = async (requestId) => {
+  try {
+    const response = await fetch(`${API_URL}/transloading-requests/${requestId}`, {
+      method: 'DELETE'
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({
+        error: 'Error deleting transloading request'
+      }));
+      throw new Error(errorData.error || 'Error deleting transloading request');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error in deleteTransloadingRequest:', error);
     throw error;
   }
 };
@@ -1735,7 +2110,23 @@ const api = {
   submitSamplingRequest,
   getSamplingRequests,
   deleteSamplingRequest,
-  getSamplingRequestById
+  getSamplingRequestById,
+  submitRepackingRequest,
+  updateRepackingRequest,
+  getRepackingRequestById,
+  deleteRepackingRequest,
+  getRepackingRequests,
+  getStorageRequests,
+  getStorageRequestById,
+  submitStorageRequest,
+  updateStorageRequest,
+  deleteStorageRequest,
+  getTransloadingRequests,
+  getTransloadingRequestById,
+  submitTransloadingRequest,
+  updateTransloadingRequest,
+  deleteTransloadingRequest
+
 };
 
 export default api;

@@ -29,13 +29,14 @@ import {
     Link
 } from '@mui/material';
 import { Edit, Delete, Visibility, Search, Download } from '@mui/icons-material';
-import { collection, query, where, getDocs, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { db } from './firebaseConfig';
 import CargoRepackingRequest from './CargoRepackingRequest';
 import { format } from 'date-fns';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import CloseIcon from '@mui/icons-material/Close';
-import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
+import {
+    getRepackingRequests,
+    deleteRepackingRequest,
+} from './services/api';
 
 
 const CargoRepacking = () => {
@@ -59,33 +60,8 @@ const CargoRepacking = () => {
     const fetchRequests = async () => {
         try {
             setLoading(true);
-            let q = query(collection(db, 'repackingRequests'), orderBy('createdAt', 'desc'));
-
-            if (filters.status !== 'all') {
-                q = query(q, where('status', '==', filters.status));
-            }
-
-            const querySnapshot = await getDocs(q);
-            const requestData = querySnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data(),
-                createdAt: doc.data().createdAt?.toDate()
-            }));
-
-            // Apply search filter
-            const filteredData = requestData.filter(request => {
-                if (filters.searchQuery) {
-                    return (
-                        request.cargoDetails.cargoNumber.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
-                        request.cargoDetails.cargoType.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
-                        request.id.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
-                        request.status.toLowerCase().includes(filters.searchQuery.toLowerCase())
-                    );
-                }
-                return true;
-            });
-
-            setRequests(filteredData);
+            const requestData = await getRepackingRequests(filters);
+            setRequests(requestData);
         } catch (error) {
             console.error('Error fetching requests:', error);
             setSnackbar({
@@ -102,32 +78,9 @@ const CargoRepacking = () => {
         fetchRequests();
     }, [filters]);
 
-    const handleStatusChange = async (requestId, newStatus) => {
-        try {
-            await updateDoc(doc(db, 'repackingRequests', requestId), {
-                status: newStatus,
-                updatedAt: new Date()
-            });
-            await fetchRequests();
-            setSnackbar({
-                open: true,
-                message: 'Status updated successfully',
-                severity: 'success'
-            });
-        } catch (error) {
-            console.error('Error updating status:', error);
-            setSnackbar({
-                open: true,
-                message: 'Error updating status',
-                severity: 'error'
-            });
-        }
-    };
-
     const handleDelete = async (requestId) => {
-
         try {
-            await deleteDoc(doc(db, 'repackingRequests', requestId));
+            await deleteRepackingRequest(requestId);
             await fetchRequests();
             setSnackbar({
                 open: true,
@@ -139,11 +92,10 @@ const CargoRepacking = () => {
             console.error('Error deleting request:', error);
             setSnackbar({
                 open: true,
-                message: 'Error deleting request',
+                message: error.message || 'Error deleting request',
                 severity: 'error'
             });
         }
-
     };
 
     const getStatusColor = (status) => {
@@ -154,6 +106,12 @@ const CargoRepacking = () => {
             'Rejected': 'error'
         };
         return colors[status] || 'default';
+    };
+
+
+    const formatDate = (timestamp) => {
+        if (!timestamp || typeof timestamp._seconds !== 'number') return 'N/A';
+        return new Date(timestamp._seconds * 1000).toLocaleString();
     };
 
     const renderMetrics = () => {
@@ -270,40 +228,39 @@ const CargoRepacking = () => {
                                     <Grid item xs={6}>
                                         <Typography variant="body2" color="textSecondary">Start Date</Typography>
                                         <Typography variant="body1">
-                                            {format(request.schedule.startDate.toDate(), 'PPpp')}
+                                            {formatDate(request.schedule.startDate)}
                                         </Typography>
                                     </Grid>
                                     <Grid item xs={6}>
                                         <Typography variant="body2" color="textSecondary">End Date</Typography>
                                         <Typography variant="body1">
-                                            {format(request.schedule.endDate.toDate(), 'PPpp')}
+                                            {formatDate(request.schedule.endDate)}
                                         </Typography>
                                     </Grid>
                                 </Grid>
                             </Paper>
                         </Grid>
 
-                        {/* Documents Section */}
-                        {/* <Grid item xs={12}>
-                            <Typography variant="subtitle1" gutterBottom>Documents</Typography>
-                            <Paper sx={{ p: 2 }}>
-                                <Grid container spacing={2}>
-                                    <Grid item xs={12}>
-                                        <Typography variant="body2" color="textSecondary" gutterBottom>
-                                            Repacking Checklist
-                                        </Typography>
-
-
-                                        <InsertDriveFileIcon sx={{ mr: 1 }} />
-                                        <Link href={request.documents.repackagingChecklist} target="_blank" rel="noopener noreferrer">
-                                            Document
-                                        </Link>
-
-
+                        {request.documents && (
+                            <Grid item xs={12}>
+                                <Typography variant="subtitle1" gutterBottom>Documents</Typography>
+                                <Paper sx={{ p: 2 }}>
+                                    <Grid container spacing={2}>
+                                        {request.documents.repackagingChecklist && (
+                                            <Grid item xs={12}>
+                                                <Button
+                                                    variant="outlined"
+                                                    startIcon={<Download />}
+                                                    onClick={() => window.open(request.documents.repackagingChecklist, '_blank')}
+                                                >
+                                                    Repacking Checklist
+                                                </Button>
+                                            </Grid>
+                                        )}
                                     </Grid>
-                                </Grid>
-                            </Paper>
-                        </Grid> */}
+                                </Paper>
+                            </Grid>
+                        )}
 
                         {/* Special Instructions Section */}
                         {request.specialInstructions && (
@@ -326,25 +283,6 @@ const CargoRepacking = () => {
                         )}
                     </Grid>
                 </DialogContent>
-                {/* <DialogActions>
-                    {request.status === 'Pending' && (
-                        <Button
-                            color="primary"
-                            onClick={() => handleStatusChange(request.id, 'In Progress')}
-                        >
-                            Start Repacking
-                        </Button>
-                    )}
-                    {request.status === 'In Progress' && (
-                        <Button
-                            color="success"
-                            onClick={() => handleStatusChange(request.id, 'Completed')}
-                        >
-                            Mark as Completed
-                        </Button>
-                    )}
-                    <Button onClick={onClose}>Close</Button>
-                </DialogActions> */}
             </Dialog>
         );
     };
@@ -430,7 +368,7 @@ const CargoRepacking = () => {
                                         ))}
                                     </TableCell>
                                     <TableCell>
-                                        {format(request.createdAt, 'dd/MM/yyyy HH:mm')}
+                                        {formatDate(request.createdAt)}
                                     </TableCell>
                                     <TableCell>
                                         <Chip
@@ -458,13 +396,6 @@ const CargoRepacking = () => {
                                                 </IconButton>
                                             </Tooltip>
                                         )}
-                                        {/* {request.status === 'Completed' && (
-                                            <Tooltip title="Download Report">
-                                                <IconButton size="small">
-                                                    <Download />
-                                                </IconButton>
-                                            </Tooltip>
-                                        )} */}
                                         {request.status === 'Pending' && (
                                             <Tooltip title="Delete">
                                                 <IconButton

@@ -31,8 +31,13 @@ import { LocalizationProvider, DateTimePicker } from '@mui/x-date-pickers';
 import { styled } from '@mui/material/styles';
 import { doc, getDoc, setDoc, addDoc, collection, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from './firebaseConfig';
 import { useAuth } from "./AuthContext";
+import {
+    submitStorageRequest,
+    updateStorageRequest,
+    getStorageRequestById
+} from './services/api';
+import { API_URL } from './config/apiConfig';
 
 
 const VisuallyHiddenInput = styled('input')`
@@ -85,6 +90,25 @@ const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSucc
         status: 'Pending'
     });
 
+    const initialFormState = {
+        cargoDetails: {
+            cargoNumber: '',
+            cargoType: '',
+            quantity: '',
+            unit: 'CBM',
+        },
+        warehouseRequirement: '',
+        schedule: {
+            startDate: null,
+            endDate: null
+        },
+        documents: {
+            storageChecklist: []
+        },
+        specialInstructions: '',
+        status: 'Pending'
+    };
+
     const { user } = useAuth();
     const [activeStep, setActiveStep] = useState(0);
     const [errors, setErrors] = useState({});
@@ -101,17 +125,30 @@ const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSucc
         setSnackbar({ ...snackbar, open: false });
     };
 
+    const resetDialog = () => {
+        setFormData(initialFormState);
+        setActiveStep(0);
+        setErrors({});
+        setSubmitError(null);
+        setSelectedCargo('');
+    };
+
+    const handleDialogClose = () => {
+        resetDialog();
+        handleClose();
+    };
+
     useEffect(() => {
         const fetchBookings = async () => {
             try {
-                const querySnapshot = await getDocs(collection(db, "bookings"));
-                const bookingsArray = querySnapshot.docs.map((doc) => ({
-                    bookingId: doc.id,
-                    ...doc.data(),
-                }));
+                const response = await fetch(`${API_URL}/bookings`);
+                if (!response.ok) {
+                    throw new Error('Error fetching bookings');
+                }
+                const bookingsData = await response.json();
 
-                // Process cargo numbers from all bookings
-                const allCargoNumbers = bookingsArray.reduce((acc, booking) => {
+                // Process cargo numbers from bookings
+                const allCargoNumbers = bookingsData.reduce((acc, booking) => {
                     if (booking.cargo) {
                         Object.entries(booking.cargo).forEach(([cargoNumber, cargoDetails]) => {
                             acc.push({
@@ -130,7 +167,11 @@ const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSucc
                 setCargoNumbers(allCargoNumbers);
             } catch (error) {
                 console.error('Error fetching bookings:', error);
-                // Handle error appropriately
+                setSnackbar({
+                    open: true,
+                    message: 'Error fetching bookings data',
+                    severity: 'error'
+                });
             }
         };
 
@@ -146,28 +187,28 @@ const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSucc
     const fetchRequestData = async () => {
         try {
             setLoading(true);
-            const docRef = doc(db, 'storageRequests', editingId);
-            const docSnap = await getDoc(docRef);
+            const data = await getStorageRequestById(editingId);
 
-            if (docSnap.exists()) {
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-
-                    // Convert Firestore Timestamps to JavaScript Date objects
-                    const formattedData = {
-                        ...data,
-                        schedule: {
-                            startDate: data.schedule?.startDate?.toDate() || null,
-                            endDate: data.schedule?.endDate?.toDate() || null
-                        }
-                    };
-
-                    setFormData(formattedData);
+            // Handle Firebase Timestamp format
+            const formattedData = {
+                ...data,
+                schedule: {
+                    startDate: data.schedule?.startDate?._seconds ?
+                        new Date(data.schedule.startDate._seconds * 1000) : null,
+                    endDate: data.schedule?.endDate?._seconds ?
+                        new Date(data.schedule.endDate._seconds * 1000) : null
                 }
-            }
+            };
+
+            setFormData(formattedData);
         } catch (error) {
             console.error('Error fetching request:', error);
             setSubmitError('Error loading request data');
+            setSnackbar({
+                open: true,
+                message: 'Error loading request data',
+                severity: 'error'
+            });
         } finally {
             setLoading(false);
         }
@@ -176,7 +217,6 @@ const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSucc
 
     const handleInputChange = (section, field, value) => {
         if (section === 'specialInstructions') {
-            // Handle special instructions directly since it's not nested
             setFormData(prev => ({
                 ...prev,
                 specialInstructions: value
@@ -185,7 +225,6 @@ const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSucc
         }
 
         if (section === 'warehouseRequirement') {
-            // Handle special instructions directly since it's not nested
             setFormData(prev => ({
                 ...prev,
                 warehouseRequirement: value
@@ -225,7 +264,6 @@ const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSucc
         const selectedCargoNumber = event.target.value;
         setSelectedCargo(selectedCargoNumber);
 
-        // Find the cargo details from cargoNumbers array directly
         const selectedCargoDetails = cargoNumbers.find(
             cargo => cargo.cargoNumber === selectedCargoNumber
         );
@@ -505,8 +543,6 @@ const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSucc
             </Grid>
         </Grid>
     );
-    // Your existing renderStepContent function here...
-    // (Keep the cargo details, sampling requirements, and schedule & documents steps as they were)
 
     const renderStepContent = (step) => {
         switch (step) {
@@ -569,63 +605,44 @@ const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSucc
     };
 
     const handleSubmit = async () => {
-
         if (!validateForm()) {
             setSubmitError('Please fill in all required fields correctly');
             return;
         }
+
         try {
             setLoading(true);
             setSubmitError(null);
 
-            const fileUrls = await uploadFiles();
-
             const requestData = {
                 ...formData,
                 company: user.company,
-                documents: fileUrls,
-                status: 'Pending',
-                updatedAt: new Date(),
-                createdAt: editingId ? formData.createdAt : new Date(),
-                requestType: "storageRequests"
+                status: 'Pending'
             };
 
             if (editingId) {
-                await setDoc(doc(db, 'storageRequests', editingId), requestData);
+                await updateStorageRequest(editingId, requestData);
             } else {
-                const docRef = await addDoc(collection(db, 'storageRequests'), requestData);
-                await setDoc(docRef, { id: docRef.id }, { merge: true });
+                await submitStorageRequest(requestData);
             }
 
             onSubmitSuccess?.();
-            handleClose();
-            setSnackbar({ open: true, message: 'Storage Request created successfully', severity: 'success' });
+            handleDialogClose();
+            setSnackbar({
+                open: true,
+                message: `Storage Request ${editingId ? 'updated' : 'created'} successfully`,
+                severity: 'success'
+            });
         } catch (error) {
             console.error('Error submitting request:', error);
-            setSnackbar({ open: true, message: 'Failed to submit request. Please try again.', severity: 'error' });
+            setSnackbar({
+                open: true,
+                message: 'Failed to submit request. Please try again.',
+                severity: 'error'
+            });
         } finally {
             setLoading(false);
         }
-    };
-
-    const uploadFiles = async () => {
-        const uploads = {};
-
-        if (formData.documents.storageChecklist) {
-            uploads.storageChecklist = await uploadFile(
-                formData.documents.storageChecklist,
-                'storage-checlist'
-            );
-        }
-
-        return uploads;
-    };
-
-    const uploadFile = async (file, path) => {
-        if (!file) return null;
-        const storageRef = ref(storage, `storage-requests/${path}/${Date.now()}_${file.name}`);
-        await uploadBytes(storageRef, file);
-        return await getDownloadURL(storageRef);
     };
 
 
@@ -633,7 +650,7 @@ const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSucc
         <>
             <Dialog
                 open={open}
-                onClose={handleClose}
+                onClose={handleDialogClose}
                 maxWidth="md"
                 fullWidth
                 PaperProps={{
@@ -645,7 +662,7 @@ const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSucc
                         <Typography variant="h6">
                             {editingId ? 'Edit Storage Request' : 'New Storage Request'}
                         </Typography>
-                        <IconButton onClick={handleClose} size="small">
+                        <IconButton onClick={handleDialogClose} size="small">
                             <CloseIcon />
                         </IconButton>
                     </Box>
@@ -670,7 +687,7 @@ const CargoStorageRequest = ({ open, handleClose, editingId = null, onSubmitSucc
                 </DialogContent>
 
                 <DialogActions>
-                    <Button onClick={handleClose}>Cancel</Button>
+                    <Button onClick={handleDialogClose}>Cancel</Button>
                     <Box sx={{ flex: '1 1 auto' }} />
                     <Button
                         disabled={activeStep === 0}

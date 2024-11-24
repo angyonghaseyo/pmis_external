@@ -28,6 +28,9 @@ const agencyRoutes = require('./src/routes/agencyRoutes');
 const cargoSamplingRoutes = require('./src/routes/cargoSamplingRoutes');
 const warehouseRoutes = require('./src/routes/warehouseRoutes');
 const facilityRentalRoutes = require('./src/routes/facilityRentalRoutes');
+const cargoRepackingRoutes = require('./src/routes/cargoRepackingRoutes');
+const cargoStorageRoutes = require('./src/routes/cargoStorageRoutes');
+const cargoTransloadingRoutes = require('./src/routes/cargoTransloadingRoutes');
 require('./src/config/firebase');
 
 const storage = new Storage({
@@ -62,6 +65,9 @@ app.use('/', agencyRoutes);
 app.use('/', cargoSamplingRoutes);
 app.use('/', warehouseRoutes);
 app.use('/', facilityRentalRoutes);
+app.use('/', cargoRepackingRoutes);
+app.use('/', cargoStorageRoutes);
+app.use('/', cargoTransloadingRoutes);
 
 const PORT = process.env.PORT || 5001;
 

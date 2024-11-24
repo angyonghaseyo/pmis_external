@@ -2,7 +2,7 @@ const { Storage } = require('@google-cloud/storage');
 const path = require('path');
 const admin = require('firebase-admin');
 
-class CargoSamplingService {
+class CargoRepackingService {
     constructor(db) {
         this.db = db;
         this.storage = new Storage({
@@ -12,9 +12,9 @@ class CargoSamplingService {
         this.bucket = this.storage.bucket('pmis-47493.appspot.com');
     }
 
-    async fetchSamplingRequestById(id) {
+    async fetchRepackingRequestById(id) {
         try {
-            const doc = await this.db.collection('samplingRequests').doc(id).get();
+            const doc = await this.db.collection('repackingRequests').doc(id).get();
             if (!doc.exists) {
                 return null;
             }
@@ -45,12 +45,12 @@ class CargoSamplingService {
 
             return { id: doc.id, ...formattedData };
         } catch (error) {
-            console.error('Error in fetchSamplingRequestById:', error);
+            console.error('Error in fetchRepackingRequestById:', error);
             throw error;
         }
     }
 
-    async createSamplingRequest(requestData, files) {
+    async createRepackingRequest(requestData, files) {
         try {
             const documentUrls = await this.uploadDocuments(files);
 
@@ -63,9 +63,7 @@ class CargoSamplingService {
                     admin.firestore.Timestamp.fromDate(new Date(requestData.schedule.endDate)) : null
             };
 
-            console.log(typeof formattedSchedule.startDate, "1234", formattedSchedule.endDate);
-
-            const samplingRequest = {
+            const repackingRequest = {
                 ...requestData,
                 schedule: formattedSchedule,
                 documents: documentUrls,
@@ -74,17 +72,19 @@ class CargoSamplingService {
                 updatedAt: admin.firestore.Timestamp.now()
             };
 
-            const docRef = await this.db.collection('samplingRequests').add(samplingRequest);
-            return { id: docRef.id, ...samplingRequest };
+            const docRef = await this.db.collection('repackingRequests').add(repackingRequest);
+            await this.db.collection('repackingRequests').doc(docRef.id).update({ id: docRef.id });
+
+            return { id: docRef.id, ...repackingRequest };
         } catch (error) {
-            console.error('Error in createSamplingRequest:', error);
+            console.error('Error in createRepackingRequest:', error);
             throw error;
         }
     }
 
-    async fetchSamplingRequests(filters) {
+    async fetchRepackingRequests(filters) {
         try {
-            let query = this.db.collection('samplingRequests');
+            let query = this.db.collection('repackingRequests');
 
             if (filters.status) {
                 query = query.where('status', '==', filters.status);
@@ -117,12 +117,12 @@ class CargoSamplingService {
 
             return requests;
         } catch (error) {
-            console.error('Error in fetchSamplingRequests:', error);
+            console.error('Error in fetchRepackingRequests:', error);
             throw error;
         }
     }
 
-    async updateSamplingRequest(id, requestData, files) {
+    async updateRepackingRequest(id, requestData, files) {
         try {
             const documentUrls = await this.uploadDocuments(files);
 
@@ -145,18 +145,18 @@ class CargoSamplingService {
                 updateData.documents = documentUrls;
             }
 
-            await this.db.collection('samplingRequests').doc(id).update(updateData);
+            await this.db.collection('repackingRequests').doc(id).update(updateData);
         } catch (error) {
-            console.error('Error in updateSamplingRequest:', error);
+            console.error('Error in updateRepackingRequest:', error);
             throw error;
         }
     }
 
-    async deleteSamplingRequest(id) {
+    async deleteRepackingRequest(id) {
         try {
-            await this.db.collection('samplingRequests').doc(id).delete();
+            await this.db.collection('repackingRequests').doc(id).delete();
         } catch (error) {
-            console.error('Error in deleteSamplingRequest:', error);
+            console.error('Error in deleteRepackingRequest:', error);
             throw error;
         }
     }
@@ -164,33 +164,19 @@ class CargoSamplingService {
     async uploadDocuments(files) {
         const documentUrls = {};
 
-        if (files.safetyDataSheet) {
-            const file = files.safetyDataSheet;
-            const fileName = `samplingRequests/sds_${Date.now()}_${file.originalname}`;
+        if (files.repackagingChecklist) {
+            const file = files.repackagingChecklist;
+            const fileName = `repackingRequests/checklist_${Date.now()}_${file.originalname}`;
             const fileRef = this.bucket.file(fileName);
             await fileRef.save(file.buffer, {
                 metadata: { contentType: file.mimetype }
             });
             await fileRef.makePublic();
-            documentUrls.safetyDataSheet = `https://storage.googleapis.com/${this.bucket.name}/${fileName}`;
-        }
-
-        if (files.additionalDocs) {
-            documentUrls.additionalDocs = await Promise.all(
-                files.additionalDocs.map(async (file) => {
-                    const fileName = `samplingRequests/additional_${Date.now()}_${file.originalname}`;
-                    const fileRef = this.bucket.file(fileName);
-                    await fileRef.save(file.buffer, {
-                        metadata: { contentType: file.mimetype }
-                    });
-                    await fileRef.makePublic();
-                    return `https://storage.googleapis.com/${this.bucket.name}/${fileName}`;
-                })
-            );
+            documentUrls.repackagingChecklist = `https://storage.googleapis.com/${this.bucket.name}/${fileName}`;
         }
 
         return documentUrls;
     }
 }
 
-module.exports = CargoSamplingService;
+module.exports = CargoRepackingService;

@@ -2,7 +2,7 @@ const { Storage } = require('@google-cloud/storage');
 const path = require('path');
 const admin = require('firebase-admin');
 
-class CargoSamplingService {
+class CargoTransloadingService {
     constructor(db) {
         this.db = db;
         this.storage = new Storage({
@@ -12,25 +12,24 @@ class CargoSamplingService {
         this.bucket = this.storage.bucket('pmis-47493.appspot.com');
     }
 
-    async fetchSamplingRequestById(id) {
+    async fetchTransloadingRequestById(id) {
         try {
-            const doc = await this.db.collection('samplingRequests').doc(id).get();
+            const doc = await this.db.collection('transloadingRequests').doc(id).get();
             if (!doc.exists) {
                 return null;
             }
 
             const data = doc.data();
-            // Ensure timestamps are properly formatted in the response
             const formattedData = {
                 ...data,
-                schedule: {
-                    startDate: data.schedule?.startDate ? {
-                        _seconds: data.schedule.startDate.seconds,
-                        _nanoseconds: data.schedule.startDate.nanoseconds
+                transloadingTimeWindow: {
+                    startDate: data.transloadingTimeWindow?.startDate ? {
+                        _seconds: data.transloadingTimeWindow.startDate.seconds,
+                        _nanoseconds: data.transloadingTimeWindow.startDate.nanoseconds
                     } : null,
-                    endDate: data.schedule?.endDate ? {
-                        _seconds: data.schedule.endDate.seconds,
-                        _nanoseconds: data.schedule.endDate.nanoseconds
+                    endDate: data.transloadingTimeWindow?.endDate ? {
+                        _seconds: data.transloadingTimeWindow.endDate.seconds,
+                        _nanoseconds: data.transloadingTimeWindow.endDate.nanoseconds
                     } : null
                 },
                 createdAt: data.createdAt ? {
@@ -45,46 +44,42 @@ class CargoSamplingService {
 
             return { id: doc.id, ...formattedData };
         } catch (error) {
-            console.error('Error in fetchSamplingRequestById:', error);
+            console.error('Error in fetchTransloadingRequestById:', error);
             throw error;
         }
     }
 
-    async createSamplingRequest(requestData, files) {
+    async createTransloadingRequest(requestData, files) {
         try {
             const documentUrls = await this.uploadDocuments(files);
 
-            // Convert dates to Firestore Timestamps
-            const formattedSchedule = {
-                ...requestData.schedule,
-                startDate: requestData.schedule.startDate ?
-                    admin.firestore.Timestamp.fromDate(new Date(requestData.schedule.startDate)) : null,
-                endDate: requestData.schedule.endDate ?
-                    admin.firestore.Timestamp.fromDate(new Date(requestData.schedule.endDate)) : null
+            const formattedTimeWindow = {
+                startDate: requestData.transloadingTimeWindow.startDate ?
+                    admin.firestore.Timestamp.fromDate(new Date(requestData.transloadingTimeWindow.startDate)) : null,
+                endDate: requestData.transloadingTimeWindow.endDate ?
+                    admin.firestore.Timestamp.fromDate(new Date(requestData.transloadingTimeWindow.endDate)) : null
             };
 
-            console.log(typeof formattedSchedule.startDate, "1234", formattedSchedule.endDate);
-
-            const samplingRequest = {
+            const transloadingRequest = {
                 ...requestData,
-                schedule: formattedSchedule,
+                transloadingTimeWindow: formattedTimeWindow,
                 documents: documentUrls,
                 status: 'Pending',
                 createdAt: admin.firestore.Timestamp.now(),
                 updatedAt: admin.firestore.Timestamp.now()
             };
 
-            const docRef = await this.db.collection('samplingRequests').add(samplingRequest);
-            return { id: docRef.id, ...samplingRequest };
+            const docRef = await this.db.collection('transloadingRequests').add(transloadingRequest);
+            return { id: docRef.id, ...transloadingRequest };
         } catch (error) {
-            console.error('Error in createSamplingRequest:', error);
+            console.error('Error in createTransloadingRequest:', error);
             throw error;
         }
     }
 
-    async fetchSamplingRequests(filters) {
+    async fetchTransloadingRequests(filters) {
         try {
-            let query = this.db.collection('samplingRequests');
+            let query = this.db.collection('transloadingRequests');
 
             if (filters.status) {
                 query = query.where('status', '==', filters.status);
@@ -117,27 +112,25 @@ class CargoSamplingService {
 
             return requests;
         } catch (error) {
-            console.error('Error in fetchSamplingRequests:', error);
+            console.error('Error in fetchTransloadingRequests:', error);
             throw error;
         }
     }
 
-    async updateSamplingRequest(id, requestData, files) {
+    async updateTransloadingRequest(id, requestData, files) {
         try {
             const documentUrls = await this.uploadDocuments(files);
 
-            // Convert dates to Firestore Timestamps
-            const formattedSchedule = {
-                ...requestData.schedule,
-                startDate: requestData.schedule.startDate ?
-                    admin.firestore.Timestamp.fromDate(new Date(requestData.schedule.startDate)) : null,
-                endDate: requestData.schedule.endDate ?
-                    admin.firestore.Timestamp.fromDate(new Date(requestData.schedule.endDate)) : null
+            const formattedTimeWindow = {
+                startDate: requestData.transloadingTimeWindow.startDate ?
+                    admin.firestore.Timestamp.fromDate(new Date(requestData.transloadingTimeWindow.startDate)) : null,
+                endDate: requestData.transloadingTimeWindow.endDate ?
+                    admin.firestore.Timestamp.fromDate(new Date(requestData.transloadingTimeWindow.endDate)) : null
             };
 
             const updateData = {
                 ...requestData,
-                schedule: formattedSchedule,
+                transloadingTimeWindow: formattedTimeWindow,
                 updatedAt: admin.firestore.Timestamp.now()
             };
 
@@ -145,18 +138,18 @@ class CargoSamplingService {
                 updateData.documents = documentUrls;
             }
 
-            await this.db.collection('samplingRequests').doc(id).update(updateData);
+            await this.db.collection('transloadingRequests').doc(id).update(updateData);
         } catch (error) {
-            console.error('Error in updateSamplingRequest:', error);
+            console.error('Error in updateTransloadingRequest:', error);
             throw error;
         }
     }
 
-    async deleteSamplingRequest(id) {
+    async deleteTransloadingRequest(id) {
         try {
-            await this.db.collection('samplingRequests').doc(id).delete();
+            await this.db.collection('transloadingRequests').doc(id).delete();
         } catch (error) {
-            console.error('Error in deleteSamplingRequest:', error);
+            console.error('Error in deleteTransloadingRequest:', error);
             throw error;
         }
     }
@@ -164,21 +157,21 @@ class CargoSamplingService {
     async uploadDocuments(files) {
         const documentUrls = {};
 
-        if (files.safetyDataSheet) {
-            const file = files.safetyDataSheet;
-            const fileName = `samplingRequests/sds_${Date.now()}_${file.originalname}`;
+        if (files.transloadingSheet) {
+            const file = files.transloadingSheet;
+            const fileName = `transloadingRequests/tsheet_${Date.now()}_${file.originalname}`;
             const fileRef = this.bucket.file(fileName);
             await fileRef.save(file.buffer, {
                 metadata: { contentType: file.mimetype }
             });
             await fileRef.makePublic();
-            documentUrls.safetyDataSheet = `https://storage.googleapis.com/${this.bucket.name}/${fileName}`;
+            documentUrls.transloadingSheet = `https://storage.googleapis.com/${this.bucket.name}/${fileName}`;
         }
 
         if (files.additionalDocs) {
             documentUrls.additionalDocs = await Promise.all(
                 files.additionalDocs.map(async (file) => {
-                    const fileName = `samplingRequests/additional_${Date.now()}_${file.originalname}`;
+                    const fileName = `transloadingRequests/additional_${Date.now()}_${file.originalname}`;
                     const fileRef = this.bucket.file(fileName);
                     await fileRef.save(file.buffer, {
                         metadata: { contentType: file.mimetype }
@@ -193,4 +186,4 @@ class CargoSamplingService {
     }
 }
 
-module.exports = CargoSamplingService;
+module.exports = CargoTransloadingService;
