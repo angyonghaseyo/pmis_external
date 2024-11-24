@@ -573,15 +573,15 @@ export const checkFacilityAvailability = async (facilityId, startTime, endTime) 
 
 export const getTrainingPrograms = async () => {
   try {
-    const response = await fetch(`${API_URL}/training-programs`);
-    if (!response.ok) {
-      throw new Error("Error fetching training programs");
-    }
-    const programs = await response.json();
-    return programs;
+      const response = await fetch(`${API_URL}/training-programs`);
+      if (!response.ok) {
+          throw new Error('Failed to fetch training programs');
+      }
+      const programs = await response.json();
+      return programs;
   } catch (error) {
-    console.error("Error fetching training programs:", error);
-    throw error;
+      console.error('Error fetching training programs:', error);
+      throw error;
   }
 };
 
@@ -604,149 +604,77 @@ export const getUserUpdatedData = async (userEmail) => {
 
 export const registerForProgram = async (programId, userEmail) => {
   try {
-    const usersRef = collection(db, "users");
-    const q = query(usersRef, where("email", "==", userEmail));
-    const querySnapshot = await getDocs(q);
-
-    if (querySnapshot.empty) {
-      throw new Error("User not found");
-    }
-
-    const userDoc = querySnapshot.docs[0];
-    const userData = userDoc.data();
-    const programRef = doc(db, "training_programs", programId);
-    const programDoc = await getDoc(programRef);
-
-    if (!programDoc.exists()) {
-      throw new Error("Program not found");
-    }
-
-    const programData = programDoc.data();
-
-    // Check capacity
-    if (
-      programData.numberOfCurrentRegistrations >=
-      programData.participantCapacity
-    ) {
-      throw new Error("Program is full");
-    }
-
-    // Check if already enrolled
-    if (
-      userData.enrolledPrograms?.some(
-        (program) => program.programId === programId
-      )
-    ) {
-      throw new Error("Already enrolled in this program");
-    }
-
-    // Use transaction to ensure atomicity
-    await runTransaction(db, async (transaction) => {
-      // Update program registrations
-      transaction.update(programRef, {
-        numberOfCurrentRegistrations: increment(1),
+      const response = await fetch(`${API_URL}/training-programs/${programId}/register`, {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ userEmail })
       });
 
-      // Update user enrollments
-      transaction.update(userDoc.ref, {
-        enrolledPrograms: arrayUnion({
-          programId: programId,
-          enrollmentDate: Timestamp.now(),
-          status: "Enrolled",
-        }),
-      });
-    });
+      if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to register for program');
+      }
+
+      return await response.json();
   } catch (error) {
-    console.error("Error in registerForProgram:", error);
-    throw error;
+      console.error('Error registering for program:', error);
+      throw error;
   }
 };
 
 export const withdrawFromProgram = async (programId, userEmail) => {
   try {
-    const usersRef = collection(db, "users");
-    const q = query(usersRef, where("email", "==", userEmail));
-    const querySnapshot = await getDocs(q);
-
-    if (querySnapshot.empty) {
-      throw new Error("User not found");
-    }
-
-    const userDoc = querySnapshot.docs[0];
-    const userData = userDoc.data();
-    const programRef = doc(db, "training_programs", programId);
-
-    const enrollmentToRemove = userData.enrolledPrograms?.find(
-      (ep) => ep.programId === programId
-    );
-
-    if (!enrollmentToRemove) {
-      throw new Error("Not enrolled in this program");
-    }
-
-    // Use transaction to ensure atomicity
-    await runTransaction(db, async (transaction) => {
-      // Update program registrations
-      transaction.update(programRef, {
-        numberOfCurrentRegistrations: increment(-1),
+      const response = await fetch(`${API_URL}/training-programs/${programId}/withdraw`, {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ userEmail })
       });
 
-      // Update user enrollments
-      transaction.update(userDoc.ref, {
-        enrolledPrograms: arrayRemove(enrollmentToRemove),
-      });
-    });
+      if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to withdraw from program');
+      }
+
+      return await response.json();
   } catch (error) {
-    console.error("Error in withdrawFromProgram:", error);
-    throw error;
+      console.error('Error withdrawing from program:', error);
+      throw error;
   }
 };
 
-// Update program completion status
 export const updateProgramCompletionStatus = async () => {
   try {
-    const now = Timestamp.now();
-    const usersRef = collection(db, "users");
-    const usersSnapshot = await getDocs(usersRef);
-
-    for (const userDoc of usersSnapshot.docs) {
-      const userData = userDoc.data();
-      if (userData.enrolledPrograms) {
-        const updatedEnrollments = userData.enrolledPrograms.map(
-          (enrollment) => {
-            if (enrollment.status === "Enrolled") {
-              const programRef = doc(
-                db,
-                "training_programs",
-                enrollment.programId
-              );
-              return getDoc(programRef).then((programDoc) => {
-                const programData = programDoc.data();
-                if (programData.endDate.toDate() <= now.toDate()) {
-                  return { ...enrollment, status: "Completed" };
-                }
-                return enrollment;
-              });
-            }
-            return enrollment;
+      const response = await fetch(`${API_URL}/training-programs/update-completion`, {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json'
           }
-        );
+      });
 
-        const resolvedEnrollments = await Promise.all(updatedEnrollments);
-        await updateDoc(userDoc.ref, { enrolledPrograms: resolvedEnrollments });
+      if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to update program completion status');
       }
-    }
+
+      return await response.json();
   } catch (error) {
-    console.error("Error updating program completion status:", error);
-    throw error;
+      console.error('Error updating program completion status:', error);
+      throw error;
   }
 };
+
 
 export const getCargoManifests = async () => {
   try {
-    const manifestsRef = collection(db, "cargo_manifests");
-    const snapshot = await getDocs(manifestsRef);
-    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const response = await fetch(`${API_URL}/cargo-manifests`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch cargo manifests');
+    }
+    return await response.json();
   } catch (error) {
     console.error("Error fetching cargo manifests:", error);
     throw error;
