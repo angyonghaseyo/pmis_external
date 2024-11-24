@@ -457,6 +457,123 @@ export const deleteOperatorRequisition = async (requisitionId) => {
   }
 };
 
+// Warehouse management
+export const getWarehouses = async () => {
+  try {
+    const response = await fetch(`${API_URL}/warehouses`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch warehouses');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching warehouses:', error);
+    throw error;
+  }
+};
+
+export const getWarehouseById = async (warehouseId) => {
+  try {
+    const response = await fetch(`${API_URL}/warehouses/${warehouseId}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch warehouse');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching warehouse:', error);
+    throw error;
+  }
+};
+
+// Facility rental management
+export const getFacilityRentals = async () => {
+  try {
+    const response = await fetch(`${API_URL}/facility-rentals`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch facility rentals');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching facility rentals:', error);
+    throw error;
+  }
+};
+
+export const createFacilityRental = async (rentalData) => {
+  try {
+    const response = await fetch(`${API_URL}/facility-rentals`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(rentalData),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to create facility rental');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error creating facility rental:', error);
+    throw error;
+  }
+};
+
+export const updateFacilityRental = async (rentalId, updateData) => {
+  try {
+    const response = await fetch(`${API_URL}/facility-rentals/${rentalId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updateData),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to update facility rental');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating facility rental:', error);
+    throw error;
+  }
+};
+
+export const deleteFacilityRental = async (rentalId) => {
+  try {
+    const response = await fetch(`${API_URL}/facility-rentals/${rentalId}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      throw new Error('Failed to delete facility rental');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error deleting facility rental:', error);
+    throw error;
+  }
+};
+
+export const checkFacilityAvailability = async (facilityId, startTime, endTime) => {
+  try {
+    const response = await fetch(`${API_URL}/facility-rentals/check-availability`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        facilityId,
+        startTime,
+        endTime,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to check facility availability');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error checking facility availability:', error);
+    throw error;
+  }
+};
+
 export const getTrainingPrograms = async () => {
   try {
     const response = await fetch(`${API_URL}/training-programs`);
@@ -1926,6 +2043,13 @@ const api = {
   deleteInquiryFeedback,
   getCompanyInfo,
   updateCompanyInfo,
+  getWarehouses,
+  getWarehouseById,
+  getFacilityRentals,
+  createFacilityRental,
+  updateFacilityRental,
+  deleteFacilityRental,
+  checkFacilityAvailability,
   getOperatorRequisitions,
   createOperatorRequisition,
   updateOperatorRequisition,
