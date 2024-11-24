@@ -59,6 +59,61 @@ class ContainerRequestController {
             res.status(500).json({ error: 'Error deleting container request' });
         }
     }
+
+    async assignContainer(req, res) {
+        try {
+            console.log('Received container assignment request');
+            console.log('Request ID:', req.params.id);
+            console.log('Assignment data:', req.body);
+
+            const result = await this.containerRequestService.assignContainerToRequest(
+                req.params.id,
+                req.body
+            );
+
+            console.log('Assignment result:', result);
+            res.status(200).json(result);
+        } catch (error) {
+            console.error('Error in assignContainer:', error);
+            res.status(500).json({
+                error: error.message || 'Error assigning container'
+            });
+        }
+    }
+    async rejectRequest(req, res) {
+        try {
+            const { id } = req.params;
+            const rejectionData = req.body;
+
+            const result = await this.containerRequestService.rejectContainerRequest(
+                id,
+                rejectionData
+            );
+
+            res.status(200).json(result);
+        } catch (error) {
+            console.error('Error rejecting container request:', error);
+            res.status(500).json({
+                error: error.message || 'Error rejecting container request'
+            });
+        }
+    }
+
+    async getRequestsByCarrier(req, res) {
+        try {
+            console.log('Received carrier request for:', req.params.carrierName);
+            const requests = await this.containerRequestService
+                .getContainerRequestsByCarrier(req.params.carrierName);
+
+            console.log('Sending response with requests:', requests.length);
+            res.status(200).json(requests);
+        } catch (error) {
+            console.error('Error in getRequestsByCarrier:', error);
+            res.status(500).json({
+                error: error.message || 'Error fetching carrier requests'
+            });
+        }
+    }
 }
 
 module.exports = ContainerRequestController;

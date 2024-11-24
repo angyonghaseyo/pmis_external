@@ -1903,6 +1903,57 @@ export const deleteTransloadingRequest = async (requestId) => {
   }
 };
 
+export const getContainerRequestsByCarrier = async (carrierName) => {
+  try {
+    const response = await fetch(`${API_URL}/container-requests/carrier/${encodeURIComponent(carrierName)}`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch container requests");
+    }
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching container requests:", error);
+    throw error;
+  }
+};
+
+export const assignContainer = async (requestId, assignmentData) => {
+  try {
+    const response = await fetch(`${API_URL}/container-requests/${requestId}/assign`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(assignmentData),
+    });
+    if (!response.ok) {
+      throw new Error("Failed to assign container");
+    }
+    return await response.json();
+  } catch (error) {
+    console.error("Error assigning container:", error);
+    throw error;
+  }
+};
+
+export const rejectContainerRequest = async (requestId, rejectionData) => {
+  try {
+    const response = await fetch(`${API_URL}/container-requests/${requestId}/reject`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(rejectionData),
+    });
+    if (!response.ok) {
+      throw new Error("Failed to reject container request");
+    }
+    return await response.json();
+  } catch (error) {
+    console.error("Error rejecting container request:", error);
+    throw error;
+  }
+};
+
 const api = {
   loginUser,
   registerUser,
@@ -2001,7 +2052,10 @@ const api = {
   getTransloadingRequestById,
   submitTransloadingRequest,
   updateTransloadingRequest,
-  deleteTransloadingRequest
+  deleteTransloadingRequest,
+  getContainerRequestsByCarrier,
+  assignContainer,
+  rejectContainerRequest
 
 };
 

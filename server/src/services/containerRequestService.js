@@ -65,6 +65,86 @@ class ContainerRequestService {
             throw error;
         }
     }
+
+    async assignContainerToRequest(requestId, assignmentData) {
+        try {
+            console.log('Assigning container to request:', requestId);
+            console.log('Assignment data:', assignmentData);
+
+            const docRef = this.db.collection('container_requests').doc(requestId);
+            const doc = await docRef.get();
+
+            if (!doc.exists) {
+                console.error('Container request not found:', requestId);
+                throw new Error('Container request not found');
+            }
+
+            console.log('Current request data:', doc.data());
+
+            // Update the container request with assignment details
+            await docRef.update({
+                status: 'Assigned',
+                assignedContainerId: assignmentData.containerId,
+                assignedAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            });
+
+            console.log('Container request updated successfully');
+            return {
+                success: true,
+                message: 'Container assigned successfully'
+            };
+        } catch (error) {
+            console.error('Error in assignContainerToRequest:', error);
+            throw error;
+        }
+    }
+
+    async rejectContainerRequest(requestId, rejectionData) {
+        try {
+            const docRef = this.db.collection('container_requests').doc(requestId);
+            const doc = await docRef.get();
+
+            if (!doc.exists) {
+                throw new Error('Container request not found');
+            }
+
+            await docRef.update({
+                status: 'Rejected',
+                rejectionReason: rejectionData.reason,
+                rejectedAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            });
+
+            return {
+                success: true,
+                message: 'Container request rejected successfully'
+            };
+        } catch (error) {
+            console.error('Error in rejectContainerRequest:', error);
+            throw error;
+        }
+    }
+
+    async getContainerRequestsByCarrier(carrierName) {
+        try {
+            console.log('Fetching container requests for carrier:', carrierName);
+            const snapshot = await this.db.collection('container_requests')
+                .where('carrierName', '==', carrierName)
+                .get();
+
+            const requests = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            console.log('Retrieved container requests:', requests);
+            return requests;
+        } catch (error) {
+            console.error('Error in getContainerRequestsByCarrier:', error);
+            throw error;
+        }
+    }
+
 }
 
 module.exports = ContainerRequestService;
