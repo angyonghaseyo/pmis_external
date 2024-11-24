@@ -40,8 +40,9 @@ import {
     Visibility as ViewIcon,
 } from '@mui/icons-material';
 import { useAuth } from './AuthContext';
+import api from './services/api'; // Import the api methods
+import { CircularProgress } from '@mui/material';
 
-const db = getFirestore();
 
 const ContainerRequestsList = () => {
     const [selectedRequest, setSelectedRequest] = useState(null);
@@ -64,7 +65,7 @@ const ContainerRequestsList = () => {
         message: '',
         severity: 'info'
     });
-
+    const [dialogKey, setDialogKey] = useState(0);
     useEffect(() => {
         if (user?.company) {
             fetchData();
@@ -103,19 +104,11 @@ const ContainerRequestsList = () => {
         }
     }, [user]);
 
+
     const fetchData = async () => {
         setIsLoading(true);
         try {
-            const requestsSnapshot = await getDocs(collection(db, "container_requests"));
-            const requestsData = requestsSnapshot.docs
-                .map(doc => ({
-                    id: doc.id,
-                    ...doc.data(),
-                    eta: doc.data().eta,
-                    etd: doc.data().etd,
-                }))
-                .filter(request => request.carrierName === user.company);
-
+            const requestsData = await api.getContainerRequestsByCarrier(user.company);
             setRequests(requestsData);
         } catch (error) {
             console.error("Failed fetching requests", error);
@@ -125,31 +118,17 @@ const ContainerRequestsList = () => {
         }
     };
 
-    const fetchCompanyContainerTypes = async () => {
-        try {
-            const menuDoc = await getDoc(doc(db, "container_menu", user.company));
-            if (menuDoc.exists()) {
-                setCompanyContainerTypes(menuDoc.data().container_types || []);
-            }
-        } catch (error) {
-            console.error("Error fetching company container types:", error);
-            showAlert("Error loading container types", "error");
-        }
-    };
+
 
     const fetchContainerMenuImages = async () => {
         try {
-            const menuDoc = await getDoc(doc(db, "container_menu", user.company));
-            if (menuDoc.exists()) {
-                const containerTypes = menuDoc.data().container_types || [];
-                const images = {};
-                containerTypes.forEach(type => {
-                    images[type.name] = type.imageUrl || '/api/placeholder/400/320';
-                });
-                setContainerImages(images);
-                return images;
-            }
-            return {};
+            const containerTypes = await api.getContainerTypesForCompany(user.company);
+            const images = {};
+            containerTypes.forEach(type => {
+                images[type.name] = type.imageUrl || '/api/placeholder/400/320';
+            });
+            setContainerImages(images);
+            return images;
         } catch (error) {
             console.error("Error fetching container menu images:", error);
             return {};
@@ -162,63 +141,91 @@ const ContainerRequestsList = () => {
     };
 
     const handleRequestClick = async (request) => {
+        console.log('Edit icon clicked. Request data:', request);
+        setIsLoading(true);
+
         try {
-            setSelectedRequest(request);
+            await new Promise(resolve => {
+                setSelectedRequest(request);
+                setIsDialogOpen(true);
+                resolve();
+            });
 
-            // Get container images from menu
-            await fetchContainerMenuImages();
+            const images = await fetchContainerMenuImages();
+            console.log('Container images fetched:', images);
 
-            // Get and filter containers from carrier_container_prices
-            const carrierDoc = await getDoc(doc(db, "carrier_container_prices", user.company));
-            if (carrierDoc.exists()) {
-                const allContainers = carrierDoc.data().containers || [];
+            const carrierPrices = await api.getCarrierContainerPrices(user.company);
+            console.log('Carrier prices received:', carrierPrices);
 
-                // Filter containers based on the requested container type (name)
-                const filteredContainers = allContainers.filter(container =>
-                    container.name === request.containerDetails?.name
-                );
+            if (carrierPrices?.length > 0) {  // Changed from carrierPrices?.containers
+                // Flatten the array of containers if needed
+                const allContainers = carrierPrices.flatMap(price => ({
+                    ...price,
+                    name: price.name,
+                    EquipmentID: price.EquipmentID,
+                    size: price.size,
+                    price: price.price,
+                    bookingStatus: price.bookingStatus,
+                    spaceUsed: price.spaceUsed || '0'
+                }));
 
-                console.log('Requested container type:', request.containerDetails?.name);
-                console.log('Available containers:', filteredContainers);
+                console.log('All containers before filtering:', allContainers);
+                console.log('Looking for container type:', request.containerDetails?.name);
 
-                setAvailableContainers(filteredContainers);
-
-                // Calculate availability for filtered containers
-                const availability = {};
-                const spaceUsage = {};
-
-                filteredContainers.forEach(container => {
-                    const currentSpaceUsed = parseFloat(container.spaceUsed || 0);
-                    const totalSpace = parseFloat(container.size);
-                    const requestedSpace = request.consolidationService ?
-                        parseFloat(request.consolidationSpace) : totalSpace;
-
-                    const isAvailable = container.bookingStatus === 'available';
-                    const hasSpace = container.bookingStatus === 'consolidation' &&
-                        (totalSpace - currentSpaceUsed) >= requestedSpace;
-
-                    availability[container.EquipmentID] = isAvailable || hasSpace;
-                    spaceUsage[container.EquipmentID] = {
-                        used: currentSpaceUsed,
-                        total: totalSpace,
-                        percentage: (currentSpaceUsed / totalSpace) * 100
-                    };
+                // Updated filtering logic
+                const filteredContainers = allContainers.filter(container => {
+                    console.log('Comparing container name:', container.name, 'with requested name:', request.containerDetails?.name);
+                    return container.name.trim() === request.containerDetails?.name.trim();
                 });
 
-                setContainerAvailability(availability);
-                setContainerSpaceUsage(spaceUsage);
+                console.log('Filtered containers:', filteredContainers);
 
-                setIsDialogOpen(true);
+                // Update all states at once
+                await new Promise(resolve => {
+                    setAvailableContainers(filteredContainers);
+
+                    const availability = {};
+                    const spaceUsage = {};
+
+                    filteredContainers.forEach(container => {
+                        const currentSpaceUsed = parseFloat(container.spaceUsed || 0);
+                        const totalSpace = parseFloat(container.size);
+                        const requestedSpace = request.consolidationService ?
+                            parseFloat(request.consolidationSpace) : totalSpace;
+
+                        // Updated availability check
+                        const isAvailable = container.bookingStatus === 'available';
+                        const hasSpace = container.bookingStatus === 'consolidation' &&
+                            (totalSpace - currentSpaceUsed) >= requestedSpace;
+
+                        availability[container.EquipmentID] = isAvailable || hasSpace;
+                        spaceUsage[container.EquipmentID] = {
+                            used: currentSpaceUsed,
+                            total: totalSpace,
+                            percentage: (currentSpaceUsed / totalSpace) * 100
+                        };
+                    });
+
+                    console.log('Container availability:', availability);
+                    console.log('Container space usage:', spaceUsage);
+
+                    setContainerAvailability(availability);
+                    setContainerSpaceUsage(spaceUsage);
+                    setDialogKey(prev => prev + 1);
+                    resolve();
+                });
 
                 if (filteredContainers.length === 0) {
+                    console.log('No containers found after filtering');
                     showAlert(`No available containers of type ${request.containerDetails?.name}`, "warning");
                 }
-            } else {
-                showAlert("No container pricing data found", "error");
             }
         } catch (error) {
-            console.error("Error preparing container data:", error);
+            console.error('Error in handleRequestClick:', error);
             showAlert("Error loading container data: " + error.message, "error");
+            setIsDialogOpen(false);
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -227,86 +234,22 @@ const ContainerRequestsList = () => {
         if (!selectedRequest || !container) return;
 
         try {
-            // Check availability again before assigning
             if (!containerAvailability[container.EquipmentID]) {
                 throw new Error("Container is no longer available");
             }
 
-            await runTransaction(db, async (transaction) => {
-                // Get the latest container data
-                const carrierContainerRef = doc(db, "carrier_container_prices", user.company);
-                const carrierDoc = await transaction.get(carrierContainerRef);
-
-                if (!carrierDoc.exists()) {
-                    throw new Error("Carrier container prices not found");
+            const assignmentData = {
+                containerId: container.EquipmentID,
+                carrierName: user.company,
+                containerDetails: {
+                    EquipmentID: container.EquipmentID,
+                    size: container.size,
+                    price: container.price,
+                    serviceType: selectedRequest.consolidationService ? 'consolidation' : 'fullContainer'
                 }
+            };
 
-                const containers = carrierDoc.data().containers || [];
-                const containerIndex = containers.findIndex(c => c.EquipmentID === container.EquipmentID);
-
-                if (containerIndex === -1) {
-                    throw new Error("Container not found");
-                }
-
-                // Calculate new space used for consolidation service
-                let newSpaceUsed = parseFloat(containers[containerIndex].spaceUsed || 0);
-                let newStatus = containers[containerIndex].bookingStatus;
-
-                if (selectedRequest.consolidationService) {
-                    newSpaceUsed += parseFloat(selectedRequest.consolidationSpace);
-                    newStatus = 'consolidation';
-
-                    if (newSpaceUsed > parseFloat(container.size)) {
-                        throw new Error("Not enough space available in container");
-                    }
-                } else {
-                    newStatus = 'unavailable';
-                    newSpaceUsed = parseFloat(container.size);
-                }
-
-                // Update container data
-                containers[containerIndex] = {
-                    ...containers[containerIndex],
-                    spaceUsed: newSpaceUsed,
-                    bookingStatus: newStatus,
-                    updatedAt: new Date().toISOString()
-                };
-
-                // Update carrier_container_prices document
-                transaction.update(carrierContainerRef, {
-                    containers: containers,
-                    lastUpdated: new Date().toISOString()
-                });
-
-                // Update container request status
-                transaction.update(doc(db, "container_requests", selectedRequest.id), {
-                    status: "Assigned",
-                    assignedContainerId: container.EquipmentID,
-                    containerDetails: {
-                        EquipmentID: container.EquipmentID,
-                        size: container.size,
-                        price: container.price,
-                        serviceType: selectedRequest.consolidationService ? 'consolidation' : 'fullContainer'
-                    },
-                    updatedAt: new Date().toISOString()
-                });
-
-                // Update booking if exists
-                const bookingQuery = query(
-                    collection(db, "bookings"),
-                    where(`cargo.${selectedRequest.cargoId}`, '!=', null)
-                );
-                const bookingSnapshot = await getDocs(bookingQuery);
-
-                if (!bookingSnapshot.empty) {
-                    const bookingDoc = bookingSnapshot.docs[0];
-                    transaction.update(doc(db, "bookings", bookingDoc.id), {
-                        [`cargo.${selectedRequest.cargoId}.isContainerRented`]: true,
-                        [`cargo.${selectedRequest.cargoId}.assignedContainerId`]: container.EquipmentID,
-                        [`cargo.${selectedRequest.cargoId}.carrierName`]: user.company
-                    });
-                }
-            });
+            await api.assignContainer(selectedRequest.id, assignmentData);
 
             showAlert("Container assigned successfully");
             await fetchData();
@@ -319,11 +262,12 @@ const ContainerRequestsList = () => {
     };
 
 
+
     const fetchContainerAvailability = async () => {
         try {
-            const carrierDoc = await getDoc(doc(db, "carrier_container_prices", user.company));
-            if (carrierDoc.exists()) {
-                const containers = carrierDoc.data().containers || [];
+            const carrierPrices = await api.getCarrierContainerPrices(user.company);
+            if (carrierPrices?.containers) {
+                const containers = carrierPrices.containers;
                 const availability = {};
                 const spaceUsage = {};
 
@@ -362,12 +306,11 @@ const ContainerRequestsList = () => {
         if (!selectedRequest || !rejectionReason) return;
 
         try {
-            await updateDoc(doc(db, "container_requests", selectedRequest.id), {
-                status: "Rejected",
-                rejectionReason: rejectionReason
-            });
+            setIsRejecting(true);
+            await api.rejectContainerRequest(selectedRequest.id, { reason: rejectionReason });
 
             showAlert("Request rejected successfully");
+            await fetchData();
             setIsDialogOpen(false);
             setRejectionReason('');
             setIsRejecting(false);
@@ -874,11 +817,14 @@ const ContainerRequestsList = () => {
             </TableContainer>
 
             <Dialog
+                key={dialogKey}
                 open={isDialogOpen}
                 onClose={() => {
+                    console.log('Dialog closing...');
                     setIsDialogOpen(false);
                     setIsRejecting(false);
                     setRejectionReason('');
+                    setSelectedRequest(null);
                 }}
                 maxWidth="lg"
                 fullWidth
@@ -887,12 +833,14 @@ const ContainerRequestsList = () => {
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Typography variant="h6">
                             {isRejecting ? 'Reject Request' : (
-                                <>
-                                    Assign Container - {selectedRequest?.containerDetails?.name}
-                                    {selectedRequest?.consolidationService &&
-                                        ` (${selectedRequest.consolidationSpace}ft³ needed)`
-                                    }
-                                </>
+                                selectedRequest && (
+                                    <>
+                                        Assign Container - {selectedRequest?.containerDetails?.name}
+                                        {selectedRequest?.consolidationService &&
+                                            ` (${selectedRequest.consolidationSpace}ft³ needed)`
+                                        }
+                                    </>
+                                )
                             )}
                         </Typography>
                         <IconButton
@@ -904,7 +852,11 @@ const ContainerRequestsList = () => {
                     </Box>
                 </DialogTitle>
                 <DialogContent>
-                    {isRejecting ? (
+                    {isLoading ? (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                            <CircularProgress />
+                        </Box>
+                    ) : isRejecting ? (
                         <TextField
                             fullWidth
                             label="Rejection Reason"
