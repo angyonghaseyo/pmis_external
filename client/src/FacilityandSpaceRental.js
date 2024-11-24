@@ -28,7 +28,8 @@ import {
     Divider,
     CircularProgress,
     Snackbar,
-    Stack
+    Stack,
+    Tooltip
 } from '@mui/material';
 import {
     Warehouse,
@@ -40,14 +41,21 @@ import {
     Event,
     AccessTime
 } from '@mui/icons-material';
-import { collection, addDoc, getDocs, doc, getDoc, deleteDoc } from 'firebase/firestore';
-import { db } from './firebaseConfig';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { addHours, isBefore, isAfter, format } from 'date-fns';
 import { useAuth } from "./AuthContext";
+import { 
+    getWarehouses, 
+    getFacilityRentals, 
+    createFacilityRental, 
+    updateFacilityRental,
+    deleteFacilityRental,
+    getWarehouseById 
+} from './services/api';
 
+// Steps for the rental process
 const steps = ['Select Warehouse', 'Specify Booking Hours', 'Review & Submit'];
 
 // Utility function to check for booking conflicts
@@ -82,7 +90,6 @@ const FacilityandSpaceRental = () => {
     const [openDialog, setOpenDialog] = useState(false);
     const [selectedFacility, setSelectedFacility] = useState(null);
     const [facilities, setFacilities] = useState([]);
-    const [company, setCompany] = useState(''); 
     const [formData, setFormData] = useState({
         company: user?.company,
         facilityId: '',
@@ -101,7 +108,6 @@ const FacilityandSpaceRental = () => {
     const [viewMode, setViewMode] = useState(false);
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [bookingConflict, setBookingConflict] = useState(false);
-
     // Effects
     useEffect(() => {
         fetchFacilities();
@@ -123,14 +129,8 @@ const FacilityandSpaceRental = () => {
     const fetchFacilities = async () => {
         try {
             setLoading(true);
-            const querySnapshot = await getDocs(collection(db, 'Warehouse'));
-            const facilitiesData = querySnapshot.docs.map(doc => ({
-                id: doc.id,
-                warehouseId: doc.id,
-                ...doc.data(),
-                bookedPeriods: doc.data().bookedPeriods || []
-            })).filter(facility => facility.status === 'Available');
-            setFacilities(facilitiesData);
+            const response = await getWarehouses();
+            setFacilities(response);
         } catch (error) {
             console.error('Error fetching facilities:', error);
             showSnackbar('Error fetching facilities', 'error');
@@ -141,12 +141,8 @@ const FacilityandSpaceRental = () => {
 
     const fetchRentalRequests = async () => {
         try {
-            const querySnapshot = await getDocs(collection(db, 'facility_rentals'));
-            const requests = querySnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
-            setRentalRequests(requests);
+            const requests = await getFacilityRentals();
+            setRentalRequests(requests.filter(request => request.company === user.company));
         } catch (error) {
             console.error('Error fetching rental requests:', error);
             showSnackbar('Error fetching rental requests', 'error');
@@ -157,11 +153,10 @@ const FacilityandSpaceRental = () => {
     const handleViewDetails = async (request) => {
         try {
             setLoading(true);
-            const facilityRef = doc(db, 'Warehouse', request.facilityId);
-            const facilityDoc = await getDoc(facilityRef);
+            const facilityData = await getWarehouseById(request.facilityId);
             
-            if (facilityDoc.exists()) {
-                setSelectedFacility({ id: facilityDoc.id, ...facilityDoc.data() });
+            if (facilityData) {
+                setSelectedFacility(facilityData);
             }
             
             setSelectedRequest(request);
@@ -277,7 +272,7 @@ const FacilityandSpaceRental = () => {
                 createdAt: new Date().toISOString()
             };
 
-            await addDoc(collection(db, 'facility_rentals'), rentalData);
+            await createFacilityRental(rentalData);
             showSnackbar('Rental request submitted successfully', 'success');
             handleCloseDialog();
             await fetchRentalRequests();
@@ -308,7 +303,7 @@ const FacilityandSpaceRental = () => {
     const handleCancelRequest = async (requestId) => {
         try {
             setLoading(true);
-            await deleteDoc(doc(db, 'facility_rentals', requestId));
+            await deleteFacilityRental(requestId);
             showSnackbar('Request cancelled successfully', 'success');
             await fetchRentalRequests();
         } catch (error) {
@@ -335,8 +330,7 @@ const FacilityandSpaceRental = () => {
                 </Box>
             ));
     };
-
-    // Content rendering based on step
+    // Step content rendering
     const getStepContent = (step) => {
         if (viewMode) {
             return (
@@ -384,6 +378,16 @@ const FacilityandSpaceRental = () => {
                                         }
                                     />
                                 </Box>
+                                {selectedRequest?.status === 'Rejected' && selectedRequest?.rejectionReason && (
+                                    <Alert severity="error" sx={{ mt: 2 }}>
+                                        <Typography variant="subtitle2" gutterBottom>
+                                            Rejection Reason:
+                                        </Typography>
+                                        <Typography variant="body2">
+                                            {selectedRequest.rejectionReason}
+                                        </Typography>
+                                    </Alert>
+                                )}
                             </Paper>
                         </Grid>
 
@@ -441,255 +445,261 @@ const FacilityandSpaceRental = () => {
                                         }}}
                                         onClick={() => handleFacilitySelect(facility)}
                                     >
-                                        <CardContent>
-                                            <Stack spacing={2}>
-                                                <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                                                    <Warehouse sx={{ fontSize: 40 }} />
-                                                </Box>
-                                                <Typography variant="h6">
-                                                    {facility.name}
-                                                </Typography>
-                                                <Typography variant="body2" color="text.secondary">
-                                                    Warehouse - {facility.squareFootage} sq ft
-                                                </Typography>
-                                                <Typography variant="h6" color="primary">
-                                                    ${(facility.pricePerDay / 24).toFixed(2)}/hour
-                                                </Typography>
-                                                {facility.features && (
-                                                    <Typography variant="body2" color="text.secondary">
-                                                        Features: {facility.features}
-                                                    </Typography>
-                                                )}
-                                                <Divider />
-                                                <Box>
-                                                    <Typography variant="subtitle2" gutterBottom>
-                                                        Current Bookings:
-                                                    </Typography>
-                                                    {getApprovedBookingsDisplay(facility)}
-                                                </Box>
-                                            </Stack>
-                                        </CardContent>
-                                    </Card>
-                                </Grid>
-                            ))}
-                        </Grid>
-                    );
-    
-                case 1:
-                    return (
-                        <Box>
-                            <Alert
-                                severity={bookingConflict ? 'error' : 'info'}
-                                sx={{ mb: 3 }}
-                            >
-                                {bookingConflict
-                                    ? 'Selected time slot conflicts with existing bookings'
-                                    : 'Please select your desired booking hours'}
-                            </Alert>
-                            <Grid container spacing={3}>
-                                <Grid item xs={12} sm={6}>
-                                    <LocalizationProvider dateAdapter={AdapterDateFns}>
-                                        <DateTimePicker
-                                            label="Start Time"
-                                            value={formData.startTime}
-                                            onChange={(date) => setFormData(prev => ({
-                                                ...prev,
-                                                startTime: date
-                                            }))}
-                                            renderInput={(params) => <TextField {...params} fullWidth />}
-                                            minDate={new Date()}
-                                            minutesStep={60}
-                                        />
-                                    </LocalizationProvider>
-                                </Grid>
-                                <Grid item xs={12} sm={6}>
-                                    <LocalizationProvider dateAdapter={AdapterDateFns}>
-                                        <DateTimePicker
-                                            label="End Time"
-                                            value={formData.endTime}
-                                            onChange={(date) => setFormData(prev => ({
-                                                ...prev,
-                                                endTime: date
-                                            }))}
-                                            renderInput={(params) => <TextField {...params} fullWidth />}
-                                            minDate={formData.startTime || new Date()}
-                                            minutesStep={60}
-                                        />
-                                    </LocalizationProvider>
-                                </Grid>
-                                <Grid item xs={12}>
-                                    <TextField
-                                        fullWidth
-                                        label="Purpose of Rental"
-                                        value={formData.purpose}
-                                        onChange={(e) => setFormData(prev => ({
-                                            ...prev,
-                                            purpose: e.target.value
-                                        }))}
-                                        multiline
-                                        rows={3}
-                                        required
-                                    />
-                                </Grid>
-                                <Grid item xs={12}>
-                                    <TextField
-                                        fullWidth
-                                        label="Special Requirements"
-                                        value={formData.specialRequirements}
-                                        onChange={(e) => setFormData(prev => ({
-                                            ...prev,
-                                            specialRequirements: e.target.value
-                                        }))}
-                                        multiline
-                                        rows={3}
-                                    />
-                                </Grid>
-                            </Grid>
-                        </Box>
-                    );
-    
-                case 2:
-                    return (
-                        <Box>
-                            <Typography variant="h6" gutterBottom>
-                                Review Booking Details
-                            </Typography>
-                            <Grid container spacing={2}>
-                                <Grid item xs={12}>
-                                    <Paper sx={{ p: 2 }}>
-                                        <Typography variant="subtitle1" gutterBottom>
-                                            Selected Warehouse
-                                        </Typography>
-                                        <Typography variant="body1" color="primary">
-                                            {selectedFacility?.name} - {selectedFacility?.squareFootage} sq ft
-                                        </Typography>
-                                        {selectedFacility?.features && (
-                                            <Typography variant="body2" color="text.secondary">
-                                                Features: {selectedFacility.features}
-                                            </Typography>
-                                        )}
-                                    </Paper>
-                                </Grid>
-    
-                                <Grid item xs={12}>
-                                    <Paper sx={{ p: 2 }}>
-                                        <Typography variant="subtitle1" gutterBottom>
-                                            Booking Period
-                                        </Typography>
-                                        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                                            <AccessTime color="primary" />
-                                            <Box>
-                                                <Typography variant="body2" color="text.secondary">
-                                                    Start: {formData.startTime?.toLocaleString()}
-                                                </Typography>
-                                                <Typography variant="body2" color="text.secondary">
-                                                    End: {formData.endTime?.toLocaleString()}
-                                                </Typography>
-                                                <Typography variant="body2" color="text.secondary">
-                                                    Duration: {Math.ceil(
-                                                        (new Date(formData.endTime) - new Date(formData.startTime)) / 
-                                                        (1000 * 60 * 60)
-                                                    )} hours
-                                                </Typography>
+                                    <CardContent>
+                                        <Stack spacing={2}>
+                                            <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                                                <Warehouse sx={{ fontSize: 40 }} />
                                             </Box>
-                                        </Box>
-                                    </Paper>
-                                </Grid>
-    
-                                <Grid item xs={12}>
-                                    <Paper sx={{ p: 2 }}>
-                                        <Typography variant="subtitle1" gutterBottom>
-                                            Total Price
-                                        </Typography>
-                                        <Typography variant="h4" color="primary">
-                                            ${calculateTotalPrice().toFixed(2)}
-                                        </Typography>
-                                    </Paper>
-                                </Grid>
-    
-                                <Grid item xs={12}>
-                                    <Paper sx={{ p: 2 }}>
-                                        <Typography variant="subtitle1" gutterBottom>
-                                            Purpose & Requirements
-                                        </Typography>
-                                        <Typography variant="body2" paragraph>
-                                            <strong>Purpose:</strong> {formData.purpose}
-                                        </Typography>
-                                        {formData.specialRequirements && (
-                                            <Typography variant="body2">
-                                                <strong>Special Requirements:</strong> {formData.specialRequirements}
+                                            <Typography variant="h6">
+                                                {facility.name}
                                             </Typography>
-                                        )}
-                                    </Paper>
-                                </Grid>
+                                            <Typography variant="body2" color="text.secondary">
+                                                Warehouse - {facility.squareFootage} sq ft
+                                            </Typography>
+                                            <Typography variant="h6" color="primary">
+                                                ${(facility.pricePerDay / 24).toFixed(2)}/hour
+                                            </Typography>
+                                            {facility.features && (
+                                                <Typography variant="body2" color="text.secondary">
+                                                    Features: {facility.features}
+                                                </Typography>
+                                            )}
+                                            <Divider />
+                                            <Box>
+                                                <Typography variant="subtitle2" gutterBottom>
+                                                    Current Bookings:
+                                                </Typography>
+                                                {getApprovedBookingsDisplay(facility)}
+                                            </Box>
+                                        </Stack>
+                                    </CardContent>
+                                </Card>
                             </Grid>
-                        </Box>
-                    );
-    
-                default:
-                    return 'Unknown step';
-            }
-        };
-    
-        return (
-            <Container maxWidth="lg" sx={{ py: 4 }}>
-                <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
-                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-                        <Typography variant="h4">Warehouse Rental</Typography>
-                        <Button
-                            variant="contained"
-                            onClick={() => setOpenDialog(true)}
-                            startIcon={<Warehouse />}
+                        ))}
+                    </Grid>
+                );
+            case 1:
+                return (
+                    <Box>
+                        <Alert
+                            severity={bookingConflict ? 'error' : 'info'}
+                            sx={{ mb: 3 }}
                         >
-                            Rent Warehouse
-                        </Button>
+                            {bookingConflict
+                                ? 'Selected time slot conflicts with existing bookings'
+                                : 'Please select your desired booking hours'}
+                        </Alert>
+                        <Grid container spacing={3}>
+                            <Grid item xs={12} sm={6}>
+                                <LocalizationProvider dateAdapter={AdapterDateFns}>
+                                    <DateTimePicker
+                                        label="Start Time"
+                                        value={formData.startTime}
+                                        onChange={(date) => setFormData(prev => ({
+                                            ...prev,
+                                            startTime: date
+                                        }))}
+                                        renderInput={(params) => <TextField {...params} fullWidth />}
+                                        minDate={new Date()}
+                                        minutesStep={60}
+                                    />
+                                </LocalizationProvider>
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <LocalizationProvider dateAdapter={AdapterDateFns}>
+                                    <DateTimePicker
+                                        label="End Time"
+                                        value={formData.endTime}
+                                        onChange={(date) => setFormData(prev => ({
+                                            ...prev,
+                                            endTime: date
+                                        }))}
+                                        renderInput={(params) => <TextField {...params} fullWidth />}
+                                        minDate={formData.startTime || new Date()}
+                                        minutesStep={60}
+                                    />
+                                </LocalizationProvider>
+                            </Grid>
+                            <Grid item xs={12}>
+                                <TextField
+                                    fullWidth
+                                    label="Purpose of Rental"
+                                    value={formData.purpose}
+                                    onChange={(e) => setFormData(prev => ({
+                                        ...prev,
+                                        purpose: e.target.value
+                                    }))}
+                                    multiline
+                                    rows={3}
+                                    required
+                                />
+                            </Grid>
+                            <Grid item xs={12}>
+                                <TextField
+                                    fullWidth
+                                    label="Special Requirements"
+                                    value={formData.specialRequirements}
+                                    onChange={(e) => setFormData(prev => ({
+                                        ...prev,
+                                        specialRequirements: e.target.value
+                                    }))}
+                                    multiline
+                                    rows={3}
+                                />
+                            </Grid>
+                        </Grid>
                     </Box>
-    
-                    <TableContainer>
-                        <Table>
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell>Warehouse</TableCell>
-                                    <TableCell>Booking Period</TableCell>
-                                    <TableCell>Duration</TableCell>
-                                    <TableCell>Total Price</TableCell>
-                                    <TableCell>Status</TableCell>
-                                    <TableCell>Actions</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {loading ? (
-                                    <TableRow>
-                                        <TableCell colSpan={6} align="center">
-                                            <CircularProgress />
-                                        </TableCell>
-                                    </TableRow>
-                                ) : rentalRequests.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={6} align="center">
-                                            <Typography>No rental requests found</Typography>
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    rentalRequests.map((request) => (
-                                        <TableRow key={request.id}>
-                                            <TableCell>{request.facilityName}</TableCell>
-                                            <TableCell>
-                                                <Typography variant="body2">
-                                                    {new Date(request.startTime).toLocaleString()}
-                                                </Typography>
-                                                <Typography variant="body2">
-                                                    {new Date(request.endTime).toLocaleString()}
-                                                </Typography>
-                                            </TableCell>
-                                            <TableCell>
-                                                {Math.ceil(
-                                                    (new Date(request.endTime) - new Date(request.startTime)) / 
+                );
+
+            case 2:
+                return (
+                    <Box>
+                        <Typography variant="h6" gutterBottom>
+                            Review Booking Details
+                        </Typography>
+                        <Grid container spacing={2}>
+                            <Grid item xs={12}>
+                                <Paper sx={{ p: 2 }}>
+                                    <Typography variant="subtitle1" gutterBottom>
+                                        Selected Warehouse
+                                    </Typography>
+                                    <Typography variant="body1" color="primary">
+                                        {selectedFacility?.name} - {selectedFacility?.squareFootage} sq ft
+                                    </Typography>
+                                    {selectedFacility?.features && (
+                                        <Typography variant="body2" color="text.secondary">
+                                            Features: {selectedFacility.features}
+                                        </Typography>
+                                    )}
+                                </Paper>
+                            </Grid>
+
+                            <Grid item xs={12}>
+                                <Paper sx={{ p: 2 }}>
+                                    <Typography variant="subtitle1" gutterBottom>
+                                        Booking Period
+                                    </Typography>
+                                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                                        <AccessTime color="primary" />
+                                        <Box>
+                                            <Typography variant="body2" color="text.secondary">
+                                                Start: {formData.startTime?.toLocaleString()}
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                End: {formData.endTime?.toLocaleString()}
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                Duration: {Math.ceil(
+                                                    (new Date(formData.endTime) - new Date(formData.startTime)) / 
                                                     (1000 * 60 * 60)
                                                 )} hours
-                                            </TableCell>
-                                            <TableCell>${request.totalPrice.toFixed(2)}</TableCell>
-                                            <TableCell>
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </Paper>
+                            </Grid>
+
+                            <Grid item xs={12}>
+                                <Paper sx={{ p: 2 }}>
+                                    <Typography variant="subtitle1" gutterBottom>
+                                        Total Price
+                                    </Typography>
+                                    <Typography variant="h4" color="primary">
+                                        ${calculateTotalPrice().toFixed(2)}
+                                    </Typography>
+                                </Paper>
+                            </Grid>
+
+                            <Grid item xs={12}>
+                                <Paper sx={{ p: 2 }}>
+                                    <Typography variant="subtitle1" gutterBottom>
+                                        Purpose & Requirements
+                                    </Typography>
+                                    <Typography variant="body2" paragraph>
+                                        <strong>Purpose:</strong> {formData.purpose}
+                                    </Typography>
+                                    {formData.specialRequirements && (
+                                        <Typography variant="body2">
+                                            <strong>Special Requirements:</strong> {formData.specialRequirements}
+                                        </Typography>
+                                    )}
+                                </Paper>
+                            </Grid>
+                        </Grid>
+                    </Box>
+                );
+
+            default:
+                return 'Unknown step';
+        }
+    };
+    return (
+        <Container maxWidth="lg" sx={{ py: 4 }}>
+            <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+                    <Typography variant="h4">Warehouse Rental</Typography>
+                    <Button
+                        variant="contained"
+                        onClick={() => setOpenDialog(true)}
+                        startIcon={<Warehouse />}
+                    >
+                        Rent Warehouse
+                    </Button>
+                </Box>
+
+                <TableContainer>
+                    <Table>
+                        <TableHead>
+                            <TableRow>
+                                <TableCell>Warehouse</TableCell>
+                                <TableCell>Booking Period</TableCell>
+                                <TableCell>Duration</TableCell>
+                                <TableCell>Total Price</TableCell>
+                                <TableCell>Status</TableCell>
+                                <TableCell>Actions</TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {loading ? (
+                                <TableRow>
+                                    <TableCell colSpan={6} align="center">
+                                        <CircularProgress />
+                                    </TableCell>
+                                </TableRow>
+                            ) : rentalRequests.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={6} align="center">
+                                        <Typography>No rental requests found</Typography>
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
+                                rentalRequests.map((request) => (
+                                    <TableRow key={request.id}>
+                                        <TableCell>{request.facilityName}</TableCell>
+                                        <TableCell>
+                                            <Typography variant="body2">
+                                                {new Date(request.startTime).toLocaleString()}
+                                            </Typography>
+                                            <Typography variant="body2">
+                                                {new Date(request.endTime).toLocaleString()}
+                                            </Typography>
+                                        </TableCell>
+                                        <TableCell>
+                                            {Math.ceil(
+                                                (new Date(request.endTime) - new Date(request.startTime)) / 
+                                                (1000 * 60 * 60)
+                                            )} hours
+                                        </TableCell>
+                                        <TableCell>${request.totalPrice.toFixed(2)}</TableCell>
+                                        <TableCell>
+                                            <Tooltip 
+                                                title={
+                                                    request.status === 'Rejected' && request.rejectionReason 
+                                                        ? request.rejectionReason 
+                                                        : ''
+                                                }
+                                                arrow
+                                            >
                                                 <Chip
                                                     label={request.status}
                                                     color={
@@ -698,114 +708,115 @@ const FacilityandSpaceRental = () => {
                                                     }
                                                     size="small"
                                                 />
-                                            </TableCell>
-                                            <TableCell>
+                                            </Tooltip>
+                                        </TableCell>
+                                        <TableCell>
+                                            <IconButton
+                                                size="small"
+                                                color="primary"
+                                                onClick={() => handleViewDetails(request)}
+                                            >
+                                                <Visibility />
+                                            </IconButton>
+                                            {request.status === 'Pending' && (
                                                 <IconButton
                                                     size="small"
-                                                    color="primary"
-                                                    onClick={() => handleViewDetails(request)}
+                                                    color="error"
+                                                    onClick={() => handleCancelRequest(request.id)}
                                                 >
-                                                    <Visibility />
+                                                    <Cancel />
                                                 </IconButton>
-                                                {request.status === 'Pending' && (
-                                                    <IconButton
-                                                        size="small"
-                                                        color="error"
-                                                        onClick={() => handleCancelRequest(request.id)}
-                                                    >
-                                                        <Cancel />
-                                                    </IconButton>
-                                                )}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                </Paper>
-    
-                <Dialog
-                    open={openDialog}
-                    onClose={handleCloseDialog}
-                    maxWidth="md"
-                    fullWidth
-                >
-                    <DialogTitle>
-                        <Box display="flex" justifyContent="space-between" alignItems="center">
-                            <Typography variant="h6">
-                                {viewMode ? 'Rental Request Details' : 'New Warehouse Rental'}
-                            </Typography>
-                            <IconButton
-                                onClick={handleCloseDialog}
-                                size="small"
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+            </Paper>
+
+            <Dialog
+                open={openDialog}
+                onClose={handleCloseDialog}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle>
+                    <Box display="flex" justifyContent="space-between" alignItems="center">
+                        <Typography variant="h6">
+                            {viewMode ? 'Rental Request Details' : 'New Warehouse Rental'}
+                        </Typography>
+                        <IconButton
+                            onClick={handleCloseDialog}
+                            size="small"
+                        >
+                            <Close />
+                        </IconButton>
+                    </Box>
+                </DialogTitle>
+
+                <DialogContent>
+                    {!viewMode && (
+                        <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
+                            {steps.map((label) => (
+                                <Step key={label}>
+                                    <StepLabel>{label}</StepLabel>
+                                </Step>
+                            ))}
+                        </Stepper>
+                    )}
+                    {getStepContent(activeStep)}
+                </DialogContent>
+
+                <DialogActions sx={{ p: 3 }}>
+                    <Button onClick={handleCloseDialog}>
+                        {viewMode ? 'Close' : 'Cancel'}
+                    </Button>
+                    {!viewMode && (
+                        <>
+                            <Button
+                                onClick={handleBack}
+                                disabled={activeStep === 0}
+                                startIcon={<ArrowBack />}
                             >
-                                <Close />
-                            </IconButton>
-                        </Box>
-                    </DialogTitle>
-    
-                    <DialogContent>
-                        {!viewMode && (
-                            <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-                                {steps.map((label) => (
-                                    <Step key={label}>
-                                        <StepLabel>{label}</StepLabel>
-                                    </Step>
-                                ))}
-                            </Stepper>
-                        )}
-                        {getStepContent(activeStep)}
-                    </DialogContent>
-    
-                    <DialogActions sx={{ p: 3 }}>
-                        <Button onClick={handleCloseDialog}>
-                            {viewMode ? 'Close' : 'Cancel'}
-                        </Button>
-                        {!viewMode && (
-                            <>
-                                <Button
-                                    onClick={handleBack}
-                                    disabled={activeStep === 0}
-                                    startIcon={<ArrowBack />}
-                                >
-                                    Back
-                                </Button>
-                                <Button
-                                    variant="contained"
-                                    onClick={handleNext}
-                                    endIcon={activeStep === steps.length - 1 ? undefined : <ArrowForward />}
-                                    disabled={loading || (activeStep === 1 && bookingConflict)}
-                                >
-                                    {loading ? (
-                                        <CircularProgress size={24} />
-                                    ) : activeStep === steps.length - 1 ? (
-                                        'Submit Request'
-                                    ) : (
-                                        'Next'
-                                    )}
-                                </Button>
-                            </>
-                        )}
-                    </DialogActions>
-                </Dialog>
-    
-                <Snackbar
-                    open={snackbar.open}
-                    autoHideDuration={6000}
+                                Back
+                            </Button>
+                            <Button
+                                variant="contained"
+                                onClick={handleNext}
+                                endIcon={activeStep === steps.length - 1 ? undefined : <ArrowForward />}
+                                disabled={loading || (activeStep === 1 && bookingConflict)}
+                            >
+                                {loading ? (
+                                    <CircularProgress size={24} />
+                                ) : activeStep === steps.length - 1 ? (
+                                    'Submit Request'
+                                ) : (
+                                    'Next'
+                                )}
+                            </Button>
+                        </>
+                    )}
+                </DialogActions>
+            </Dialog>
+
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={6000}
+                onClose={() => setSnackbar({ ...snackbar, open: false })}
+                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            >
+                <Alert
                     onClose={() => setSnackbar({ ...snackbar, open: false })}
-                    anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+                    severity={snackbar.severity}
+                    sx={{ width: '100%' }}
                 >
-                    <Alert
-                        onClose={() => setSnackbar({ ...snackbar, open: false })}
-                        severity={snackbar.severity}
-                        sx={{ width: '100%' }}
-                    >
-                        {snackbar.message}
-                    </Alert>
-                </Snackbar>
-            </Container>
-        );
-    };
-    
-    export default FacilityandSpaceRental;
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
+        </Container>
+    );
+};
+
+export default FacilityandSpaceRental;
