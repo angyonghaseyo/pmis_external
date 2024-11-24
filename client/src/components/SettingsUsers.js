@@ -32,7 +32,7 @@ import {
   Container
 } from '@mui/material';
 import { Edit2, Trash2 } from 'lucide-react';
-import { getUsers, updateUser, deleteUser, inviteUser, getCurrentUser, cancelInvitation, getAllUsersInCompany, getUserData } from '../services/api';
+import { getUsers, updateUser, deleteUser, inviteUser, getCurrentUser, cancelInvitation, getAllUsersInCompany } from '../services/api';
 import Pagination from '@mui/material/Pagination';
 import { useAuth } from '../AuthContext'
 

@@ -35,7 +35,6 @@ import {
 } from "firebase/storage";
 
 import { db } from "../firebaseConfig";
-import { startOfMonth, endOfMonth } from "date-fns";
 import { API_URL } from "../config/apiConfig";
 
 const storage = getStorage();
@@ -105,6 +104,23 @@ export const updateUserProfile = async (userData) => {
   }
 };
 
+export const getUserUpdatedData = async (userEmail) => {
+  try {
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, where("email", "==", userEmail));
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+      throw new Error("User not found");
+    }
+
+    return querySnapshot.docs[0].data();
+  } catch (error) {
+    console.error("Error fetching updated user data:", error);
+    throw error;
+  }
+};
+
 // Fetch current user's company
 export const getCurrentUserCompany = async () => {
   const user = await auth.currentUser;
@@ -127,9 +143,9 @@ export const sendPasswordResetEmailToUser = (email) =>
 export const confirmUserPasswordReset = (oobCode, newPassword) =>
   confirmPasswordReset(auth, oobCode, newPassword).catch(handleApiError);
 
-export const getUsers = async (userId) => {
+export const getUsers = async (userEmail) => {
   try {
-    const response = await fetch(`${API_URL}/users?email=${userId}`);
+    const response = await fetch(`${API_URL}/users?email=${userEmail}`);
     if (!response.ok) {
       throw new Error("Error fetching users");
     }
@@ -141,10 +157,10 @@ export const getUsers = async (userId) => {
   }
 };
 
-export const getAllUsersInCompany = async (userId) => {
+export const getAllUsersInCompany = async (userEmail) => {
   try {
     const response = await fetch(
-      `${API_URL}/all-users-in-company?email=${userId}`
+      `${API_URL}/all-users-in-company?email=${userEmail}`
     );
     if (!response.ok) {
       throw new Error("Error fetching users in company");
@@ -259,7 +275,6 @@ export const getUserInquiriesFeedback = async (userId) => {
       throw new Error("Error fetching inquiries and feedback");
     }
     const results = await response.json();
-    console.log(results);
     return results;
   } catch (error) {
     console.error("Error fetching inquiries and feedback:", error);
@@ -315,12 +330,25 @@ export const updateInquiryFeedback = async (incrementalId, data) => {
   }
 };
 // Delete inquiry or feedback
-export const deleteInquiryFeedback = async (id) => {
+export const deleteInquiryFeedback = async (incrementalId) => {
   try {
-    const docRef = doc(db, "inquiries_feedback", id);
-    await deleteDoc(docRef);
+    const response = await fetch(`${API_URL}/inquiries-feedback/${incrementalId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({
+        error: 'Error deleting inquiry/feedback'
+      }));
+      throw new Error(errorData.error || 'Error deleting inquiry/feedback');
+    }
+
+    return await response.json();
   } catch (error) {
-    console.error("Error deleting inquiry/feedback:", error);
+    console.error('Error in deleteInquiryFeedback:', error);
     throw error;
   }
 };
@@ -328,7 +356,6 @@ export const deleteInquiryFeedback = async (id) => {
 // Company operations
 export const getCompanyInfo = async (companyName) => {
   try {
-    console.log("Company Name", companyName);
     const response = await fetch(
       `${API_URL}/company-data?companyName=${encodeURIComponent(companyName)}`
     );
@@ -576,197 +603,91 @@ export const checkFacilityAvailability = async (facilityId, startTime, endTime) 
 
 export const getTrainingPrograms = async () => {
   try {
-    const response = await fetch(`${API_URL}/training-programs`);
-    if (!response.ok) {
-      throw new Error("Error fetching training programs");
-    }
-    const programs = await response.json();
-    return programs;
+      const response = await fetch(`${API_URL}/training-programs`);
+      if (!response.ok) {
+          throw new Error('Failed to fetch training programs');
+      }
+      const programs = await response.json();
+      return programs;
   } catch (error) {
-    console.error("Error fetching training programs:", error);
-    throw error;
-  }
-};
-
-// Get user data including enrolled programs
-export const getUserData = async (userId) => {
-  try {
-    const userRef = doc(db, "users", userId);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    const userDoc = await getDoc(userRef);
-    if (userDoc.exists()) {
-      return userDoc.data();
-    } else {
-      throw new Error("User not found");
-    }
-  } catch (error) {
-    console.error("Error fetching user data:", error);
-    throw error;
-  }
-};
-
-export const getUserUpdatedData = async (userEmail) => {
-  try {
-    const usersRef = collection(db, "users");
-    const q = query(usersRef, where("email", "==", userEmail));
-    const querySnapshot = await getDocs(q);
-
-    if (querySnapshot.empty) {
-      throw new Error("User not found");
-    }
-
-    return querySnapshot.docs[0].data();
-  } catch (error) {
-    console.error("Error fetching updated user data:", error);
-    throw error;
+      console.error('Error fetching training programs:', error);
+      throw error;
   }
 };
 
 export const registerForProgram = async (programId, userEmail) => {
   try {
-    const usersRef = collection(db, "users");
-    const q = query(usersRef, where("email", "==", userEmail));
-    const querySnapshot = await getDocs(q);
-
-    if (querySnapshot.empty) {
-      throw new Error("User not found");
-    }
-
-    const userDoc = querySnapshot.docs[0];
-    const userData = userDoc.data();
-    const programRef = doc(db, "training_programs", programId);
-    const programDoc = await getDoc(programRef);
-
-    if (!programDoc.exists()) {
-      throw new Error("Program not found");
-    }
-
-    const programData = programDoc.data();
-
-    // Check capacity
-    if (
-      programData.numberOfCurrentRegistrations >=
-      programData.participantCapacity
-    ) {
-      throw new Error("Program is full");
-    }
-
-    // Check if already enrolled
-    if (
-      userData.enrolledPrograms?.some(
-        (program) => program.programId === programId
-      )
-    ) {
-      throw new Error("Already enrolled in this program");
-    }
-
-    // Use transaction to ensure atomicity
-    await runTransaction(db, async (transaction) => {
-      // Update program registrations
-      transaction.update(programRef, {
-        numberOfCurrentRegistrations: increment(1),
+      const response = await fetch(`${API_URL}/training-programs/${programId}/register`, {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ userEmail })
       });
 
-      // Update user enrollments
-      transaction.update(userDoc.ref, {
-        enrolledPrograms: arrayUnion({
-          programId: programId,
-          enrollmentDate: Timestamp.now(),
-          status: "Enrolled",
-        }),
-      });
-    });
+      if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to register for program');
+      }
+
+      return await response.json();
   } catch (error) {
-    console.error("Error in registerForProgram:", error);
-    throw error;
+      console.error('Error registering for program:', error);
+      throw error;
   }
 };
 
 export const withdrawFromProgram = async (programId, userEmail) => {
   try {
-    const usersRef = collection(db, "users");
-    const q = query(usersRef, where("email", "==", userEmail));
-    const querySnapshot = await getDocs(q);
-
-    if (querySnapshot.empty) {
-      throw new Error("User not found");
-    }
-
-    const userDoc = querySnapshot.docs[0];
-    const userData = userDoc.data();
-    const programRef = doc(db, "training_programs", programId);
-
-    const enrollmentToRemove = userData.enrolledPrograms?.find(
-      (ep) => ep.programId === programId
-    );
-
-    if (!enrollmentToRemove) {
-      throw new Error("Not enrolled in this program");
-    }
-
-    // Use transaction to ensure atomicity
-    await runTransaction(db, async (transaction) => {
-      // Update program registrations
-      transaction.update(programRef, {
-        numberOfCurrentRegistrations: increment(-1),
+      const response = await fetch(`${API_URL}/training-programs/${programId}/withdraw`, {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ userEmail })
       });
 
-      // Update user enrollments
-      transaction.update(userDoc.ref, {
-        enrolledPrograms: arrayRemove(enrollmentToRemove),
-      });
-    });
+      if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to withdraw from program');
+      }
+
+      return await response.json();
   } catch (error) {
-    console.error("Error in withdrawFromProgram:", error);
-    throw error;
+      console.error('Error withdrawing from program:', error);
+      throw error;
   }
 };
 
-// Update program completion status
 export const updateProgramCompletionStatus = async () => {
   try {
-    const now = Timestamp.now();
-    const usersRef = collection(db, "users");
-    const usersSnapshot = await getDocs(usersRef);
-
-    for (const userDoc of usersSnapshot.docs) {
-      const userData = userDoc.data();
-      if (userData.enrolledPrograms) {
-        const updatedEnrollments = userData.enrolledPrograms.map(
-          (enrollment) => {
-            if (enrollment.status === "Enrolled") {
-              const programRef = doc(
-                db,
-                "training_programs",
-                enrollment.programId
-              );
-              return getDoc(programRef).then((programDoc) => {
-                const programData = programDoc.data();
-                if (programData.endDate.toDate() <= now.toDate()) {
-                  return { ...enrollment, status: "Completed" };
-                }
-                return enrollment;
-              });
-            }
-            return enrollment;
+      const response = await fetch(`${API_URL}/training-programs/update-completion`, {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json'
           }
-        );
+      });
 
-        const resolvedEnrollments = await Promise.all(updatedEnrollments);
-        await updateDoc(userDoc.ref, { enrolledPrograms: resolvedEnrollments });
+      if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to update program completion status');
       }
-    }
+
+      return await response.json();
   } catch (error) {
-    console.error("Error updating program completion status:", error);
-    throw error;
+      console.error('Error updating program completion status:', error);
+      throw error;
   }
 };
+
 
 export const getCargoManifests = async () => {
   try {
-    const manifestsRef = collection(db, "cargo_manifests");
-    const snapshot = await getDocs(manifestsRef);
-    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const response = await fetch(`${API_URL}/cargo-manifests`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch cargo manifests');
+    }
+    return await response.json();
   } catch (error) {
     console.error("Error fetching cargo manifests:", error);
     throw error;
@@ -853,7 +774,6 @@ export const getActiveVesselVisits = async () => {
   }
 };
 
-// In api.js, add these functions
 export const getAdHocResourceRequests = async () => {
   try {
     const response = await fetch(`${API_URL}/ad-hoc-resource-requests`);
@@ -1224,7 +1144,6 @@ export const retrieveBookingDocument = async (bookingId, cargoId, documentType) 
 
     const data = await response.json();
     const documentUrl = data.cargo[cargoId].documents[documentType];
-    console.log(documentUrl);
     if (documentType === "Safety Data Sheet") {
       await updateDoc(doc(db, "bookings", bookingId), {
         [`cargo.${cargoId}.documentStatus['UN Classification Sheet']`]: {
@@ -1397,28 +1316,11 @@ export const updateDocumentStatus = async (
   }
 };
 
-// Dashboard data
-export const getLeaveStatistics = () =>
-  authAxios.get("/leave-statistics").catch(handleApiError);
-
-export const getTimeLog = () =>
-  authAxios.get("/time-log").catch(handleApiError);
-
-export const getServiceOperations = () =>
-  authAxios.get("/service-operations").catch(handleApiError);
-
 // Assets and Facilities
 export const getAssets = () => authAxios.get("/assets").catch(handleApiError);
 
 export const getFacilities = () =>
   authAxios.get("/facilities").catch(handleApiError);
-
-// Manpower
-export const getEmployees = () =>
-  authAxios.get("/employees").catch(handleApiError);
-
-export const updateEmployee = (employeeId, data) =>
-  authAxios.put(`/employees/${employeeId}`, data).catch(handleApiError);
 
 // Vessel Visits
 export const getVesselVisits = async () => {
@@ -1434,10 +1336,17 @@ export const getVesselVisits = async () => {
   }
 };
 
-export const getVesselVisitsConfirmedWithoutManifests = () => {
-  return axios
-    .get("/vessel-visits-confirmed-without-manifests")
-    .catch(handleApiError);
+export const getVesselVisitsConfirmedWithoutManifests = async () => {
+  try {
+    const response = await fetch(`${API_URL}/vessel-visits-confirmed-without-manifests`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch confirmed vessel visits without manifests");
+    }
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching confirmed vessel visits without manifests:", error);
+    throw error;
+  }
 };
 
 export const createVesselVisit = (visitData) =>
@@ -1446,42 +1355,6 @@ export const createVesselVisit = (visitData) =>
 export const updateVesselVisit = (visitId, visitData) =>
   authAxios.put(`/vessel-visits/${visitId}`, visitData).catch(handleApiError);
 
-// Port Operations
-export const getPortOperations = () =>
-  authAxios.get("/port-operations").catch(handleApiError);
-
-export const createPortOperation = (operationData) =>
-  authAxios.post("/port-operations", operationData).catch(handleApiError);
-
-// Cargos
-export const getCargos = () => authAxios.get("/cargos").catch(handleApiError);
-
-export const createCargo = (cargoData) =>
-  authAxios.post("/cargos", cargoData).catch(handleApiError);
-
-export const updateCargo = (cargoId, cargoData) =>
-  authAxios.put(`/cargos/${cargoId}`, cargoData).catch(handleApiError);
-
-// Financial
-export const getFinancialReports = () =>
-  authAxios.get("/financial-reports").catch(handleApiError);
-
-export const createInvoice = (invoiceData) =>
-  authAxios.post("/invoices", invoiceData).catch(handleApiError);
-
-// Customs and Trade Documents
-export const getCustomsDocuments = () =>
-  authAxios.get("/customs-documents").catch(handleApiError);
-
-export const submitCustomsDocument = (documentData) =>
-  authAxios.post("/customs-documents", documentData).catch(handleApiError);
-
-// Settings
-export const getUserSettings = () =>
-  authAxios.get("/user-settings").catch(handleApiError);
-
-export const updateUserSettings = (settingsData) =>
-  authAxios.put("/user-settings", settingsData).catch(handleApiError);
 
 export const getBillingRequestsByMonth1 = async (companyId, monthRange) => {
   try {
@@ -1515,12 +1388,11 @@ export const getBillingRequestsByMonth1 = async (companyId, monthRange) => {
 
 export const getPricingRates = async () => {
   try {
-    const ratesDoc = await getDoc(doc(db, 'pricing', 'rates'));
-    if (ratesDoc.exists()) {
-      return ratesDoc.data();
-    } else {
-      return null;
+    const response = await fetch(`${API_URL}/pricing-rates`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch pricing rates');
     }
+    return await response.json();
   } catch (error) {
     console.error('Error fetching pricing rates:', error);
     throw error;
@@ -1530,7 +1402,6 @@ export const getPricingRates = async () => {
 export const submitSamplingRequest = async (requestData) => {
   try {
     const formData = new FormData();
-    console.log(requestData.schedule, "1234", typeof requestData.schedule);
     formData.append('samplingDetails', JSON.stringify({
       cargoDetails: requestData.cargoDetails,
       samplingDetails: requestData.samplingDetails,
@@ -2105,27 +1976,11 @@ const api = {
   createOperatorRequisition,
   updateOperatorRequisition,
   deleteOperatorRequisition,
-  getLeaveStatistics,
-  getTimeLog,
-  getServiceOperations,
   getAssets,
   getFacilities,
-  getEmployees,
-  updateEmployee,
   getVesselVisits,
   createVesselVisit,
   updateVesselVisit,
-  getPortOperations,
-  createPortOperation,
-  getCargos,
-  createCargo,
-  updateCargo,
-  getFinancialReports,
-  createInvoice,
-  getCustomsDocuments,
-  submitCustomsDocument,
-  getUserSettings,
-  updateUserSettings,
   getAllUsersInCompany,
   getCargoManifests,
   submitCargoManifest,

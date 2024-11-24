@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import Header from "./Header";
 import Sidebar from "./Sidebar";
@@ -56,13 +56,10 @@ function App() {
   }, [login]);
 
   const hasAccessRights = (requiredRights) => {
-    // console.log('User access rights:', user?.accessRights);
-    // console.log('Required rights:', requiredRights);
     if (!user || !user.accessRights) return false;
     const hasRights = requiredRights.some((right) =>
       user.accessRights.includes(right)
     );
-    // console.log('Has required rights:', hasRights);
     return hasRights;
   };
 

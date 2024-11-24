@@ -18,10 +18,10 @@ class InquiryController {
     }
 
     async updateInquiryFeedback(req, res) {
-        const { incrementalId } = req.params;
+        const { id } = req.params;
         const data = req.body;
         try {
-            await this.inquiryService.updateInquiryFeedback(incrementalId, data, req.file);
+            await this.inquiryService.updateInquiryFeedback(id, data, req.file);
             res.status(200).send('Inquiry/feedback updated successfully');
         } catch (error) {
             console.error('Error updating inquiry/feedback:', error);
@@ -34,7 +34,7 @@ class InquiryController {
         const { email } = data;
 
         if (!email) {
-            return res.status(400).send('email is required');
+            return res.status(400).send('Email is required');
         }
 
         try {
@@ -43,6 +43,17 @@ class InquiryController {
         } catch (error) {
             console.error('Error in createInquiryFeedback:', error);
             res.status(500).send('Error creating inquiry/feedback');
+        }
+    }
+
+    async deleteInquiryFeedback(req, res) {
+        const { id } = req.params;
+        try {
+            await this.inquiryService.deleteInquiryFeedback(id);
+            res.status(200).json({ message: 'Inquiry/feedback deleted successfully' });
+        } catch (error) {
+            console.error('Error deleting inquiry/feedback:', error);
+            res.status(500).json({ error: 'Error deleting inquiry/feedback' });
         }
     }
 }

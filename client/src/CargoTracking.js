@@ -26,16 +26,8 @@ import {
     Inventory,
     Warehouse,
     LocalShipping,
-    Check,
     Close,
-    Edit,
-    Download,
-    Add,
-    Delete,
-    Assignment,
-    Person,
     Search,
-    Save
 } from '@mui/icons-material';
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import ReactFlow, {
@@ -44,7 +36,7 @@ import ReactFlow, {
     useEdgesState
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Html5QrcodeScanner, Html5Qrcode } from 'html5-qrcode';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 import { collection, query, getDocs, doc, updateDoc, where } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import { format } from 'date-fns';
