@@ -35,7 +35,6 @@ import {
 } from "firebase/storage";
 
 import { db } from "../firebaseConfig";
-import { startOfMonth, endOfMonth } from "date-fns";
 import { API_URL } from "../config/apiConfig";
 
 const storage = getStorage();
@@ -259,7 +258,6 @@ export const getUserInquiriesFeedback = async (userId) => {
       throw new Error("Error fetching inquiries and feedback");
     }
     const results = await response.json();
-    console.log(results);
     return results;
   } catch (error) {
     console.error("Error fetching inquiries and feedback:", error);
@@ -328,7 +326,6 @@ export const deleteInquiryFeedback = async (id) => {
 // Company operations
 export const getCompanyInfo = async (companyName) => {
   try {
-    console.log("Company Name", companyName);
     const response = await fetch(
       `${API_URL}/company-data?companyName=${encodeURIComponent(companyName)}`
     );
@@ -588,23 +585,6 @@ export const getTrainingPrograms = async () => {
   }
 };
 
-// Get user data including enrolled programs
-export const getUserData = async (userId) => {
-  try {
-    const userRef = doc(db, "users", userId);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    const userDoc = await getDoc(userRef);
-    if (userDoc.exists()) {
-      return userDoc.data();
-    } else {
-      throw new Error("User not found");
-    }
-  } catch (error) {
-    console.error("Error fetching user data:", error);
-    throw error;
-  }
-};
-
 export const getUserUpdatedData = async (userEmail) => {
   try {
     const usersRef = collection(db, "users");
@@ -853,7 +833,6 @@ export const getActiveVesselVisits = async () => {
   }
 };
 
-// In api.js, add these functions
 export const getAdHocResourceRequests = async () => {
   try {
     const response = await fetch(`${API_URL}/ad-hoc-resource-requests`);
@@ -1224,7 +1203,6 @@ export const retrieveBookingDocument = async (bookingId, cargoId, documentType) 
 
     const data = await response.json();
     const documentUrl = data.cargo[cargoId].documents[documentType];
-    console.log(documentUrl);
     if (documentType === "Safety Data Sheet") {
       await updateDoc(doc(db, "bookings", bookingId), {
         [`cargo.${cargoId}.documentStatus['UN Classification Sheet']`]: {
@@ -1397,28 +1375,11 @@ export const updateDocumentStatus = async (
   }
 };
 
-// Dashboard data
-export const getLeaveStatistics = () =>
-  authAxios.get("/leave-statistics").catch(handleApiError);
-
-export const getTimeLog = () =>
-  authAxios.get("/time-log").catch(handleApiError);
-
-export const getServiceOperations = () =>
-  authAxios.get("/service-operations").catch(handleApiError);
-
 // Assets and Facilities
 export const getAssets = () => authAxios.get("/assets").catch(handleApiError);
 
 export const getFacilities = () =>
   authAxios.get("/facilities").catch(handleApiError);
-
-// Manpower
-export const getEmployees = () =>
-  authAxios.get("/employees").catch(handleApiError);
-
-export const updateEmployee = (employeeId, data) =>
-  authAxios.put(`/employees/${employeeId}`, data).catch(handleApiError);
 
 // Vessel Visits
 export const getVesselVisits = async () => {
@@ -1434,10 +1395,17 @@ export const getVesselVisits = async () => {
   }
 };
 
-export const getVesselVisitsConfirmedWithoutManifests = () => {
-  return axios
-    .get("/vessel-visits-confirmed-without-manifests")
-    .catch(handleApiError);
+export const getVesselVisitsConfirmedWithoutManifests = async () => {
+  try {
+    const response = await fetch(`${API_URL}/vessel-visits-confirmed-without-manifests`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch confirmed vessel visits without manifests");
+    }
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching confirmed vessel visits without manifests:", error);
+    throw error;
+  }
 };
 
 export const createVesselVisit = (visitData) =>
@@ -1446,42 +1414,6 @@ export const createVesselVisit = (visitData) =>
 export const updateVesselVisit = (visitId, visitData) =>
   authAxios.put(`/vessel-visits/${visitId}`, visitData).catch(handleApiError);
 
-// Port Operations
-export const getPortOperations = () =>
-  authAxios.get("/port-operations").catch(handleApiError);
-
-export const createPortOperation = (operationData) =>
-  authAxios.post("/port-operations", operationData).catch(handleApiError);
-
-// Cargos
-export const getCargos = () => authAxios.get("/cargos").catch(handleApiError);
-
-export const createCargo = (cargoData) =>
-  authAxios.post("/cargos", cargoData).catch(handleApiError);
-
-export const updateCargo = (cargoId, cargoData) =>
-  authAxios.put(`/cargos/${cargoId}`, cargoData).catch(handleApiError);
-
-// Financial
-export const getFinancialReports = () =>
-  authAxios.get("/financial-reports").catch(handleApiError);
-
-export const createInvoice = (invoiceData) =>
-  authAxios.post("/invoices", invoiceData).catch(handleApiError);
-
-// Customs and Trade Documents
-export const getCustomsDocuments = () =>
-  authAxios.get("/customs-documents").catch(handleApiError);
-
-export const submitCustomsDocument = (documentData) =>
-  authAxios.post("/customs-documents", documentData).catch(handleApiError);
-
-// Settings
-export const getUserSettings = () =>
-  authAxios.get("/user-settings").catch(handleApiError);
-
-export const updateUserSettings = (settingsData) =>
-  authAxios.put("/user-settings", settingsData).catch(handleApiError);
 
 export const getBillingRequestsByMonth1 = async (companyId, monthRange) => {
   try {
@@ -1515,12 +1447,11 @@ export const getBillingRequestsByMonth1 = async (companyId, monthRange) => {
 
 export const getPricingRates = async () => {
   try {
-    const ratesDoc = await getDoc(doc(db, 'pricing', 'rates'));
-    if (ratesDoc.exists()) {
-      return ratesDoc.data();
-    } else {
-      return null;
+    const response = await fetch(`${API_URL}/pricing-rates`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch pricing rates');
     }
+    return await response.json();
   } catch (error) {
     console.error('Error fetching pricing rates:', error);
     throw error;
@@ -1530,7 +1461,6 @@ export const getPricingRates = async () => {
 export const submitSamplingRequest = async (requestData) => {
   try {
     const formData = new FormData();
-    console.log(requestData.schedule, "1234", typeof requestData.schedule);
     formData.append('samplingDetails', JSON.stringify({
       cargoDetails: requestData.cargoDetails,
       samplingDetails: requestData.samplingDetails,
@@ -2054,27 +1984,11 @@ const api = {
   createOperatorRequisition,
   updateOperatorRequisition,
   deleteOperatorRequisition,
-  getLeaveStatistics,
-  getTimeLog,
-  getServiceOperations,
   getAssets,
   getFacilities,
-  getEmployees,
-  updateEmployee,
   getVesselVisits,
   createVesselVisit,
   updateVesselVisit,
-  getPortOperations,
-  createPortOperation,
-  getCargos,
-  createCargo,
-  updateCargo,
-  getFinancialReports,
-  createInvoice,
-  getCustomsDocuments,
-  submitCustomsDocument,
-  getUserSettings,
-  updateUserSettings,
   getAllUsersInCompany,
   getCargoManifests,
   submitCargoManifest,

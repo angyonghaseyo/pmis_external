@@ -19,7 +19,6 @@ import {
   Notifications,
   Logout,
   Person,
-  DirectionsBoat,
 } from "@mui/icons-material";
 import { useAuth } from "./AuthContext";
 import logo from "./images/PortConnect-external.png";

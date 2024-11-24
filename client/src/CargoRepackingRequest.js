@@ -19,7 +19,6 @@ import {
     Chip,
     Paper,
     OutlinedInput,
-    Divider,
     FormHelperText,
     Alert,
     IconButton,
@@ -29,8 +28,6 @@ import { Close as CloseIcon, CloudUpload as CloudUploadIcon } from '@mui/icons-m
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DateTimePicker } from '@mui/x-date-pickers';
 import { styled } from '@mui/material/styles';
-import { doc, getDoc, setDoc, addDoc, collection, getDocs } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useAuth } from "./AuthContext";
 import { API_URL } from './config/apiConfig';
 import {

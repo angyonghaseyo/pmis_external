@@ -14,7 +14,6 @@ import {
     Chip,
     IconButton,
     TextField,
-    MenuItem,
     Grid,
     Card,
     CardContent,
@@ -26,15 +25,12 @@ import {
     DialogTitle,
     DialogContent,
     DialogActions,
-    Link
 } from '@mui/material';
 import {
     Warehouse
 } from '@mui/icons-material';
 import { Edit, Delete, Visibility, Search, Download } from '@mui/icons-material';
-import { collection, query, where, getDocs, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import CargoStorageRequest from './CargoStorageRequest';
-import { format, differenceInDays } from 'date-fns';
 import CloseIcon from '@mui/icons-material/Close';
 import {
     getStorageRequests,

@@ -489,12 +489,6 @@ const DocumentManager = () => {
     ? HSCodeCategories[determineCategory(cargoDetails.hsCode)]
     : null;
 
-  // const handleUploadClick = (documentType) => {
-  //   console.log("click");
-  //   setSelectedDocument(documentType);
-  //   setUploadDialogOpen(true);
-  // };
-
   //Denzel
   const handleUploadClick = (documentType) => {
     console.log("handleUploadClick called with:", documentType);
