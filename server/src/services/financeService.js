@@ -1,4 +1,4 @@
-const { db, admin } = require('../config/firebase');
+const { db } = require('../config/firebase');
 
 class FinanceService {
     async getBillingRequests(companyId, requestType) {
@@ -49,6 +49,32 @@ class FinanceService {
         } catch (error) {
             console.error('Error fetching billing requests by month:', error);
             throw new Error('Failed to fetch billing requests by month');
+        }
+    }
+
+    async getBillingRequestsByMonth1(companyId, monthRange) {
+        try {
+            const billingRequestsRef = db.collection('billing_requests');
+            const querySnapshot = await billingRequestsRef
+                .where('company', '==', companyId)
+                .get();
+            
+            const billingRequests = querySnapshot.docs
+                .map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }))
+                .filter(request => {
+                    const dateCompleted = new Date(request.dateCompleted);
+                    const startDate = new Date(monthRange.start);
+                    const endDate = new Date(monthRange.end);
+                    return dateCompleted >= startDate && dateCompleted <= endDate;
+                });
+
+            return billingRequests;
+        } catch (error) {
+            console.error('Error fetching billing requests by month:', error);
+            throw new Error(`Failed to fetch billing requests: ${error.message}`);
         }
     }
 }

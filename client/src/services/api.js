@@ -1358,33 +1358,29 @@ export const updateVesselVisit = (visitId, visitData) =>
 
 export const getBillingRequestsByMonth1 = async (companyId, monthRange) => {
   try {
-    const billingRequestsQuery = query(
-      collection(db, "billing_requests"),
-      where("company", "==", companyId)
-    );
+      const response = await fetch(
+          `${API_URL}/billing-requests-by-month1?` + 
+          `companyId=${encodeURIComponent(companyId)}&` +
+          `startDate=${encodeURIComponent(monthRange.start)}&` +
+          `endDate=${encodeURIComponent(monthRange.end)}`,
+          {
+              method: 'GET',
+              headers: {
+                  'Content-Type': 'application/json',
+              }
+          }
+      );
 
-    const querySnapshot = await getDocs(billingRequestsQuery);
+      if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
-    const billingRequests = querySnapshot.docs
-      .map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }))
-      .filter((request) => {
-        const dateCompleted = new Date(request.dateCompleted);
-        return (
-          dateCompleted >= new Date(monthRange.start) &&
-          dateCompleted <= new Date(monthRange.end)
-        );
-      });
-
-    return billingRequests;
+      return await response.json();
   } catch (error) {
-    console.error('Error fetching billing requests by month:', error);
-    throw error;
+      console.error('Error fetching billing requests by month:', error);
+      throw error;
   }
 };
-
 
 export const getPricingRates = async () => {
   try {
