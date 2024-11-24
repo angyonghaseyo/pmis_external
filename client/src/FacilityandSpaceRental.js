@@ -28,7 +28,8 @@ import {
     Divider,
     CircularProgress,
     Snackbar,
-    Stack
+    Stack,
+    Tooltip
 } from '@mui/material';
 import {
     Warehouse,
@@ -377,6 +378,16 @@ const FacilityandSpaceRental = () => {
                                         }
                                     />
                                 </Box>
+                                {selectedRequest?.status === 'Rejected' && selectedRequest?.rejectionReason && (
+                                    <Alert severity="error" sx={{ mt: 2 }}>
+                                        <Typography variant="subtitle2" gutterBottom>
+                                            Rejection Reason:
+                                        </Typography>
+                                        <Typography variant="body2">
+                                            {selectedRequest.rejectionReason}
+                                        </Typography>
+                                    </Alert>
+                                )}
                             </Paper>
                         </Grid>
 
@@ -467,7 +478,7 @@ const FacilityandSpaceRental = () => {
                         ))}
                     </Grid>
                 );
-                case 1:
+            case 1:
                 return (
                     <Box>
                         <Alert
@@ -681,14 +692,23 @@ const FacilityandSpaceRental = () => {
                                         </TableCell>
                                         <TableCell>${request.totalPrice.toFixed(2)}</TableCell>
                                         <TableCell>
-                                            <Chip
-                                                label={request.status}
-                                                color={
-                                                    request.status === 'Approved' ? 'success' :
-                                                    request.status === 'Rejected' ? 'error' : 'warning'
+                                            <Tooltip 
+                                                title={
+                                                    request.status === 'Rejected' && request.rejectionReason 
+                                                        ? request.rejectionReason 
+                                                        : ''
                                                 }
-                                                size="small"
-                                            />
+                                                arrow
+                                            >
+                                                <Chip
+                                                    label={request.status}
+                                                    color={
+                                                        request.status === 'Approved' ? 'success' :
+                                                        request.status === 'Rejected' ? 'error' : 'warning'
+                                                    }
+                                                    size="small"
+                                                />
+                                            </Tooltip>
                                         </TableCell>
                                         <TableCell>
                                             <IconButton
